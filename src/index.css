@@ -9,9 +9,115 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Empêche le zoom sur iOS */
+  touch-action: manipulation;
 }
 
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
+}
+
+/* Optimisations pour mobile */
+@media (max-width: 768px) {
+  /* Améliore la lisibilité des graphiques sur mobile */
+  .recharts-wrapper {
+    font-size: 12px !important;
+  }
+  
+  /* Optimise les champs de saisie pour mobile */
+  input[type="number"], input[type="text"] {
+    font-size: 16px !important; /* Évite le zoom sur iOS */
+    -webkit-appearance: none;
+    border-radius: 8px;
+    padding: 12px 8px;
+  }
+  
+  /* Améliore les boutons tactiles */
+  button {
+    min-height: 44px;
+    min-width: 44px;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  /* Optimise les tableaux pour le scroll horizontal */
+  .overflow-x-auto {
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+  
+  /* Améliore la navigation tactile */
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  /* Optimise les graphiques pour mobile */
+  .recharts-tooltip-wrapper {
+    font-size: 12px !important;
+  }
+  
+  /* Améliore l'espacement sur mobile */
+  .mobile-optimized {
+    padding: 8px;
+    margin: 4px 0;
+  }
+}
+
+/* Améliore l'accessibilité */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Optimise l'affichage des graphiques */
+.recharts-responsive-container {
+  min-height: 250px;
+}
+
+/* Améliore la lisibilité des tooltips */
+.recharts-tooltip-wrapper {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Optimise les champs de saisie */
+input:focus {
+  outline: 2px solid #3498db;
+  outline-offset: 2px;
+}
+
+/* Améliore les boutons */
+button:focus {
+  outline: 2px solid #3498db;
+  outline-offset: 2px;
+}
+
+/* Optimise le scroll sur mobile */
+.overflow-x-auto {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e0 #f7fafc;
+}
+
+.overflow-x-auto::-webkit-scrollbar {
+  height: 6px;
+}
+
+.overflow-x-auto::-webkit-scrollbar-track {
+  background: #f7fafc;
+  border-radius: 3px;
+}
+
+.overflow-x-auto::-webkit-scrollbar-thumb {
+  background: #cbd5e0;
+  border-radius: 3px;
+}
+
+.overflow-x-auto::-webkit-scrollbar-thumb:hover {
+  background: #a0aec0;
 } 

@@ -150,24 +150,25 @@ const SimulateurRentabilite = () => {
   const pieColors = ['#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c', '#34495e'];
 
   return (
-    <div className="p-6 bg-gray-50 min-h-screen">
-      <div className="max-w-7xl mx-auto bg-white rounded-lg shadow-lg p-8">
+    <div className="p-2 sm:p-4 md:p-6 bg-gray-50 min-h-screen">
+      <div className="max-w-7xl mx-auto bg-white rounded-lg shadow-lg p-4 sm:p-6 md:p-8">
         
-        <h1 className="text-3xl font-bold text-center text-gray-800 mb-8 pb-4 border-b-4 border-blue-500">
+        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-center text-gray-800 mb-4 sm:mb-6 md:mb-8 pb-2 sm:pb-3 md:pb-4 border-b-2 sm:border-b-3 md:border-b-4 border-blue-500">
           🧮 Simulateur Interactif - Analyse de Rentabilité Avancée
         </h1>
 
         {/* Paramètres globaux */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-8">
-          <h3 className="text-lg font-semibold mb-4 text-blue-800">🎛️ Paramètres Globaux</h3>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4 md:p-6 mb-4 sm:mb-6 md:mb-8">
+          <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-blue-800">🎛️ Paramètres Globaux</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Volume point de vente</label>
               <input 
                 type="number"
                 value={volume}
                 onChange={(e) => setVolume(parseFloat(e.target.value) || 0)}
-                className="w-full p-2 border border-gray-300 rounded"
+                className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
+                style={{ fontSize: '16px' }} // Évite le zoom sur iOS
               />
             </div>
             <div>
@@ -176,7 +177,8 @@ const SimulateurRentabilite = () => {
                 type="number"
                 value={abatsParKg}
                 onChange={(e) => setAbatsParKg(parseFloat(e.target.value) || 0)}
-                className="w-full p-2 border border-gray-300 rounded"
+                className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
+                style={{ fontSize: '16px' }}
               />
             </div>
             <div>
@@ -188,14 +190,15 @@ const SimulateurRentabilite = () => {
                 max="1"
                 value={peration}
                 onChange={(e) => setPeration(parseFloat(e.target.value) || 0)}
-                className="w-full p-2 border border-gray-300 rounded"
+                className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
+                style={{ fontSize: '16px' }}
               />
               <div className="text-xs text-gray-500 mt-1">{(peration * 100).toFixed(1)}%</div>
             </div>
             <div className="flex items-end">
               <button 
                 onClick={resetPrix}
-                className="w-full px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
+                className="w-full px-3 sm:px-4 py-2 sm:py-3 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors text-sm sm:text-base min-h-[44px]"
               >
                 🔄 Reset Tout
               </button>
@@ -204,12 +207,12 @@ const SimulateurRentabilite = () => {
         </div>
 
         {/* Validation de la répartition */}
-        <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-8">
-          <h3 className="text-lg font-semibold mb-2 text-orange-800">⚠️ Contrôle des Répartitions</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6 md:mb-8">
+          <h3 className="text-base sm:text-lg font-semibold mb-2 sm:mb-3 text-orange-800">⚠️ Contrôle des Répartitions</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
             <div>
               <div className="text-sm text-gray-600">Total des répartitions:</div>
-              <div className={`text-lg font-bold ${
+              <div className={`text-base sm:text-lg font-bold ${
                 Math.abs(Object.values(produits).reduce((sum, p) => sum + p.repartition, 0) - 1) < 0.001 
                   ? 'text-green-600' 
                   : 'text-red-600'
@@ -219,7 +222,7 @@ const SimulateurRentabilite = () => {
             </div>
             <div>
               <div className="text-sm text-gray-600">Écart par rapport à 100%:</div>
-              <div className={`text-lg font-bold ${
+              <div className={`text-base sm:text-lg font-bold ${
                 Math.abs(Object.values(produits).reduce((sum, p) => sum + p.repartition, 0) - 1) < 0.001 
                   ? 'text-green-600' 
                   : 'text-red-600'
@@ -241,7 +244,7 @@ const SimulateurRentabilite = () => {
                     });
                   }
                 }}
-                className="w-full px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600 transition-colors text-sm"
+                className="w-full px-3 sm:px-4 py-2 sm:py-3 bg-orange-500 text-white rounded hover:bg-orange-600 transition-colors text-sm min-h-[44px]"
               >
                 🔧 Normaliser à 100%
               </button>
@@ -250,43 +253,43 @@ const SimulateurRentabilite = () => {
         </div>
 
         {/* Actions rapides étendues */}
-        <div className="bg-gray-100 p-6 rounded-lg mb-8">
-          <h3 className="text-lg font-semibold mb-4 text-gray-700">⚡ Actions Rapides</h3>
-          <div className="space-y-3">
+        <div className="bg-gray-100 p-3 sm:p-4 md:p-6 rounded-lg mb-4 sm:mb-6 md:mb-8">
+          <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-gray-700">⚡ Actions Rapides</h3>
+          <div className="space-y-3 sm:space-y-4">
             <div>
               <div className="text-sm font-medium text-gray-600 mb-2">Prix de vente:</div>
               <div className="flex flex-wrap gap-2">
-                <button onClick={() => augmenterTousPrix(50)} className="px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600">+50</button>
-                <button onClick={() => augmenterTousPrix(100)} className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600">+100</button>
-                <button onClick={() => augmenterTousPrix(200)} className="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600">+200</button>
-                <button onClick={() => augmenterTousPrix(-100)} className="px-3 py-1 bg-yellow-500 text-white rounded text-sm hover:bg-yellow-600">-100</button>
+                <button onClick={() => augmenterTousPrix(50)} className="px-3 py-2 sm:px-4 sm:py-3 bg-green-500 text-white rounded text-sm hover:bg-green-600 min-h-[44px] min-w-[60px]">+50</button>
+                <button onClick={() => augmenterTousPrix(100)} className="px-3 py-2 sm:px-4 sm:py-3 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 min-h-[44px] min-w-[60px]">+100</button>
+                <button onClick={() => augmenterTousPrix(200)} className="px-3 py-2 sm:px-4 sm:py-3 bg-red-500 text-white rounded text-sm hover:bg-red-600 min-h-[44px] min-w-[60px]">+200</button>
+                <button onClick={() => augmenterTousPrix(-100)} className="px-3 py-2 sm:px-4 sm:py-3 bg-yellow-500 text-white rounded text-sm hover:bg-yellow-600 min-h-[44px] min-w-[60px]">-100</button>
               </div>
             </div>
             <div>
               <div className="text-sm font-medium text-gray-600 mb-2">Prix d'achat:</div>
               <div className="flex flex-wrap gap-2">
-                <button onClick={() => augmenterTousPrix(50, 'prixAchat')} className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700">+50</button>
-                <button onClick={() => augmenterTousPrix(-50, 'prixAchat')} className="px-3 py-1 bg-orange-500 text-white rounded text-sm hover:bg-orange-600">-50</button>
+                <button onClick={() => augmenterTousPrix(50, 'prixAchat')} className="px-3 py-2 sm:px-4 sm:py-3 bg-green-600 text-white rounded text-sm hover:bg-green-700 min-h-[44px] min-w-[60px]">+50</button>
+                <button onClick={() => augmenterTousPrix(-50, 'prixAchat')} className="px-3 py-2 sm:px-4 sm:py-3 bg-orange-500 text-white rounded text-sm hover:bg-orange-600 min-h-[44px] min-w-[60px]">-50</button>
               </div>
             </div>
           </div>
         </div>
 
         {/* Résumé global */}
-        <div className="bg-green-50 border border-green-200 rounded-lg p-6 mb-8">
-          <h3 className="text-lg font-semibold mb-4 text-green-800">📊 Résumé Global</h3>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="bg-green-50 border border-green-200 rounded-lg p-3 sm:p-4 md:p-6 mb-4 sm:mb-6 md:mb-8">
+          <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-green-800">📊 Résumé Global</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
             <div>
               <div className="text-sm text-gray-600">Volume point de vente:</div>
-              <div className="text-xl font-bold text-gray-800">{volume.toLocaleString()}</div>
+              <div className="text-lg sm:text-xl font-bold text-gray-800">{volume.toLocaleString()}</div>
             </div>
             <div>
               <div className="text-sm text-gray-600">Bénéfice Total:</div>
-              <div className="text-xl font-bold text-green-600">{Math.round(beneficeTotal).toLocaleString()}</div>
+              <div className="text-lg sm:text-xl font-bold text-green-600">{Math.round(beneficeTotal).toLocaleString()}</div>
             </div>
             <div>
               <div className="text-sm text-gray-600">Marge Moyenne:</div>
-              <div className="text-xl font-bold text-blue-600">{(margeMoyenne * 100).toFixed(2)}%</div>
+              <div className="text-lg sm:text-xl font-bold text-blue-600">{(margeMoyenne * 100).toFixed(2)}%</div>
             </div>
             <div>
               <div className="text-sm text-gray-600">Paramètres Bœuf/Veau:</div>
@@ -296,15 +299,15 @@ const SimulateurRentabilite = () => {
         </div>
 
         {/* Graphiques */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 md:gap-8 mb-4 sm:mb-6 md:mb-8">
           {/* Histogramme des bénéfices */}
-          <div className="bg-white p-6 rounded-lg shadow-md border">
-            <h3 className="text-lg font-semibold mb-4 text-gray-800">📊 Bénéfices par Produit</h3>
-            <ResponsiveContainer width="100%" height={300}>
+          <div className="bg-white p-3 sm:p-4 md:p-6 rounded-lg shadow-md border">
+            <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-gray-800">📊 Bénéfices par Produit</h3>
+            <ResponsiveContainer width="100%" height={250} className="sm:h-[300px]">
               <BarChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="nom" angle={-45} textAnchor="end" height={80} />
-                <YAxis tickFormatter={(value) => `${(value / 1000000).toFixed(1)}M`} />
+                <XAxis dataKey="nom" angle={-45} textAnchor="end" height={60} tick={{ fontSize: 12 }} />
+                <YAxis tickFormatter={(value) => `${(value / 1000000).toFixed(1)}M`} tick={{ fontSize: 12 }} />
                 <Tooltip formatter={(value) => [value.toLocaleString(), 'Bénéfice']} />
                 <Bar dataKey="benefice" fill="#3498db" />
               </BarChart>
@@ -312,15 +315,15 @@ const SimulateurRentabilite = () => {
           </div>
 
           {/* Graphique en secteurs de la répartition */}
-          <div className="bg-white p-6 rounded-lg shadow-md border">
-            <h3 className="text-lg font-semibold mb-4 text-gray-800">🥧 Répartition des Bénéfices</h3>
-            <ResponsiveContainer width="100%" height={300}>
+          <div className="bg-white p-3 sm:p-4 md:p-6 rounded-lg shadow-md border">
+            <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-gray-800">🥧 Répartition des Bénéfices</h3>
+            <ResponsiveContainer width="100%" height={250} className="sm:h-[300px]">
               <PieChart>
                 <Pie
                   data={chartData}
                   cx="50%"
                   cy="50%"
-                  outerRadius={80}
+                  outerRadius={60}
                   dataKey="benefice"
                   label={({nom, percent}) => `${nom}: ${(percent * 100).toFixed(1)}%`}
                 >
@@ -335,125 +338,121 @@ const SimulateurRentabilite = () => {
         </div>
 
         {/* Graphique des marges */}
-        <div className="bg-white p-6 rounded-lg shadow-md border mb-8">
-          <h3 className="text-lg font-semibold mb-4 text-gray-800">📈 Marges Brutes par Produit</h3>
-          <ResponsiveContainer width="100%" height={300}>
+        <div className="bg-white p-3 sm:p-4 md:p-6 rounded-lg shadow-md border mb-4 sm:mb-6 md:mb-8">
+          <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-gray-800">📈 Marges Brutes par Produit</h3>
+          <ResponsiveContainer width="100%" height={250} className="sm:h-[300px]">
             <BarChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="nom" />
-              <YAxis tickFormatter={(value) => `${value.toFixed(1)}%`} />
+              <XAxis dataKey="nom" tick={{ fontSize: 12 }} />
+              <YAxis tickFormatter={(value) => `${value.toFixed(1)}%`} tick={{ fontSize: 12 }} />
               <Tooltip formatter={(value) => [`${value.toFixed(2)}%`, 'Marge Brute']} />
               <Bar dataKey="marge" fill="#2ecc71" />
             </BarChart>
           </ResponsiveContainer>
         </div>
 
-        {/* Tableau détaillé */}
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse shadow-md">
-            <thead>
-              <tr className="bg-gradient-to-r from-blue-500 to-blue-600 text-white">
-                <th className="p-4 text-left">Produit</th>
-                <th className="p-4 text-center">Répartition</th>
-                <th className="p-4 text-center">Prix d'achat</th>
-                <th className="p-4 text-center">Prix de vente</th>
-                <th className="p-4 text-center">Formule</th>
-                <th className="p-4 text-center">Marge brute %</th>
-                <th className="p-4 text-center">Bénéfice</th>
-                <th className="p-4 text-center">% du total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {produitsAvecCalculs.map((produit, index) => {
-                const isEditable = produit.editable;
-                const pourcentageTotal = (produit.benefice / beneficeTotal) * 100;
-                
-                return (
-                  <tr key={produit.nom} className={index % 2 === 0 ? "bg-gray-50" : "bg-white"}>
-                    <td className="p-3 font-semibold text-gray-800">
-                      {produit.nom}
-                      {produit.hasAbats && <div className="text-xs text-blue-600">🥩 Avec abats</div>}
-                      {!isEditable && <div className="text-xs text-gray-500">(calculé)</div>}
-                    </td>
-                    <td className="p-3 text-center">
-                      <input 
-                        type="number"
-                        step="0.001"
-                        min="0"
-                        max="1"
-                        value={produit.repartition}
-                        onChange={(e) => updatePrix(produit.nom, 'repartition', e.target.value)}
-                        className="w-20 p-2 text-center border border-gray-300 rounded"
-                      />
-                      <div className="text-xs text-gray-500 mt-1">
-                        {(produit.repartition * 100).toFixed(2)}%
-                      </div>
-                    </td>
-                    <td className="p-3 text-center">
-                      {isEditable ? (
-                        <input 
-                          type="number"
-                          value={produit.prixAchat || ''}
-                          onChange={(e) => updatePrix(produit.nom, 'prixAchat', e.target.value)}
-                          className="w-20 p-2 text-center border border-gray-300 rounded"
-                        />
-                      ) : (
-                        <span className="text-gray-400">-</span>
-                      )}
-                    </td>
-                    <td className="p-3 text-center">
-                      {isEditable ? (
-                        <input 
-                          type="number"
-                          value={produit.prixVente || ''}
-                          onChange={(e) => updatePrix(produit.nom, 'prixVente', e.target.value)}
-                          className="w-20 p-2 text-center border border-gray-300 rounded"
-                        />
-                      ) : (
-                        <span className="text-gray-400">-</span>
-                      )}
-                    </td>
-                    <td className="p-3 text-center text-xs">
-                      {produit.hasAbats ? (
-                        <div className="text-blue-600">
-                          ((PV+{abatsParKg})×(1-{(peration*100).toFixed(1)}%))/PA-1
-                        </div>
-                      ) : (
-                        <div className="text-gray-600">PV/PA-1</div>
-                      )}
-                    </td>
-                    <td className="p-3 text-center font-bold">
-                      <span className={
-                        produit.margeBrute > 0.2 ? "text-green-600" : 
-                        produit.margeBrute > 0.1 ? "text-yellow-600" : "text-red-600"
-                      }>
-                        {(produit.margeBrute * 100).toFixed(2)}%
-                      </span>
-                    </td>
-                    <td className="p-3 text-center font-bold text-green-600">
-                      {Math.round(produit.benefice).toLocaleString()}
-                    </td>
-                    <td className="p-3 text-center">
-                      <div className={`px-2 py-1 rounded-full text-xs font-bold text-white ${
-                        pourcentageTotal > 50 ? 'bg-red-500' : 
-                        pourcentageTotal > 20 ? 'bg-yellow-500' : 'bg-blue-500'
-                      }`}>
-                        {pourcentageTotal.toFixed(1)}%
-                      </div>
-                    </td>
+        {/* Tableau détaillé - Version mobile optimisée */}
+        <div className="overflow-x-auto -mx-4 sm:mx-0">
+          <div className="min-w-full inline-block align-middle">
+            <div className="overflow-hidden">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gradient-to-r from-blue-500 to-blue-600">
+                  <tr>
+                    <th className="px-2 sm:px-4 py-3 text-left text-xs sm:text-sm font-medium text-white uppercase tracking-wider">Produit</th>
+                    <th className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-medium text-white uppercase tracking-wider">Répartition</th>
+                    <th className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-medium text-white uppercase tracking-wider">Prix A</th>
+                    <th className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-medium text-white uppercase tracking-wider">Prix V</th>
+                    <th className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-medium text-white uppercase tracking-wider">Marge %</th>
+                    <th className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-medium text-white uppercase tracking-wider">Bénéfice</th>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {produitsAvecCalculs.map((produit, index) => {
+                    const isEditable = produit.editable;
+                    const pourcentageTotal = (produit.benefice / beneficeTotal) * 100;
+                    
+                    return (
+                      <tr key={produit.nom} className={index % 2 === 0 ? "bg-gray-50" : "bg-white"}>
+                        <td className="px-2 sm:px-4 py-3 text-xs sm:text-sm font-semibold text-gray-800">
+                          <div>{produit.nom}</div>
+                          {produit.hasAbats && <div className="text-xs text-blue-600">🥩 Avec abats</div>}
+                          {!isEditable && <div className="text-xs text-gray-500">(calculé)</div>}
+                        </td>
+                        <td className="px-2 sm:px-4 py-3 text-center">
+                          <input 
+                            type="number"
+                            step="0.001"
+                            min="0"
+                            max="1"
+                            value={produit.repartition}
+                            onChange={(e) => updatePrix(produit.nom, 'repartition', e.target.value)}
+                            className="w-16 sm:w-20 p-1 sm:p-2 text-center border border-gray-300 rounded text-xs sm:text-sm"
+                            style={{ fontSize: '16px' }}
+                          />
+                          <div className="text-xs text-gray-500 mt-1">
+                            {(produit.repartition * 100).toFixed(1)}%
+                          </div>
+                        </td>
+                        <td className="px-2 sm:px-4 py-3 text-center">
+                          {isEditable ? (
+                            <input 
+                              type="number"
+                              value={produit.prixAchat || ''}
+                              onChange={(e) => updatePrix(produit.nom, 'prixAchat', e.target.value)}
+                              className="w-16 sm:w-20 p-1 sm:p-2 text-center border border-gray-300 rounded text-xs sm:text-sm"
+                              style={{ fontSize: '16px' }}
+                            />
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </td>
+                        <td className="px-2 sm:px-4 py-3 text-center">
+                          {isEditable ? (
+                            <input 
+                              type="number"
+                              value={produit.prixVente || ''}
+                              onChange={(e) => updatePrix(produit.nom, 'prixVente', e.target.value)}
+                              className="w-16 sm:w-20 p-1 sm:p-2 text-center border border-gray-300 rounded text-xs sm:text-sm"
+                              style={{ fontSize: '16px' }}
+                            />
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </td>
+                        <td className="px-2 sm:px-4 py-3 text-center">
+                          <span className={`text-xs sm:text-sm font-bold ${
+                            produit.margeBrute > 0.2 ? "text-green-600" : 
+                            produit.margeBrute > 0.1 ? "text-yellow-600" : "text-red-600"
+                          }`}>
+                            {(produit.margeBrute * 100).toFixed(1)}%
+                          </span>
+                        </td>
+                        <td className="px-2 sm:px-4 py-3 text-center">
+                          <div className="text-xs sm:text-sm font-bold text-green-600">
+                            {Math.round(produit.benefice).toLocaleString()}
+                          </div>
+                          <div className={`px-1 sm:px-2 py-0.5 rounded-full text-xs font-bold text-white ${
+                            pourcentageTotal > 50 ? 'bg-red-500' : 
+                            pourcentageTotal > 20 ? 'bg-yellow-500' : 'bg-blue-500'
+                          }`}>
+                            {pourcentageTotal.toFixed(1)}%
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
 
         {/* Graphiques de simulation Bœuf/Veau */}
-        <div className="mt-8 space-y-8">
-          <h2 className="text-2xl font-bold text-center text-gray-800 mb-6">
+        <div className="mt-6 sm:mt-8 space-y-6 sm:space-y-8">
+          <h2 className="text-xl sm:text-2xl font-bold text-center text-gray-800 mb-4 sm:mb-6">
             🎯 Comparaison Stratégique - Bœuf & Veau
           </h2>
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
             <p className="text-sm text-yellow-800">
               <strong>💡 Analyse Comparative:</strong> 
               <span className="text-green-700 font-medium">Augmenter les prix de vente</span> vs 
@@ -462,11 +461,11 @@ const SimulateurRentabilite = () => {
             </p>
           </div>
           
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 md:gap-8">
             {/* Simulation augmentations */}
-            <div className="bg-white p-6 rounded-lg shadow-md border">
-              <h3 className="text-lg font-semibold mb-4 text-green-700">📈 Impact Augmentations de Prix</h3>
-              <ResponsiveContainer width="100%" height={350}>
+            <div className="bg-white p-3 sm:p-4 md:p-6 rounded-lg shadow-md border">
+              <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-green-700">📈 Impact Augmentations de Prix</h3>
+              <ResponsiveContainer width="100%" height={250} className="sm:h-[350px]">
                 <LineChart data={(() => {
                   const augmentations = [0, 50, 100, 150, 200];
                   return augmentations.map(aug => {
@@ -502,8 +501,8 @@ const SimulateurRentabilite = () => {
                   });
                 })()}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="augmentation" />
-                  <YAxis tickFormatter={(value) => `${(value / 1000000).toFixed(1)}M`} />
+                  <XAxis dataKey="augmentation" tick={{ fontSize: 12 }} />
+                  <YAxis tickFormatter={(value) => `${(value / 1000000).toFixed(1)}M`} tick={{ fontSize: 12 }} />
                   <Tooltip 
                     formatter={(value, name) => [
                       name === 'beneficeTotal' ? value.toLocaleString() : `+${value.toLocaleString()}`,
@@ -527,8 +526,8 @@ const SimulateurRentabilite = () => {
                   />
                 </LineChart>
               </ResponsiveContainer>
-              <div className="mt-4 text-sm text-gray-600">
-                <div className="flex items-center gap-4">
+              <div className="mt-3 sm:mt-4 text-xs sm:text-sm text-gray-600">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
                   <div className="flex items-center gap-2">
                     <div className="w-4 h-0.5 bg-green-600"></div>
                     <span>Bénéfice Total</span>
@@ -542,9 +541,9 @@ const SimulateurRentabilite = () => {
             </div>
 
             {/* Simulation diminutions prix d'achat */}
-            <div className="bg-white p-6 rounded-lg shadow-md border">
-              <h3 className="text-lg font-semibold mb-4 text-blue-700">📉 Impact Diminutions Prix d'Achat</h3>
-              <ResponsiveContainer width="100%" height={350}>
+            <div className="bg-white p-3 sm:p-4 md:p-6 rounded-lg shadow-md border">
+              <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-blue-700">📉 Impact Diminutions Prix d'Achat</h3>
+              <ResponsiveContainer width="100%" height={250} className="sm:h-[350px]">
                 <LineChart data={(() => {
                   const diminutions = [0, -50, -100, -150, -200];
                   return diminutions.map(dim => {
@@ -580,8 +579,8 @@ const SimulateurRentabilite = () => {
                   });
                 })()}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="diminution" />
-                  <YAxis tickFormatter={(value) => `${(value / 1000000).toFixed(1)}M`} />
+                  <XAxis dataKey="diminution" tick={{ fontSize: 12 }} />
+                  <YAxis tickFormatter={(value) => `${(value / 1000000).toFixed(1)}M`} tick={{ fontSize: 12 }} />
                   <Tooltip 
                     formatter={(value, name) => [
                       name === 'beneficeTotal' ? value.toLocaleString() : `+${value.toLocaleString()}`,
@@ -605,8 +604,8 @@ const SimulateurRentabilite = () => {
                   />
                 </LineChart>
               </ResponsiveContainer>
-              <div className="mt-4 text-sm text-gray-600">
-                <div className="flex items-center gap-4">
+              <div className="mt-3 sm:mt-4 text-xs sm:text-sm text-gray-600">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
                   <div className="flex items-center gap-2">
                     <div className="w-4 h-0.5 bg-blue-500"></div>
                     <span>Bénéfice Total</span>
@@ -621,20 +620,20 @@ const SimulateurRentabilite = () => {
           </div>
 
           {/* Tableau récapitulatif des simulations */}
-          <div className="bg-white p-6 rounded-lg shadow-md border">
-            <h3 className="text-lg font-semibold mb-4 text-gray-800">📋 Tableau Récapitulatif - Impact sur Bœuf & Veau</h3>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="bg-white p-3 sm:p-4 md:p-6 rounded-lg shadow-md border">
+            <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-gray-800">📋 Tableau Récapitulatif - Impact sur Bœuf & Veau</h3>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 md:gap-8">
               
               {/* Tableau augmentations */}
-              <div>
+              <div className="overflow-x-auto">
                 <h4 className="font-medium text-green-700 mb-3">📈 Augmentations</h4>
-                <table className="w-full text-sm border-collapse">
+                <table className="w-full text-xs sm:text-sm border-collapse">
                   <thead>
                     <tr className="bg-green-100">
-                      <th className="border p-2 text-left">Augmentation</th>
-                      <th className="border p-2 text-right">Bénéfice Total</th>
-                      <th className="border p-2 text-right">Gain</th>
-                      <th className="border p-2 text-right">% Gain</th>
+                      <th className="border p-1 sm:p-2 text-left">Augmentation</th>
+                      <th className="border p-1 sm:p-2 text-right">Bénéfice Total</th>
+                      <th className="border p-1 sm:p-2 text-right">Gain</th>
+                      <th className="border p-1 sm:p-2 text-right">% Gain</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -668,10 +667,10 @@ const SimulateurRentabilite = () => {
                       
                       return (
                         <tr key={aug} className={aug === 0 ? "bg-gray-100 font-medium" : ""}>
-                          <td className="border p-2">+{aug}</td>
-                          <td className="border p-2 text-right">{Math.round(beneficeTotalSimule).toLocaleString()}</td>
-                          <td className="border p-2 text-right text-green-600">+{Math.round(gain).toLocaleString()}</td>
-                          <td className="border p-2 text-right text-green-600">+{pourcentageGain.toFixed(1)}%</td>
+                          <td className="border p-1 sm:p-2">+{aug}</td>
+                          <td className="border p-1 sm:p-2 text-right">{Math.round(beneficeTotalSimule).toLocaleString()}</td>
+                          <td className="border p-1 sm:p-2 text-right text-green-600">+{Math.round(gain).toLocaleString()}</td>
+                          <td className="border p-1 sm:p-2 text-right text-green-600">+{pourcentageGain.toFixed(1)}%</td>
                         </tr>
                       );
                     })}
@@ -680,15 +679,15 @@ const SimulateurRentabilite = () => {
               </div>
 
               {/* Tableau diminutions prix d'achat */}
-              <div>
+              <div className="overflow-x-auto">
                 <h4 className="font-medium text-blue-700 mb-3">📉 Diminutions Prix d'Achat</h4>
-                <table className="w-full text-sm border-collapse">
+                <table className="w-full text-xs sm:text-sm border-collapse">
                   <thead>
                     <tr className="bg-blue-100">
-                      <th className="border p-2 text-left">Diminution PA</th>
-                      <th className="border p-2 text-right">Bénéfice Total</th>
-                      <th className="border p-2 text-right">Gain</th>
-                      <th className="border p-2 text-right">% Gain</th>
+                      <th className="border p-1 sm:p-2 text-left">Diminution PA</th>
+                      <th className="border p-1 sm:p-2 text-right">Bénéfice Total</th>
+                      <th className="border p-1 sm:p-2 text-right">Gain</th>
+                      <th className="border p-1 sm:p-2 text-right">% Gain</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -722,10 +721,10 @@ const SimulateurRentabilite = () => {
                       
                       return (
                         <tr key={dim} className={dim === 0 ? "bg-gray-100 font-medium" : ""}>
-                          <td className="border p-2">{dim === 0 ? '0' : dim}</td>
-                          <td className="border p-2 text-right">{Math.round(beneficeTotalSimule).toLocaleString()}</td>
-                          <td className="border p-2 text-right text-green-600">+{Math.round(gain).toLocaleString()}</td>
-                          <td className="border p-2 text-right text-green-600">+{pourcentageGain.toFixed(1)}%</td>
+                          <td className="border p-1 sm:p-2">{dim === 0 ? '0' : dim}</td>
+                          <td className="border p-1 sm:p-2 text-right">{Math.round(beneficeTotalSimule).toLocaleString()}</td>
+                          <td className="border p-1 sm:p-2 text-right text-green-600">+{Math.round(gain).toLocaleString()}</td>
+                          <td className="border p-1 sm:p-2 text-right text-green-600">+{pourcentageGain.toFixed(1)}%</td>
                         </tr>
                       );
                     })}
@@ -736,7 +735,7 @@ const SimulateurRentabilite = () => {
           </div>
         </div>
 
-        <div className="mt-6 bg-gray-100 p-4 rounded-lg text-sm text-gray-600">
+        <div className="mt-4 sm:mt-6 bg-gray-100 p-3 sm:p-4 rounded-lg text-xs sm:text-sm text-gray-600">
           <strong>💡 Informations:</strong><br/>
           • <strong>Formule standard:</strong> Marge brute % = (Prix vente / Prix achat) - 1<br/>
           • <strong>Formule Bœuf/Veau:</strong> Marge brute % = ((Prix vente + Abats par kg) × (1 - Pération)) / Prix achat - 1<br/>
