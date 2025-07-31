@@ -1,7 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 const SimulateurRentabilite = () => {
+  const mainContainerRef = useRef(null);
   const [activeTab, setActiveTab] = useState('main'); // 'main', 'volume', 'charges', 'dcf' ou 'dcfSimulation'
   const [volume, setVolume] = useState(20000000);
   const [abatsParKg, setAbatsParKg] = useState(200);
@@ -299,6 +302,108 @@ const SimulateurRentabilite = () => {
     };
     
     reader.readAsText(file);
+  };
+
+  // Fonction de génération de PDF
+  const generatePDF = async () => {
+    if (!mainContainerRef.current) {
+      alert('Erreur: Impossible de générer le PDF. Veuillez réessayer.');
+      return;
+    }
+
+    try {
+      // Afficher un message de chargement
+      const loadingMessage = document.createElement('div');
+      loadingMessage.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 20px;
+        border-radius: 10px;
+        z-index: 10000;
+        font-size: 16px;
+      `;
+      loadingMessage.textContent = 'Génération du PDF en cours...';
+      document.body.appendChild(loadingMessage);
+
+      // Capturer le contenu de la page
+      const canvas = await html2canvas(mainContainerRef.current, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        width: mainContainerRef.current.scrollWidth,
+        height: mainContainerRef.current.scrollHeight
+      });
+
+      // Créer le PDF
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = pdfWidth - 20; // Marge de 10mm de chaque côté
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      
+      // Ajouter un titre au PDF
+      pdf.setFontSize(20);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Rapport de Simulation - Mata Trading', 105, 15, { align: 'center' });
+      
+      pdf.setFontSize(12);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(`Généré le: ${new Date().toLocaleString('fr-FR')}`, 105, 25, { align: 'center' });
+      pdf.text(`Onglet actif: ${getTabName(activeTab)}`, 105, 32, { align: 'center' });
+      
+      // Ajouter l'image du contenu
+      let heightLeft = imgHeight;
+      let position = 40; // Commencer après le titre
+      
+      pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
+      heightLeft -= (pdfHeight - position);
+      
+      // Ajouter des pages supplémentaires si nécessaire
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
+        heightLeft -= pdfHeight;
+      }
+
+      // Sauvegarder le PDF
+      const fileName = `mata-trading-report-${new Date().toISOString().split('T')[0]}-${activeTab}.pdf`;
+      pdf.save(fileName);
+
+      // Supprimer le message de chargement
+      document.body.removeChild(loadingMessage);
+      
+      alert('PDF généré avec succès !');
+      
+    } catch (error) {
+      console.error('Erreur lors de la génération du PDF:', error);
+      alert('Erreur lors de la génération du PDF. Veuillez réessayer.');
+      
+      // Supprimer le message de chargement en cas d'erreur
+      const loadingMessage = document.querySelector('div[style*="position: fixed"]');
+      if (loadingMessage) {
+        document.body.removeChild(loadingMessage);
+      }
+    }
+  };
+
+  // Fonction helper pour obtenir le nom de l'onglet
+  const getTabName = (tab) => {
+    const tabNames = {
+      'main': 'Principal',
+      'volume': 'Simulation Volume',
+      'charges': 'Charges',
+      'dcf': 'DCF Simple',
+      'dcfSimulation': 'DCF Simulation'
+    };
+    return tabNames[tab] || tab;
   };
 
   const margeMoyenne = calculerMargeMoyenne();
@@ -632,7 +737,7 @@ const SimulateurRentabilite = () => {
             </div>
           </div>
           <div>
-            <div className="text-sm font-medium text-gray-600 mb-2">Export/Import:</div>
+            <div className="text-sm font-medium text-gray-600 mb-2">Export/Import/PDF:</div>
             <div className="flex flex-wrap gap-2">
               <button onClick={exportData} className="px-3 py-2 sm:px-4 sm:py-3 bg-purple-500 text-white rounded text-sm hover:bg-purple-600 min-h-[44px] min-w-[80px]">📤 Exporter</button>
               <label className="px-3 py-2 sm:px-4 sm:py-3 bg-indigo-500 text-white rounded text-sm hover:bg-indigo-600 min-h-[44px] min-w-[80px] cursor-pointer text-center">
@@ -644,6 +749,7 @@ const SimulateurRentabilite = () => {
                   className="hidden"
                 />
               </label>
+              <button onClick={generatePDF} className="px-3 py-2 sm:px-4 sm:py-3 bg-orange-500 text-white rounded text-sm hover:bg-orange-600 min-h-[44px] min-w-[80px]">📄 PDF</button>
               <button onClick={resetPrix} className="px-3 py-2 sm:px-4 sm:py-3 bg-red-500 text-white rounded text-sm hover:bg-red-600 min-h-[44px] min-w-[80px]">🔄 Reset</button>
             </div>
           </div>
@@ -1330,7 +1436,7 @@ const SimulateurRentabilite = () => {
 
   return (
     <div className="p-2 sm:p-4 md:p-6 bg-gray-50 min-h-screen">
-      <div className="max-w-7xl mx-auto bg-white rounded-lg shadow-lg p-4 sm:p-6 md:p-8">
+      <div ref={mainContainerRef} className="max-w-7xl mx-auto bg-white rounded-lg shadow-lg p-4 sm:p-6 md:p-8">
         
         <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-center text-gray-800 mb-4 sm:mb-6 md:mb-8 pb-2 sm:pb-3 md:pb-4 border-b-2 sm:border-b-3 md:border-b-4 border-blue-500">
           🧮 Simulateur Interactif - Analyse de Rentabilité Avancée
