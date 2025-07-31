@@ -203,6 +203,104 @@ const SimulateurRentabilite = () => {
     setDureeAnalyse(60);
   };
 
+  // Fonction d'export des données
+  const exportData = () => {
+    const dataToExport = {
+      version: '1.0',
+      timestamp: new Date().toISOString(),
+      data: {
+        // Paramètres globaux
+        volume,
+        abatsParKg,
+        peration,
+        
+        // Simulation de volume
+        selectedProduct,
+        additionalVolume,
+        
+        // Charges
+        chargesFixes,
+        dureeAmortissement,
+        salaire,
+        electricite,
+        eau,
+        internet,
+        sacsLivraison,
+        chargesTransport,
+        
+        // DCF
+        tauxActualisationAnnuel,
+        dureeAnalyse,
+        
+        // Produits
+        produits
+      }
+    };
+    
+    const jsonString = JSON.stringify(dataToExport, null, 2);
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `mata-trading-simulation-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  // Fonction d'import des données
+  const importData = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const importedData = JSON.parse(e.target.result);
+        
+        // Vérifier la version et la structure
+        if (!importedData.version || !importedData.data) {
+          alert('Format de fichier invalide. Veuillez utiliser un fichier exporté depuis cette application.');
+          return;
+        }
+        
+        const data = importedData.data;
+        
+        // Importer les données
+        setVolume(data.volume || 20000000);
+        setAbatsParKg(data.abatsParKg || 200);
+        setPeration(data.peration || 0.1);
+        setSelectedProduct(data.selectedProduct || 'Poulet');
+        setAdditionalVolume(data.additionalVolume || 5000000);
+        setChargesFixes(data.chargesFixes || 5000000);
+        setDureeAmortissement(data.dureeAmortissement || 24);
+        setSalaire(data.salaire || 250000);
+        setElectricite(data.electricite || 25000);
+        setEau(data.eau || 5000);
+        setInternet(data.internet || 10000);
+        setSacsLivraison(data.sacsLivraison || 30000);
+        setChargesTransport(data.chargesTransport || 150000);
+        setTauxActualisationAnnuel(data.tauxActualisationAnnuel || 12);
+        setDureeAnalyse(data.dureeAnalyse || 60);
+        
+        // Importer les produits
+        if (data.produits) {
+          setProduits(data.produits);
+        }
+        
+        alert('Données importées avec succès !');
+        
+      } catch (error) {
+        alert('Erreur lors de l\'import du fichier. Veuillez vérifier que le fichier est valide.');
+        console.error('Import error:', error);
+      }
+    };
+    
+    reader.readAsText(file);
+  };
+
   const margeMoyenne = calculerMargeMoyenne();
   const adjustedVolume = getAdjustedVolume();
   const adjustedProduits = getAdjustedRepartitions();
@@ -531,6 +629,22 @@ const SimulateurRentabilite = () => {
             <div className="flex flex-wrap gap-2">
               <button onClick={() => augmenterTousPrix(50, 'prixAchat')} className="px-3 py-2 sm:px-4 sm:py-3 bg-green-600 text-white rounded text-sm hover:bg-green-700 min-h-[44px] min-w-[60px]">+50</button>
               <button onClick={() => augmenterTousPrix(-50, 'prixAchat')} className="px-3 py-2 sm:px-4 sm:py-3 bg-orange-500 text-white rounded text-sm hover:bg-orange-600 min-h-[44px] min-w-[60px]">-50</button>
+            </div>
+          </div>
+          <div>
+            <div className="text-sm font-medium text-gray-600 mb-2">Export/Import:</div>
+            <div className="flex flex-wrap gap-2">
+              <button onClick={exportData} className="px-3 py-2 sm:px-4 sm:py-3 bg-purple-500 text-white rounded text-sm hover:bg-purple-600 min-h-[44px] min-w-[80px]">📤 Exporter</button>
+              <label className="px-3 py-2 sm:px-4 sm:py-3 bg-indigo-500 text-white rounded text-sm hover:bg-indigo-600 min-h-[44px] min-w-[80px] cursor-pointer text-center">
+                📥 Importer
+                <input 
+                  type="file" 
+                  accept=".json"
+                  onChange={importData}
+                  className="hidden"
+                />
+              </label>
+              <button onClick={resetPrix} className="px-3 py-2 sm:px-4 sm:py-3 bg-red-500 text-white rounded text-sm hover:bg-red-600 min-h-[44px] min-w-[80px]">🔄 Reset</button>
             </div>
           </div>
         </div>
