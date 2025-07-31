@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 
 const SimulateurRentabilite = () => {
-  const [activeTab, setActiveTab] = useState('main'); // 'main', 'volume', 'charges' ou 'dcf'
+  const [activeTab, setActiveTab] = useState('main'); // 'main', 'volume', 'charges', 'dcf' ou 'dcfSimulation'
   const [volume, setVolume] = useState(20000000);
   const [abatsParKg, setAbatsParKg] = useState(200);
   const [peration, setPeration] = useState(0.1);
@@ -337,6 +337,127 @@ const SimulateurRentabilite = () => {
   };
   
   const indicateursDCF = calculerIndicateursDCF();
+
+  // Calcul des flux DCF pour la simulation
+  const calculerFluxDCFSimulation = () => {
+    const flux = [];
+    const adjustedVolume = getAdjustedVolume();
+    const adjustedRepartitions = getAdjustedRepartitions();
+    
+    // Calculer le bénéfice total avec les données de simulation
+    let beneficeTotalSimulation = 0;
+    Object.keys(produits).forEach(nom => {
+      if (produits[nom].editable) {
+        const margeBrute = calculerMargeBrute(produits[nom]);
+        const repartition = adjustedRepartitions[nom];
+        const benefice = calculerBenefice(margeBrute, repartition, adjustedVolume);
+        beneficeTotalSimulation += benefice;
+      }
+    });
+    
+    // Calculer la marge moyenne pour les produits non-éditables
+    const margeMoyenne = calculerMargeMoyenne();
+    Object.keys(produits).forEach(nom => {
+      if (!produits[nom].editable) {
+        const repartition = adjustedRepartitions[nom];
+        const benefice = calculerBenefice(margeMoyenne, repartition, adjustedVolume);
+        beneficeTotalSimulation += benefice;
+      }
+    });
+    
+    const beneficeBrutMensuel = beneficeTotalSimulation;
+    const chargesFixesMensuelles = chargesTotales;
+    const investissementInitial = -chargesFixes; // Décaissement initial
+    
+    // Mois 0 : investissement initial
+    flux.push({
+      mois: 0,
+      beneficeBrut: 0,
+      chargesFixes: 0,
+      fluxNet: investissementInitial,
+      fluxActualise: investissementInitial,
+      cumulActualise: investissementInitial
+    });
+    
+    // Mois 1 à dureeAnalyse
+    let cumulActualise = investissementInitial;
+    for (let mois = 1; mois <= dureeAnalyse; mois++) {
+      const fluxNet = beneficeBrutMensuel - chargesFixesMensuelles;
+      const facteurActualisation = Math.pow(1 + tauxActualisationMensuel, -mois);
+      const fluxActualise = fluxNet * facteurActualisation;
+      cumulActualise += fluxActualise;
+      
+      flux.push({
+        mois,
+        beneficeBrut: beneficeBrutMensuel,
+        chargesFixes: chargesFixesMensuelles,
+        fluxNet,
+        fluxActualise,
+        cumulActualise
+      });
+    }
+    
+    return flux;
+  };
+  
+  const fluxDCFSimulation = calculerFluxDCFSimulation();
+  
+  // Calcul des indicateurs DCF pour la simulation
+  const calculerIndicateursDCFSimulation = () => {
+    const investissementInitial = Math.abs(fluxDCFSimulation[0].fluxNet);
+    
+    // VAN (NPV)
+    const van = fluxDCFSimulation.reduce((sum, flux) => sum + flux.fluxActualise, 0);
+    
+    // TRI mensuel (approximation par itération)
+    const calculerTRI = () => {
+      let triMensuel = 0.01; // 1% par mois comme point de départ
+      const tolerance = 0.0001;
+      const maxIterations = 100;
+      
+      for (let i = 0; i < maxIterations; i++) {
+        let vanTest = fluxDCFSimulation[0].fluxNet; // Investissement initial
+        
+        for (let mois = 1; mois <= dureeAnalyse; mois++) {
+          const fluxNet = fluxDCFSimulation[mois].fluxNet;
+          const facteurActualisation = Math.pow(1 + triMensuel, -mois);
+          vanTest += fluxNet * facteurActualisation;
+        }
+        
+        if (Math.abs(vanTest) < tolerance) {
+          break;
+        }
+        
+        // Ajustement du TRI
+        if (vanTest > 0) {
+          triMensuel += 0.001;
+        } else {
+          triMensuel -= 0.001;
+        }
+      }
+      
+      return triMensuel;
+    };
+    
+    const triMensuel = calculerTRI();
+    const triAnnuel = Math.pow(1 + triMensuel, 12) - 1;
+    
+    // Indice de profitabilité
+    const indiceProfitabilite = (van + investissementInitial) / investissementInitial;
+    
+    // Délai de récupération actualisé
+    const paybackActualise = fluxDCFSimulation.findIndex(flux => flux.cumulActualise >= 0);
+    
+    return {
+      van,
+      triMensuel,
+      triAnnuel,
+      indiceProfitabilite,
+      paybackActualise: paybackActualise === -1 ? 'Jamais' : paybackActualise
+    };
+  };
+  
+  const indicateursDCFSimulation = calculerIndicateursDCFSimulation();
 
   const renderMainContent = () => (
     <>
@@ -870,6 +991,228 @@ const SimulateurRentabilite = () => {
     </>
   );
 
+  const renderDCFSimulationContent = () => (
+    <>
+      {/* Paramètres DCF */}
+      <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 sm:p-4 md:p-6 mb-4 sm:mb-6 md:mb-8">
+        <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-purple-800">📊 Modèle DCF - Simulation Volume</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Taux d'actualisation annuel (%)</label>
+            <input 
+              type="number"
+              step="0.1"
+              min="0"
+              max="50"
+              value={tauxActualisationAnnuel}
+              onChange={(e) => setTauxActualisationAnnuel(parseFloat(e.target.value) || 0)}
+              className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
+              style={{ fontSize: '16px' }}
+            />
+            <div className="text-xs text-gray-500 mt-1">Taux mensuel: {(tauxActualisationMensuel * 100).toFixed(3)}%</div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Durée d'analyse (mois)</label>
+            <input 
+              type="number"
+              min="12"
+              max="120"
+              value={dureeAnalyse}
+              onChange={(e) => setDureeAnalyse(parseInt(e.target.value) || 60)}
+              className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
+              style={{ fontSize: '16px' }}
+            />
+            <div className="text-xs text-gray-500 mt-1">{(dureeAnalyse / 12).toFixed(1)} années</div>
+          </div>
+          <div className="flex items-end">
+            <div className="w-full p-2 sm:p-3 bg-purple-100 rounded text-sm">
+              <div className="text-purple-800 font-medium">Investissement initial</div>
+              <div className="text-purple-600 text-xs">{chargesFixes.toLocaleString()}</div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Informations sur la simulation */}
+        <div className="mt-4 p-3 bg-purple-100 rounded">
+          <div className="text-sm text-purple-800">
+            <strong>📈 Données de simulation utilisées:</strong>
+            <div className="mt-2 text-xs">
+              • Volume total: {getAdjustedVolume().toLocaleString()}
+              {activeTab === 'volume' && (
+                <>
+                  <br/>• Produit sélectionné: {selectedProduct}
+                  <br/>• Volume ajouté: {additionalVolume.toLocaleString()}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Indicateurs DCF */}
+      <div className="bg-green-50 border border-green-200 rounded-lg p-3 sm:p-4 md:p-6 mb-4 sm:mb-6 md:mb-8">
+        <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-green-800">📈 Indicateurs DCF - Simulation</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+          <div>
+            <div className="text-sm text-gray-600">VAN (NPV):</div>
+            <div className={`text-lg sm:text-xl font-bold ${
+              indicateursDCFSimulation.van > 0 ? 'text-green-600' : 'text-red-600'
+            }`}>
+              {indicateursDCFSimulation.van.toLocaleString('fr-FR', {minimumFractionDigits: 0, maximumFractionDigits: 0})}
+            </div>
+            <div className="text-xs text-gray-500">
+              {indicateursDCFSimulation.van > 0 ? 'Projet rentable' : 'Projet non rentable'}
+            </div>
+          </div>
+          <div>
+            <div className="text-sm text-gray-600">TRI annuel:</div>
+            <div className={`text-lg sm:text-xl font-bold ${
+              indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel / 100) ? 'text-green-600' : 'text-red-600'
+            }`}>
+              {(indicateursDCFSimulation.triAnnuel * 100).toFixed(2)}%
+            </div>
+            <div className="text-xs text-gray-500">
+              TRI mensuel: {(indicateursDCFSimulation.triMensuel * 100).toFixed(2)}%
+            </div>
+          </div>
+          <div>
+            <div className="text-sm text-gray-600">Indice de profitabilité:</div>
+            <div className={`text-lg sm:text-xl font-bold ${
+              indicateursDCFSimulation.indiceProfitabilite > 1 ? 'text-green-600' : 'text-red-600'
+            }`}>
+              {indicateursDCFSimulation.indiceProfitabilite.toFixed(3)}
+            </div>
+            <div className="text-xs text-gray-500">
+              {indicateursDCFSimulation.indiceProfitabilite > 1 ? 'Projet viable' : 'Projet non viable'}
+            </div>
+          </div>
+          <div>
+            <div className="text-sm text-gray-600">Payback actualisé:</div>
+            <div className="text-lg sm:text-xl font-bold text-blue-600">
+              {typeof indicateursDCFSimulation.paybackActualise === 'number' 
+                ? `${indicateursDCFSimulation.paybackActualise} mois`
+                : indicateursDCFSimulation.paybackActualise
+              }
+            </div>
+            <div className="text-xs text-gray-500">
+              {typeof indicateursDCFSimulation.paybackActualise === 'number' 
+                ? `(${(indicateursDCFSimulation.paybackActualise / 12).toFixed(1)} ans)`
+                : 'Récupération impossible'
+              }
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Flux de trésorerie détaillés */}
+      <div className="bg-white p-3 sm:p-4 md:p-6 rounded-lg shadow-md border mb-4 sm:mb-6 md:mb-8">
+        <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-gray-800">💰 Flux de Trésorerie Détailés - Simulation</h3>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gradient-to-r from-purple-500 to-purple-600">
+              <tr>
+                <th className="px-2 sm:px-4 py-3 text-left text-xs sm:text-sm font-medium text-white uppercase tracking-wider">Mois</th>
+                <th className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-medium text-white uppercase tracking-wider">Bénéfice Brut</th>
+                <th className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-medium text-white uppercase tracking-wider">Charges Fixes</th>
+                <th className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-medium text-white uppercase tracking-wider">Flux Net</th>
+                <th className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-medium text-white uppercase tracking-wider">Flux Actualisé</th>
+                <th className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-medium text-white uppercase tracking-wider">Cumul Actualisé</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {fluxDCFSimulation.slice(0, 13).map((flux, index) => (
+                <tr key={flux.mois} className={index % 2 === 0 ? "bg-gray-50" : "bg-white"}>
+                  <td className="px-2 sm:px-4 py-3 text-xs sm:text-sm font-semibold text-gray-800">
+                    {flux.mois === 0 ? 'Mois 0' : `Mois ${flux.mois}`}
+                  </td>
+                  <td className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm">
+                    {flux.beneficeBrut.toLocaleString()}
+                  </td>
+                  <td className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm">
+                    {flux.chargesFixes.toLocaleString()}
+                  </td>
+                  <td className={`px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-bold ${
+                    flux.fluxNet > 0 ? 'text-green-600' : 'text-red-600'
+                  }`}>
+                    {flux.fluxNet.toLocaleString()}
+                  </td>
+                  <td className={`px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-bold ${
+                    flux.fluxActualise > 0 ? 'text-green-600' : 'text-red-600'
+                  }`}>
+                    {flux.fluxActualise.toLocaleString('fr-FR', {minimumFractionDigits: 0, maximumFractionDigits: 0})}
+                  </td>
+                  <td className={`px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-bold ${
+                    flux.cumulActualise > 0 ? 'text-green-600' : 'text-red-600'
+                  }`}>
+                    {flux.cumulActualise.toLocaleString('fr-FR', {minimumFractionDigits: 0, maximumFractionDigits: 0})}
+                  </td>
+                </tr>
+              ))}
+              {fluxDCFSimulation.length > 13 && (
+                <tr className="bg-gray-100">
+                  <td colSpan="6" className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm text-gray-600">
+                    ... et {fluxDCFSimulation.length - 13} mois supplémentaires
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Graphique des flux de trésorerie */}
+      <div className="bg-white p-3 sm:p-4 md:p-6 rounded-lg shadow-md border mb-4 sm:mb-6 md:mb-8">
+        <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-gray-800">📊 Évolution des Flux de Trésorerie - Simulation</h3>
+        <ResponsiveContainer width="100%" height={300}>
+          <LineChart data={fluxDCFSimulation.slice(0, 25)}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis 
+              dataKey="mois" 
+              tick={{ fontSize: 12 }}
+              label={{ value: 'Mois', position: 'insideBottom', offset: -5 }}
+            />
+            <YAxis 
+              tick={{ fontSize: 12 }}
+              tickFormatter={(value) => `${(value / 1000000).toFixed(1)}M`}
+            />
+            <Tooltip 
+              formatter={(value, name) => [
+                value.toLocaleString(), 
+                name === 'fluxNet' ? 'Flux Net' : 
+                name === 'fluxActualise' ? 'Flux Actualisé' : 
+                name === 'cumulActualise' ? 'Cumul Actualisé' : name
+              ]}
+            />
+            <Line 
+              type="monotone" 
+              dataKey="fluxNet" 
+              stroke="#3498db" 
+              strokeWidth={2}
+              name="Flux Net"
+            />
+            <Line 
+              type="monotone" 
+              dataKey="fluxActualise" 
+              stroke="#e74c3c" 
+              strokeWidth={2}
+              name="Flux Actualisé"
+            />
+            <Line 
+              type="monotone" 
+              dataKey="cumulActualise" 
+              stroke="#2ecc71" 
+              strokeWidth={3}
+              name="Cumul Actualisé"
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* Contenu identique au premier onglet mais avec les données ajustées */}
+      {renderMainContent()}
+    </>
+  );
+
   return (
     <div className="p-2 sm:p-4 md:p-6 bg-gray-50 min-h-screen">
       <div className="max-w-7xl mx-auto bg-white rounded-lg shadow-lg p-4 sm:p-6 md:p-8">
@@ -920,6 +1263,16 @@ const SimulateurRentabilite = () => {
            >
              📊 DCF
            </button>
+           <button
+             onClick={() => setActiveTab('dcfSimulation')}
+             className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+               activeTab === 'dcfSimulation'
+                 ? 'bg-purple-500 text-white'
+                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+             }`}
+           >
+             📊 DCF Simulation
+           </button>
          </div>
 
                  {/* Contenu des onglets */}
@@ -927,6 +1280,7 @@ const SimulateurRentabilite = () => {
          {activeTab === 'volume' && renderVolumeSimulationContent()}
          {activeTab === 'charges' && renderChargesContent()}
          {activeTab === 'dcf' && renderDCFContent()}
+         {activeTab === 'dcfSimulation' && renderDCFSimulationContent()}
 
         {/* Graphiques */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 md:gap-8 mb-4 sm:mb-6 md:mb-8">
