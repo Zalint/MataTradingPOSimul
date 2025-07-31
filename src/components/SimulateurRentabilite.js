@@ -329,49 +329,118 @@ const SimulateurRentabilite = () => {
       loadingMessage.textContent = 'Génération du PDF en cours...';
       document.body.appendChild(loadingMessage);
 
-      // Capturer le contenu de la page
+      // Ajouter des styles temporaires pour améliorer la lisibilité du PDF
+      const originalStyles = {};
+      const elementsToStyle = mainContainerRef.current.querySelectorAll('*');
+      
+      elementsToStyle.forEach(element => {
+        const computedStyle = window.getComputedStyle(element);
+        originalStyles[element] = {
+          fontSize: element.style.fontSize,
+          fontWeight: element.style.fontWeight,
+          color: element.style.color,
+          backgroundColor: element.style.backgroundColor
+        };
+        
+        // Augmenter la taille des polices pour une meilleure lisibilité
+        if (computedStyle.fontSize && parseFloat(computedStyle.fontSize) < 16) {
+          element.style.fontSize = '16px';
+        }
+        
+        // Améliorer le contraste des textes
+        if (computedStyle.color === 'rgb(107, 114, 128)' || computedStyle.color === 'rgb(156, 163, 175)') {
+          element.style.color = '#374151';
+        }
+        
+        // Améliorer la visibilité des tableaux
+        if (element.tagName === 'TABLE' || element.classList.contains('table')) {
+          element.style.border = '2px solid #e5e7eb';
+          element.style.backgroundColor = '#ffffff';
+        }
+      });
+
+      // Attendre un peu pour que les graphiques se rendent correctement
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      // Capturer le contenu de la page avec des paramètres optimisés
       const canvas = await html2canvas(mainContainerRef.current, {
-        scale: 2,
+        scale: 3, // Augmenter la résolution pour plus de clarté
         useCORS: true,
         allowTaint: true,
         backgroundColor: '#ffffff',
         width: mainContainerRef.current.scrollWidth,
-        height: mainContainerRef.current.scrollHeight
+        height: mainContainerRef.current.scrollHeight,
+        logging: false, // Désactiver les logs pour de meilleures performances
+        imageTimeout: 15000, // Augmenter le timeout pour les images
+        removeContainer: false,
+        foreignObjectRendering: true, // Améliorer le rendu des éléments complexes
+        scrollX: 0,
+        scrollY: 0
       });
 
-      // Créer le PDF
-      const imgData = canvas.toDataURL('image/png');
+      // Restaurer les styles originaux
+      Object.keys(originalStyles).forEach(element => {
+        const styles = originalStyles[element];
+        element.style.fontSize = styles.fontSize;
+        element.style.fontWeight = styles.fontWeight;
+        element.style.color = styles.color;
+        element.style.backgroundColor = styles.backgroundColor;
+      });
+
+      // Créer le PDF avec une meilleure qualité
+      const imgData = canvas.toDataURL('image/jpeg', 0.95); // Utiliser JPEG avec haute qualité
       const pdf = new jsPDF('p', 'mm', 'a4');
       
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
-      const imgWidth = pdfWidth - 20; // Marge de 10mm de chaque côté
+      const imgWidth = pdfWidth - 30; // Augmenter les marges pour plus de clarté
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
       
-      // Ajouter un titre au PDF
-      pdf.setFontSize(20);
+      // Ajouter un titre plus détaillé au PDF
+      pdf.setFontSize(24);
       pdf.setFont('helvetica', 'bold');
-      pdf.text('Rapport de Simulation - Mata Trading', 105, 15, { align: 'center' });
+      pdf.setTextColor(44, 62, 80); // Couleur bleu foncé
+      pdf.text('Rapport de Simulation - Mata Trading', 105, 20, { align: 'center' });
       
-      pdf.setFontSize(12);
+      // Ligne de séparation
+      pdf.setDrawColor(52, 152, 219);
+      pdf.setLineWidth(0.5);
+      pdf.line(30, 25, 180, 25);
+      
+      pdf.setFontSize(14);
       pdf.setFont('helvetica', 'normal');
-      pdf.text(`Généré le: ${new Date().toLocaleString('fr-FR')}`, 105, 25, { align: 'center' });
-      pdf.text(`Onglet actif: ${getTabName(activeTab)}`, 105, 32, { align: 'center' });
+      pdf.setTextColor(52, 73, 94);
+      pdf.text(`Généré le: ${new Date().toLocaleString('fr-FR')}`, 105, 35, { align: 'center' });
+      pdf.text(`Onglet actif: ${getTabName(activeTab)}`, 105, 42, { align: 'center' });
       
-      // Ajouter l'image du contenu
+      // Ajouter des informations sur la simulation si applicable
+      if (activeTab === 'volume' && additionalVolume > 0) {
+        pdf.setFontSize(12);
+        pdf.setTextColor(155, 89, 182);
+        pdf.text(`Simulation: +${additionalVolume.toLocaleString()} pour ${selectedProduct}`, 105, 49, { align: 'center' });
+      }
+      
+      // Ajouter l'image du contenu avec de meilleures marges
       let heightLeft = imgHeight;
-      let position = 40; // Commencer après le titre
+      let position = 55; // Commencer plus bas pour laisser de l'espace au titre
       
-      pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
+      pdf.addImage(imgData, 'JPEG', 15, position, imgWidth, imgHeight);
       heightLeft -= (pdfHeight - position);
       
       // Ajouter des pages supplémentaires si nécessaire
       while (heightLeft >= 0) {
         position = heightLeft - imgHeight;
         pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
+        pdf.addImage(imgData, 'JPEG', 15, position, imgWidth, imgHeight);
         heightLeft -= pdfHeight;
       }
+
+      // Ajouter un pied de page sur la dernière page
+      const pageCount = pdf.internal.getNumberOfPages();
+      pdf.setPage(pageCount);
+      pdf.setFontSize(10);
+      pdf.setTextColor(128, 128, 128);
+      pdf.text(`Page ${pageCount} - Mata Trading Simulator`, 105, pdfHeight - 10, { align: 'center' });
 
       // Sauvegarder le PDF
       const fileName = `mata-trading-report-${new Date().toISOString().split('T')[0]}-${activeTab}.pdf`;
