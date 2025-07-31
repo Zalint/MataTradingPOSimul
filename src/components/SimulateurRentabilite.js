@@ -172,7 +172,7 @@ const SimulateurRentabilite = () => {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Abats par kg (Bœuf/Veau)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Prix Abats par kg (Bœuf/Veau)</label>
               <input 
                 type="number"
                 value={abatsParKg}
