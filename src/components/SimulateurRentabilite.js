@@ -212,9 +212,25 @@ const SimulateurRentabilite = () => {
   const amortissementChargesFixes = chargesFixes / dureeAmortissement; // Amortissement sur la durée définie
   const chargesTotales = amortissementChargesFixes + chargesMensuelles;
   
+  // Calcul avec les données originales (pour l'affichage principal et DCF simple)
   let beneficeTotal = 0;
+  const produitsAvecCalculs = Object.entries(produits).map(([nom, data]) => {
+    let margeBrute;
+    if (data.editable && data.prixAchat && data.prixVente) {
+      margeBrute = calculerMargeBrute(data);
+    } else {
+      margeBrute = margeMoyenne;
+    }
+    
+    const benefice = calculerBenefice(margeBrute, data.repartition, volume);
+    beneficeTotal += benefice;
+    
+    return { nom, ...data, margeBrute, benefice };
+  });
 
-  const produitsAvecCalculs = Object.entries(adjustedProduits).map(([nom, data]) => {
+  // Calcul avec les données de simulation (pour l'affichage de simulation)
+  let beneficeTotalSimulation = 0;
+  const produitsAvecCalculsSimulation = Object.entries(adjustedProduits).map(([nom, data]) => {
     let margeBrute;
     if (data.editable && data.prixAchat && data.prixVente) {
       margeBrute = calculerMargeBrute(data);
@@ -223,20 +239,29 @@ const SimulateurRentabilite = () => {
     }
     
     const benefice = calculerBenefice(margeBrute, data.repartition, adjustedVolume);
-    beneficeTotal += benefice;
+    beneficeTotalSimulation += benefice;
     
     return { nom, ...data, margeBrute, benefice };
   });
 
-  const chartData = produitsAvecCalculs.map(p => ({
+  // Utiliser les données appropriées selon l'onglet actif
+  const produitsActifs = activeTab === 'volume' ? produitsAvecCalculsSimulation : produitsAvecCalculs;
+  const volumeActif = activeTab === 'volume' ? adjustedVolume : volume;
+  
+  const chartData = produitsActifs.map(p => ({
     nom: p.nom,
     benefice: Math.round(p.benefice),
     marge: p.margeBrute * 100,
     repartition: p.repartition * 100,
-    volume: Math.round(p.repartition * adjustedVolume)
+    volume: Math.round(p.repartition * volumeActif)
   }));
 
   const pieColors = ['#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c', '#34495e'];
+
+  // Fonction helper pour obtenir le bénéfice total approprié selon l'onglet
+  const getBeneficeTotalActif = () => {
+    return activeTab === 'volume' ? beneficeTotalSimulation : beneficeTotal;
+  };
 
   // Calculs DCF
   const tauxActualisationMensuel = Math.pow(1 + tauxActualisationAnnuel / 100, 1/12) - 1;
@@ -341,30 +366,6 @@ const SimulateurRentabilite = () => {
   // Calcul des flux DCF pour la simulation
   const calculerFluxDCFSimulation = () => {
     const flux = [];
-    const adjustedVolume = getAdjustedVolume();
-    const adjustedProduits = getAdjustedRepartitions();
-    
-    // Calculer le bénéfice total avec les données de simulation
-    let beneficeTotalSimulation = 0;
-    Object.keys(adjustedProduits).forEach(nom => {
-      if (adjustedProduits[nom].editable) {
-        const margeBrute = calculerMargeBrute(adjustedProduits[nom]);
-        const repartition = adjustedProduits[nom].repartition;
-        const benefice = calculerBenefice(margeBrute, repartition, adjustedVolume);
-        beneficeTotalSimulation += benefice;
-      }
-    });
-    
-    // Calculer la marge moyenne pour les produits non-éditables
-    const margeMoyenne = calculerMargeMoyenne();
-    Object.keys(adjustedProduits).forEach(nom => {
-      if (!adjustedProduits[nom].editable) {
-        const repartition = adjustedProduits[nom].repartition;
-        const benefice = calculerBenefice(margeMoyenne, repartition, adjustedVolume);
-        beneficeTotalSimulation += benefice;
-      }
-    });
-    
     const beneficeBrutMensuel = beneficeTotalSimulation;
     const chargesFixesMensuelles = chargesTotales;
     const investissementInitial = -chargesFixes; // Décaissement initial
@@ -548,7 +549,7 @@ const SimulateurRentabilite = () => {
           </div>
           <div>
             <div className="text-sm text-gray-600">Bénéfice Total:</div>
-            <div className="text-lg sm:text-xl font-bold text-green-600">{Math.round(beneficeTotal).toLocaleString()}</div>
+            <div className="text-lg sm:text-xl font-bold text-green-600">{Math.round(getBeneficeTotalActif()).toLocaleString()}</div>
           </div>
           <div>
             <div className="text-sm text-gray-600">Marge Moyenne:</div>
@@ -767,14 +768,14 @@ const SimulateurRentabilite = () => {
          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
            <div>
              <div className="text-sm text-gray-600">Bénéfice net mensuel:</div>
-             <div className="text-lg sm:text-xl font-bold text-green-600">{(beneficeTotal - chargesTotales).toLocaleString()}</div>
+             <div className="text-lg sm:text-xl font-bold text-green-600">{(getBeneficeTotalActif() - chargesTotales).toLocaleString()}</div>
            </div>
            <div>
              <div className="text-sm text-gray-600">Rentabilité:</div>
              <div className={`text-lg sm:text-xl font-bold ${
-               (beneficeTotal - chargesTotales) > 0 ? 'text-green-600' : 'text-red-600'
+               (getBeneficeTotalActif() - chargesTotales) > 0 ? 'text-green-600' : 'text-red-600'
              }`}>
-               {((beneficeTotal - chargesTotales) / beneficeTotal * 100).toFixed(1)}%
+               {((getBeneficeTotalActif() - chargesTotales) / getBeneficeTotalActif() * 100).toFixed(1)}%
              </div>
            </div>
          </div>
@@ -1351,9 +1352,9 @@ const SimulateurRentabilite = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {produitsAvecCalculs.map((produit, index) => {
+                  {produitsActifs.map((produit, index) => {
                     const isEditable = produit.editable;
-                    const pourcentageTotal = (produit.benefice / beneficeTotal) * 100;
+                    const pourcentageTotal = (produit.benefice / getBeneficeTotalActif()) * 100;
                     
                     return (
                       <tr key={produit.nom} className={index % 2 === 0 ? "bg-gray-50" : "bg-white"}>
