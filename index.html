@@ -25,7 +25,7 @@
 
         const SimulateurRentabilite = () => {
             const [volume, setVolume] = useState(20000000);
-            const [abatsParKg, setAbatsParKg] = useState(200);
+            const [abatsParKg, setAbatsParKg] = useState(100);
             const [peration, setPeration] = useState(0.1);
             
             const [produits, setProduits] = useState({
@@ -193,7 +193,7 @@
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Abats par kg (Bœuf/Veau)</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Filet, foie, yell par kg (Bœuf/Veau)</label>
                                     <input 
                                         type="number"
                                         value={abatsParKg}

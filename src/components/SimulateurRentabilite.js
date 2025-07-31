@@ -23,6 +23,8 @@ const SimulateurRentabilite = () => {
   const [internet, setInternet] = useState(10000);
   const [sacsLivraison, setSacsLivraison] = useState(30000);
   const [chargesTransport, setChargesTransport] = useState(150000);
+  const [loyer, setLoyer] = useState(250000);
+  const [autresCharges, setAutresCharges] = useState(0);
   
   // États pour le DCF
   const [tauxActualisationAnnuel, setTauxActualisationAnnuel] = useState(12); // 12% par défaut
@@ -201,6 +203,8 @@ const SimulateurRentabilite = () => {
     setInternet(10000);
     setSacsLivraison(30000);
     setChargesTransport(150000);
+    setLoyer(250000);
+    setAutresCharges(0);
     // Reset DCF
     setTauxActualisationAnnuel(12);
     setDureeAnalyse(60);
@@ -230,6 +234,8 @@ const SimulateurRentabilite = () => {
         internet,
         sacsLivraison,
         chargesTransport,
+        loyer,
+        autresCharges,
         
         // DCF
         tauxActualisationAnnuel,
@@ -285,6 +291,8 @@ const SimulateurRentabilite = () => {
         setInternet(data.internet || 10000);
         setSacsLivraison(data.sacsLivraison || 30000);
         setChargesTransport(data.chargesTransport || 150000);
+        setLoyer(data.loyer || 250000);
+        setAutresCharges(data.autresCharges || 0);
         setTauxActualisationAnnuel(data.tauxActualisationAnnuel || 12);
         setDureeAnalyse(data.dureeAnalyse || 60);
         
@@ -411,7 +419,7 @@ const SimulateurRentabilite = () => {
   const adjustedProduits = getAdjustedRepartitions();
   
   // Calcul des charges totales
-  const chargesMensuelles = salaire + electricite + eau + internet + sacsLivraison + chargesTransport;
+  const chargesMensuelles = salaire + electricite + eau + internet + sacsLivraison + chargesTransport + loyer + autresCharges;
   const amortissementChargesFixes = chargesFixes / dureeAmortissement; // Amortissement sur la durée définie
   const chargesTotales = amortissementChargesFixes + chargesMensuelles;
   
@@ -954,6 +962,26 @@ const SimulateurRentabilite = () => {
                 type="number"
                 value={chargesTransport}
                 onChange={(e) => setChargesTransport(parseFloat(e.target.value) || 0)}
+                className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
+                style={{ fontSize: '16px' }}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Loyer</label>
+              <input 
+                type="number"
+                value={loyer}
+                onChange={(e) => setLoyer(parseFloat(e.target.value) || 0)}
+                className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
+                style={{ fontSize: '16px' }}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Autres charges</label>
+              <input 
+                type="number"
+                value={autresCharges}
+                onChange={(e) => setAutresCharges(parseFloat(e.target.value) || 0)}
                 className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
                 style={{ fontSize: '16px' }}
               />
