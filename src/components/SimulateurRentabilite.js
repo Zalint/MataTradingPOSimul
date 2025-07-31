@@ -5,7 +5,7 @@ import html2canvas from 'html2canvas';
 
 const SimulateurRentabilite = () => {
   const mainContainerRef = useRef(null);
-  const [activeTab, setActiveTab] = useState('main'); // 'main', 'volume', 'charges', 'dcf' ou 'dcfSimulation'
+  const [activeTab, setActiveTab] = useState('main'); // 'main', 'volume', 'charges', 'dcf', 'dcfSimulation' ou 'faq'
   const [volume, setVolume] = useState(20000000);
   const [abatsParKg, setAbatsParKg] = useState(200);
   const [peration, setPeration] = useState(0.1);
@@ -443,7 +443,8 @@ const SimulateurRentabilite = () => {
       'volume': 'Simulation Volume',
       'charges': 'Charges',
       'dcf': 'DCF Simple',
-      'dcfSimulation': 'DCF Simulation'
+      'dcfSimulation': 'DCF Simulation',
+      'faq': 'FAQ'
     };
     return tabNames[tab] || tab;
   };
@@ -1664,6 +1665,143 @@ const SimulateurRentabilite = () => {
     </>
   );
 
+  const renderFAQContent = () => (
+    <>
+      {/* FAQ Générale */}
+      <div className="bg-teal-50 border border-teal-200 rounded-lg p-3 sm:p-4 md:p-6 mb-4 sm:mb-6 md:mb-8">
+        <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-teal-800">❓ Questions Fréquemment Posées</h3>
+        
+        {/* Valeurs par défaut */}
+        <div className="mb-6">
+          <h4 className="text-sm font-semibold text-teal-700 mb-3">📊 Valeurs par Défaut de la Simulation</h4>
+          <div className="space-y-3">
+            <div className="bg-white p-3 rounded border">
+              <div className="font-medium text-gray-800">CA (Chiffre d'Affaires) Mensuel</div>
+              <div className="text-lg font-bold text-blue-600">20,000,000</div>
+              <div className="text-sm text-gray-600">Volume de vente mensuel total de tous les produits</div>
+            </div>
+            <div className="bg-white p-3 rounded border">
+              <div className="font-medium text-gray-800">CA Annuel</div>
+              <div className="text-lg font-bold text-blue-600">240,000,000</div>
+              <div className="text-sm text-gray-600">20,000,000 × 12 mois</div>
+            </div>
+            <div className="bg-white p-3 rounded border">
+              <div className="font-medium text-gray-800">Bénéfice Mensuel Approximatif</div>
+              <div className="text-lg font-bold text-green-600">~2,000,000</div>
+              <div className="text-sm text-gray-600">Environ 10% du CA mensuel</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Paramètres financiers */}
+        <div className="mb-6">
+          <h4 className="text-sm font-semibold text-teal-700 mb-3">🏦 Paramètres Financiers DCF</h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="bg-white p-3 rounded border">
+              <div className="font-medium text-gray-800">CAPEX (annuel)</div>
+              <div className="text-lg font-bold text-purple-600">24,000,000</div>
+              <div className="text-sm text-gray-600">10% du CA annuel (240M × 10%)</div>
+            </div>
+            <div className="bg-white p-3 rounded border">
+              <div className="font-medium text-gray-800">BFR (annuel)</div>
+              <div className="text-lg font-bold text-orange-600">18,000,000</div>
+              <div className="text-sm text-gray-600">7.5% du CA annuel (240M × 7.5%)</div>
+            </div>
+            <div className="bg-white p-3 rounded border">
+              <div className="font-medium text-gray-800">D&A (annuel)</div>
+              <div className="text-lg font-bold text-indigo-600">12,000,000</div>
+              <div className="text-sm text-gray-600">50% du CAPEX (24M × 50%)</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Explications des concepts */}
+        <div className="mb-6">
+          <h4 className="text-sm font-semibold text-teal-700 mb-3">📚 Explications des Concepts Financiers</h4>
+          <div className="space-y-4">
+            <div className="bg-white p-4 rounded border">
+              <div className="font-medium text-gray-800 mb-2">💼 CAPEX (Capital Expenditure)</div>
+              <div className="text-sm text-gray-600">
+                Dépenses d'investissement en capital pour acquérir, maintenir ou améliorer des actifs physiques 
+                (équipements, bâtiments, véhicules, etc.). Ces investissements sont essentiels pour la croissance 
+                et le maintien de l'activité.
+              </div>
+            </div>
+            <div className="bg-white p-4 rounded border">
+              <div className="font-medium text-gray-800 mb-2">💰 BFR (Besoin en Fonds de Roulement)</div>
+              <div className="text-sm text-gray-600">
+                Différence entre les actifs circulants (stocks, créances clients) et les passifs circulants 
+                (dettes fournisseurs). Il représente le besoin de financement pour faire fonctionner l'activité 
+                au quotidien.
+              </div>
+            </div>
+            <div className="bg-white p-4 rounded border">
+              <div className="font-medium text-gray-800 mb-2">📉 D&A (Dépréciation et Amortissement)</div>
+              <div className="text-sm text-gray-600">
+                <strong>Dépréciation :</strong> Réduction de la valeur d'un actif au fil du temps, généralement 
+                en raison de l'usure ou du vieillissement. Cela impacte le bilan de l'entreprise en diminuant 
+                la valeur de ses actifs.<br/><br/>
+                <strong>Amortissement :</strong> Spécifique aux actifs incorporels (comme les brevets ou les logiciels), 
+                et comme la dépréciation, il permet d'étaler le coût sur la durée de vie de l'actif.
+              </div>
+            </div>
+            <div className="bg-white p-4 rounded border">
+              <div className="font-medium text-gray-800 mb-2">📊 WACC (Weighted Average Cost of Capital)</div>
+              <div className="text-sm text-gray-600">
+                Coût moyen pondéré du capital qui représente le taux de rendement minimum requis par les 
+                investisseurs (actionnaires et créanciers). Il est utilisé pour actualiser les flux de 
+                trésorerie futurs dans le modèle DCF.
+              </div>
+            </div>
+            <div className="bg-white p-4 rounded border">
+              <div className="font-medium text-gray-800 mb-2">📈 Croissance Terminale (g)</div>
+              <div className="text-sm text-gray-600">
+                Taux de croissance à perpétuité utilisé pour calculer la valeur terminale. Il représente 
+                la croissance annuelle attendue après la période de prévision détaillée (généralement 3-5%).
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Indicateurs financiers */}
+        <div>
+          <h4 className="text-sm font-semibold text-teal-700 mb-3">📈 Indicateurs Financiers</h4>
+          <div className="space-y-4">
+            <div className="bg-white p-4 rounded border">
+              <div className="font-medium text-gray-800 mb-2">💵 EBIT (Earnings Before Interest and Taxes)</div>
+              <div className="text-sm text-gray-600">
+                Bénéfice avant intérêts et impôts. Il mesure la rentabilité des opérations d'une entreprise 
+                sans l'impact de sa structure de capital ni les impôts qu'elle doit payer.
+              </div>
+            </div>
+            <div className="bg-white p-4 rounded border">
+              <div className="font-medium text-gray-800 mb-2">💵 EBITDA (Earnings Before Interest, Taxes, Depreciation, and Amortization)</div>
+              <div className="text-sm text-gray-600">
+                Bénéfice avant intérêts, impôts, dépréciation et amortissement. Il permet d'évaluer les 
+                performances opérationnelles de l'entreprise dans une perspective plus brute et de mettre 
+                l'accent sur la capacité à générer des liquidités.
+              </div>
+            </div>
+            <div className="bg-white p-4 rounded border">
+              <div className="font-medium text-gray-800 mb-2">💵 NOPAT (Net Operating Profit After Taxes)</div>
+              <div className="text-sm text-gray-600">
+                Résultat net d'exploitation après impôts. Il représente le bénéfice opérationnel après 
+                déduction des impôts, calculé comme : NOPAT = EBIT × (1 - Taux d'imposition).
+              </div>
+            </div>
+            <div className="bg-white p-4 rounded border">
+              <div className="font-medium text-gray-800 mb-2">💵 FCF (Free Cash Flow)</div>
+              <div className="text-sm text-gray-600">
+                Flux de trésorerie disponible. Il représente les liquidités générées par l'activité après 
+                déduction des investissements nécessaires : FCF = NOPAT + D&A - CAPEX - ΔBFR.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+
   return (
     <div className="p-2 sm:p-4 md:p-6 bg-gray-50 min-h-screen">
       <div ref={mainContainerRef} className="max-w-7xl mx-auto bg-white rounded-lg shadow-lg p-4 sm:p-6 md:p-8">
@@ -1724,6 +1862,16 @@ const SimulateurRentabilite = () => {
            >
              📊 DCF Simulation
            </button>
+           <button
+             onClick={() => setActiveTab('faq')}
+             className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+               activeTab === 'faq'
+                 ? 'bg-teal-500 text-white'
+                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+             }`}
+           >
+             ❓ FAQ
+           </button>
          </div>
 
                  {/* Contenu des onglets */}
@@ -1732,6 +1880,7 @@ const SimulateurRentabilite = () => {
          {activeTab === 'charges' && renderChargesContent()}
          {activeTab === 'dcf' && renderDCFContent()}
          {activeTab === 'dcfSimulation' && renderDCFSimulationContent()}
+         {activeTab === 'faq' && renderFAQContent()}
 
         {/* Graphiques */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 md:gap-8 mb-4 sm:mb-6 md:mb-8">
