@@ -2,9 +2,14 @@ import React, { useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 
 const SimulateurRentabilite = () => {
+  const [activeTab, setActiveTab] = useState('main'); // 'main' ou 'volume'
   const [volume, setVolume] = useState(20000000);
   const [abatsParKg, setAbatsParKg] = useState(200);
   const [peration, setPeration] = useState(0.1);
+  
+  // Nouveaux états pour la simulation de volume
+  const [selectedProduct, setSelectedProduct] = useState('Poulet');
+  const [additionalVolume, setAdditionalVolume] = useState(5000000);
   
   const [produits, setProduits] = useState({
     'Boeuf': {
@@ -57,6 +62,44 @@ const SimulateurRentabilite = () => {
       hasAbats: false
     }
   });
+
+  // Calcul du volume ajusté pour la simulation
+  const getAdjustedVolume = () => {
+    if (activeTab === 'volume') {
+      return volume + additionalVolume;
+    }
+    return volume;
+  };
+
+  // Calcul des répartitions ajustées pour la simulation
+  const getAdjustedRepartitions = () => {
+    if (activeTab === 'volume') {
+      const adjustedProduits = { ...produits };
+      const totalVolume = volume + additionalVolume;
+      
+      // Calculer le nouveau volume pour le produit sélectionné
+      const selectedProductVolume = produits[selectedProduct].repartition * volume + additionalVolume;
+      const newRepartition = selectedProductVolume / totalVolume;
+      
+      // Ajuster la répartition du produit sélectionné
+      adjustedProduits[selectedProduct] = {
+        ...adjustedProduits[selectedProduct],
+        repartition: newRepartition
+      };
+      
+      // Ajuster les répartitions des autres produits
+      const otherProductsVolume = volume - (produits[selectedProduct].repartition * volume);
+      Object.keys(adjustedProduits).forEach(nom => {
+        if (nom !== selectedProduct) {
+          const currentVolume = adjustedProduits[nom].repartition * volume;
+          adjustedProduits[nom].repartition = currentVolume / totalVolume;
+        }
+      });
+      
+      return adjustedProduits;
+    }
+    return produits;
+  };
 
   const calculerMargeMoyenne = () => {
     const produitsEditables = Object.entries(produits).filter(([nom, data]) => 
@@ -121,12 +164,16 @@ const SimulateurRentabilite = () => {
     setVolume(20000000);
     setAbatsParKg(200);
     setPeration(0.1);
+    setAdditionalVolume(5000000);
+    setSelectedProduct('Poulet');
   };
 
   const margeMoyenne = calculerMargeMoyenne();
+  const adjustedVolume = getAdjustedVolume();
+  const adjustedProduits = getAdjustedRepartitions();
   let beneficeTotal = 0;
 
-  const produitsAvecCalculs = Object.entries(produits).map(([nom, data]) => {
+  const produitsAvecCalculs = Object.entries(adjustedProduits).map(([nom, data]) => {
     let margeBrute;
     if (data.editable && data.prixAchat && data.prixVente) {
       margeBrute = calculerMargeBrute(data);
@@ -134,7 +181,7 @@ const SimulateurRentabilite = () => {
       margeBrute = margeMoyenne;
     }
     
-    const benefice = calculerBenefice(margeBrute, data.repartition, volume);
+    const benefice = calculerBenefice(margeBrute, data.repartition, adjustedVolume);
     beneficeTotal += benefice;
     
     return { nom, ...data, margeBrute, benefice };
@@ -149,6 +196,226 @@ const SimulateurRentabilite = () => {
 
   const pieColors = ['#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c', '#34495e'];
 
+  const renderMainContent = () => (
+    <>
+      {/* Paramètres globaux */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4 md:p-6 mb-4 sm:mb-6 md:mb-8">
+        <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-blue-800">🎛️ Paramètres Globaux</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Volume point de vente</label>
+            <input 
+              type="number"
+              value={volume}
+              onChange={(e) => setVolume(parseFloat(e.target.value) || 0)}
+              className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
+              style={{ fontSize: '16px' }}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Abats par kg (Bœuf/Veau)</label>
+            <input 
+              type="number"
+              value={abatsParKg}
+              onChange={(e) => setAbatsParKg(parseFloat(e.target.value) || 0)}
+              className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
+              style={{ fontSize: '16px' }}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Pération % (Bœuf/Veau)</label>
+            <input 
+              type="number"
+              step="0.01"
+              min="0"
+              max="1"
+              value={peration}
+              onChange={(e) => setPeration(parseFloat(e.target.value) || 0)}
+              className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
+              style={{ fontSize: '16px' }}
+            />
+            <div className="text-xs text-gray-500 mt-1">{(peration * 100).toFixed(1)}%</div>
+          </div>
+          <div className="flex items-end">
+            <button 
+              onClick={resetPrix}
+              className="w-full px-3 sm:px-4 py-2 sm:py-3 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors text-sm sm:text-base min-h-[44px]"
+            >
+              🔄 Reset Tout
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Validation de la répartition */}
+      <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6 md:mb-8">
+        <h3 className="text-base sm:text-lg font-semibold mb-2 sm:mb-3 text-orange-800">⚠️ Contrôle des Répartitions</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+          <div>
+            <div className="text-sm text-gray-600">Total des répartitions:</div>
+            <div className={`text-base sm:text-lg font-bold ${
+              Math.abs(Object.values(adjustedProduits).reduce((sum, p) => sum + p.repartition, 0) - 1) < 0.001 
+                ? 'text-green-600' 
+                : 'text-red-600'
+            }`}>
+              {(Object.values(adjustedProduits).reduce((sum, p) => sum + p.repartition, 0) * 100).toFixed(2)}%
+            </div>
+          </div>
+          <div>
+            <div className="text-sm text-gray-600">Écart par rapport à 100%:</div>
+            <div className={`text-base sm:text-lg font-bold ${
+              Math.abs(Object.values(adjustedProduits).reduce((sum, p) => sum + p.repartition, 0) - 1) < 0.001 
+                ? 'text-green-600' 
+                : 'text-red-600'
+            }`}>
+              {((Object.values(adjustedProduits).reduce((sum, p) => sum + p.repartition, 0) - 1) * 100).toFixed(2)}%
+            </div>
+          </div>
+          <div className="flex items-end">
+            <button 
+              onClick={() => {
+                const total = Object.values(adjustedProduits).reduce((sum, p) => sum + p.repartition, 0);
+                if (total > 0) {
+                  setProduits(prev => {
+                    const nouveauxProduits = { ...prev };
+                    Object.keys(nouveauxProduits).forEach(nom => {
+                      nouveauxProduits[nom].repartition = nouveauxProduits[nom].repartition / total;
+                    });
+                    return nouveauxProduits;
+                  });
+                }
+              }}
+              className="w-full px-3 sm:px-4 py-2 sm:py-3 bg-orange-500 text-white rounded hover:bg-orange-600 transition-colors text-sm min-h-[44px]"
+            >
+              🔧 Normaliser à 100%
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Actions rapides étendues */}
+      <div className="bg-gray-100 p-3 sm:p-4 md:p-6 rounded-lg mb-4 sm:mb-6 md:mb-8">
+        <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-gray-700">⚡ Actions Rapides</h3>
+        <div className="space-y-3 sm:space-y-4">
+          <div>
+            <div className="text-sm font-medium text-gray-600 mb-2">Prix de vente:</div>
+            <div className="flex flex-wrap gap-2">
+              <button onClick={() => augmenterTousPrix(50)} className="px-3 py-2 sm:px-4 sm:py-3 bg-green-500 text-white rounded text-sm hover:bg-green-600 min-h-[44px] min-w-[60px]">+50</button>
+              <button onClick={() => augmenterTousPrix(100)} className="px-3 py-2 sm:px-4 sm:py-3 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 min-h-[44px] min-w-[60px]">+100</button>
+              <button onClick={() => augmenterTousPrix(200)} className="px-3 py-2 sm:px-4 sm:py-3 bg-red-500 text-white rounded text-sm hover:bg-red-600 min-h-[44px] min-w-[60px]">+200</button>
+              <button onClick={() => augmenterTousPrix(-100)} className="px-3 py-2 sm:px-4 sm:py-3 bg-yellow-500 text-white rounded text-sm hover:bg-yellow-600 min-h-[44px] min-w-[60px]">-100</button>
+            </div>
+          </div>
+          <div>
+            <div className="text-sm font-medium text-gray-600 mb-2">Prix d'achat:</div>
+            <div className="flex flex-wrap gap-2">
+              <button onClick={() => augmenterTousPrix(50, 'prixAchat')} className="px-3 py-2 sm:px-4 sm:py-3 bg-green-600 text-white rounded text-sm hover:bg-green-700 min-h-[44px] min-w-[60px]">+50</button>
+              <button onClick={() => augmenterTousPrix(-50, 'prixAchat')} className="px-3 py-2 sm:px-4 sm:py-3 bg-orange-500 text-white rounded text-sm hover:bg-orange-600 min-h-[44px] min-w-[60px]">-50</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Résumé global */}
+      <div className="bg-green-50 border border-green-200 rounded-lg p-3 sm:p-4 md:p-6 mb-4 sm:mb-6 md:mb-8">
+        <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-green-800">📊 Résumé Global</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+          <div>
+            <div className="text-sm text-gray-600">Volume point de vente:</div>
+            <div className="text-lg sm:text-xl font-bold text-gray-800">{adjustedVolume.toLocaleString()}</div>
+            {activeTab === 'volume' && (
+              <div className="text-xs text-blue-600">(+{additionalVolume.toLocaleString()})</div>
+            )}
+          </div>
+          <div>
+            <div className="text-sm text-gray-600">Bénéfice Total:</div>
+            <div className="text-lg sm:text-xl font-bold text-green-600">{Math.round(beneficeTotal).toLocaleString()}</div>
+          </div>
+          <div>
+            <div className="text-sm text-gray-600">Marge Moyenne:</div>
+            <div className="text-lg sm:text-xl font-bold text-blue-600">{(margeMoyenne * 100).toFixed(2)}%</div>
+          </div>
+          <div>
+            <div className="text-sm text-gray-600">Paramètres Bœuf/Veau:</div>
+            <div className="text-sm text-gray-700">Abats: {abatsParKg} | Pération: {(peration * 100).toFixed(1)}%</div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+
+  const renderVolumeSimulationContent = () => (
+    <>
+      {/* Paramètres de simulation de volume */}
+      <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 sm:p-4 md:p-6 mb-4 sm:mb-6 md:mb-8">
+        <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-purple-800">📈 Simulation Augmentation Volume Produit</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Produit à augmenter</label>
+            <select 
+              value={selectedProduct}
+              onChange={(e) => setSelectedProduct(e.target.value)}
+              className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
+              style={{ fontSize: '16px' }}
+            >
+              {Object.keys(produits).filter(nom => produits[nom].editable).map(nom => (
+                <option key={nom} value={nom}>{nom}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Volume à ajouter</label>
+            <input 
+              type="number"
+              value={additionalVolume}
+              onChange={(e) => setAdditionalVolume(parseFloat(e.target.value) || 0)}
+              className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
+              style={{ fontSize: '16px' }}
+            />
+          </div>
+          <div className="flex items-end">
+            <div className="w-full p-2 sm:p-3 bg-purple-100 rounded text-sm">
+              <div className="text-purple-800 font-medium">Volume total: {adjustedVolume.toLocaleString()}</div>
+              <div className="text-purple-600 text-xs">Base: {volume.toLocaleString()} + Ajout: {additionalVolume.toLocaleString()}</div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Aperçu des changements */}
+        <div className="mt-4 p-3 bg-white rounded border">
+          <h4 className="text-sm font-semibold text-purple-800 mb-2">📊 Aperçu des Changements</h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <div className="text-xs text-gray-600 mb-1">Volume {selectedProduct}:</div>
+              <div className="text-sm">
+                <span className="text-gray-500">Avant: </span>
+                <span className="font-medium">{(produits[selectedProduct].repartition * volume).toLocaleString()}</span>
+              </div>
+              <div className="text-sm">
+                <span className="text-green-600">Après: </span>
+                <span className="font-medium text-green-600">{(adjustedProduits[selectedProduct].repartition * adjustedVolume).toLocaleString()}</span>
+              </div>
+            </div>
+            <div>
+              <div className="text-xs text-gray-600 mb-1">Répartition {selectedProduct}:</div>
+              <div className="text-sm">
+                <span className="text-gray-500">Avant: </span>
+                <span className="font-medium">{(produits[selectedProduct].repartition * 100).toFixed(2)}%</span>
+              </div>
+              <div className="text-sm">
+                <span className="text-green-600">Après: </span>
+                <span className="font-medium text-green-600">{(adjustedProduits[selectedProduct].repartition * 100).toFixed(2)}%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Contenu identique au premier onglet mais avec les données ajustées */}
+      {renderMainContent()}
+    </>
+  );
+
   return (
     <div className="p-2 sm:p-4 md:p-6 bg-gray-50 min-h-screen">
       <div className="max-w-7xl mx-auto bg-white rounded-lg shadow-lg p-4 sm:p-6 md:p-8">
@@ -157,146 +424,32 @@ const SimulateurRentabilite = () => {
           🧮 Simulateur Interactif - Analyse de Rentabilité Avancée
         </h1>
 
-        {/* Paramètres globaux */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4 md:p-6 mb-4 sm:mb-6 md:mb-8">
-          <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-blue-800">🎛️ Paramètres Globaux</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Volume point de vente</label>
-              <input 
-                type="number"
-                value={volume}
-                onChange={(e) => setVolume(parseFloat(e.target.value) || 0)}
-                className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
-                style={{ fontSize: '16px' }} // Évite le zoom sur iOS
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Prix Abats par kg (Bœuf/Veau)</label>
-              <input 
-                type="number"
-                value={abatsParKg}
-                onChange={(e) => setAbatsParKg(parseFloat(e.target.value) || 0)}
-                className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
-                style={{ fontSize: '16px' }}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Pération % (Bœuf/Veau)</label>
-              <input 
-                type="number"
-                step="0.01"
-                min="0"
-                max="1"
-                value={peration}
-                onChange={(e) => setPeration(parseFloat(e.target.value) || 0)}
-                className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
-                style={{ fontSize: '16px' }}
-              />
-              <div className="text-xs text-gray-500 mt-1">{(peration * 100).toFixed(1)}%</div>
-            </div>
-            <div className="flex items-end">
-              <button 
-                onClick={resetPrix}
-                className="w-full px-3 sm:px-4 py-2 sm:py-3 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors text-sm sm:text-base min-h-[44px]"
-              >
-                🔄 Reset Tout
-              </button>
-            </div>
-          </div>
+        {/* Onglets */}
+        <div className="flex border-b border-gray-200 mb-6">
+          <button
+            onClick={() => setActiveTab('main')}
+            className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+              activeTab === 'main'
+                ? 'bg-blue-500 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            📊 Simulation Principale
+          </button>
+          <button
+            onClick={() => setActiveTab('volume')}
+            className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+              activeTab === 'volume'
+                ? 'bg-purple-500 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            📈 Simulation Volume Produit
+          </button>
         </div>
 
-        {/* Validation de la répartition */}
-        <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6 md:mb-8">
-          <h3 className="text-base sm:text-lg font-semibold mb-2 sm:mb-3 text-orange-800">⚠️ Contrôle des Répartitions</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-            <div>
-              <div className="text-sm text-gray-600">Total des répartitions:</div>
-              <div className={`text-base sm:text-lg font-bold ${
-                Math.abs(Object.values(produits).reduce((sum, p) => sum + p.repartition, 0) - 1) < 0.001 
-                  ? 'text-green-600' 
-                  : 'text-red-600'
-              }`}>
-                {(Object.values(produits).reduce((sum, p) => sum + p.repartition, 0) * 100).toFixed(2)}%
-              </div>
-            </div>
-            <div>
-              <div className="text-sm text-gray-600">Écart par rapport à 100%:</div>
-              <div className={`text-base sm:text-lg font-bold ${
-                Math.abs(Object.values(produits).reduce((sum, p) => sum + p.repartition, 0) - 1) < 0.001 
-                  ? 'text-green-600' 
-                  : 'text-red-600'
-              }`}>
-                {((Object.values(produits).reduce((sum, p) => sum + p.repartition, 0) - 1) * 100).toFixed(2)}%
-              </div>
-            </div>
-            <div className="flex items-end">
-              <button 
-                onClick={() => {
-                  const total = Object.values(produits).reduce((sum, p) => sum + p.repartition, 0);
-                  if (total > 0) {
-                    setProduits(prev => {
-                      const nouveauxProduits = { ...prev };
-                      Object.keys(nouveauxProduits).forEach(nom => {
-                        nouveauxProduits[nom].repartition = nouveauxProduits[nom].repartition / total;
-                      });
-                      return nouveauxProduits;
-                    });
-                  }
-                }}
-                className="w-full px-3 sm:px-4 py-2 sm:py-3 bg-orange-500 text-white rounded hover:bg-orange-600 transition-colors text-sm min-h-[44px]"
-              >
-                🔧 Normaliser à 100%
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Actions rapides étendues */}
-        <div className="bg-gray-100 p-3 sm:p-4 md:p-6 rounded-lg mb-4 sm:mb-6 md:mb-8">
-          <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-gray-700">⚡ Actions Rapides</h3>
-          <div className="space-y-3 sm:space-y-4">
-            <div>
-              <div className="text-sm font-medium text-gray-600 mb-2">Prix de vente:</div>
-              <div className="flex flex-wrap gap-2">
-                <button onClick={() => augmenterTousPrix(50)} className="px-3 py-2 sm:px-4 sm:py-3 bg-green-500 text-white rounded text-sm hover:bg-green-600 min-h-[44px] min-w-[60px]">+50</button>
-                <button onClick={() => augmenterTousPrix(100)} className="px-3 py-2 sm:px-4 sm:py-3 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 min-h-[44px] min-w-[60px]">+100</button>
-                <button onClick={() => augmenterTousPrix(200)} className="px-3 py-2 sm:px-4 sm:py-3 bg-red-500 text-white rounded text-sm hover:bg-red-600 min-h-[44px] min-w-[60px]">+200</button>
-                <button onClick={() => augmenterTousPrix(-100)} className="px-3 py-2 sm:px-4 sm:py-3 bg-yellow-500 text-white rounded text-sm hover:bg-yellow-600 min-h-[44px] min-w-[60px]">-100</button>
-              </div>
-            </div>
-            <div>
-              <div className="text-sm font-medium text-gray-600 mb-2">Prix d'achat:</div>
-              <div className="flex flex-wrap gap-2">
-                <button onClick={() => augmenterTousPrix(50, 'prixAchat')} className="px-3 py-2 sm:px-4 sm:py-3 bg-green-600 text-white rounded text-sm hover:bg-green-700 min-h-[44px] min-w-[60px]">+50</button>
-                <button onClick={() => augmenterTousPrix(-50, 'prixAchat')} className="px-3 py-2 sm:px-4 sm:py-3 bg-orange-500 text-white rounded text-sm hover:bg-orange-600 min-h-[44px] min-w-[60px]">-50</button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Résumé global */}
-        <div className="bg-green-50 border border-green-200 rounded-lg p-3 sm:p-4 md:p-6 mb-4 sm:mb-6 md:mb-8">
-          <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-green-800">📊 Résumé Global</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-            <div>
-              <div className="text-sm text-gray-600">Volume point de vente:</div>
-              <div className="text-lg sm:text-xl font-bold text-gray-800">{volume.toLocaleString()}</div>
-            </div>
-            <div>
-              <div className="text-sm text-gray-600">Bénéfice Total:</div>
-              <div className="text-lg sm:text-xl font-bold text-green-600">{Math.round(beneficeTotal).toLocaleString()}</div>
-            </div>
-            <div>
-              <div className="text-sm text-gray-600">Marge Moyenne:</div>
-              <div className="text-lg sm:text-xl font-bold text-blue-600">{(margeMoyenne * 100).toFixed(2)}%</div>
-            </div>
-            <div>
-              <div className="text-sm text-gray-600">Paramètres Bœuf/Veau:</div>
-              <div className="text-sm text-gray-700">Abats: {abatsParKg} | Pération: {(peration * 100).toFixed(1)}%</div>
-            </div>
-          </div>
-        </div>
+        {/* Contenu des onglets */}
+        {activeTab === 'main' ? renderMainContent() : renderVolumeSimulationContent()}
 
         {/* Graphiques */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 md:gap-8 mb-4 sm:mb-6 md:mb-8">
@@ -377,6 +530,9 @@ const SimulateurRentabilite = () => {
                           <div>{produit.nom}</div>
                           {produit.hasAbats && <div className="text-xs text-blue-600">🥩 Avec abats</div>}
                           {!isEditable && <div className="text-xs text-gray-500">(calculé)</div>}
+                          {activeTab === 'volume' && produit.nom === selectedProduct && (
+                            <div className="text-xs text-purple-600">📈 Volume augmenté</div>
+                          )}
                         </td>
                         <td className="px-2 sm:px-4 py-3 text-center">
                           <input 
@@ -447,301 +603,13 @@ const SimulateurRentabilite = () => {
           </div>
         </div>
 
-        {/* Graphiques de simulation Bœuf/Veau */}
-        <div className="mt-6 sm:mt-8 space-y-6 sm:space-y-8">
-          <h2 className="text-xl sm:text-2xl font-bold text-center text-gray-800 mb-4 sm:mb-6">
-            🎯 Comparaison Stratégique - Bœuf & Veau
-          </h2>
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
-            <p className="text-sm text-yellow-800">
-              <strong>💡 Analyse Comparative:</strong> 
-              <span className="text-green-700 font-medium">Augmenter les prix de vente</span> vs 
-              <span className="text-blue-700 font-medium">Diminuer les prix d'achat</span> - 
-              Quelle stratégie est la plus rentable ?
-            </p>
-          </div>
-          
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 md:gap-8">
-            {/* Simulation augmentations */}
-            <div className="bg-white p-3 sm:p-4 md:p-6 rounded-lg shadow-md border">
-              <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-green-700">📈 Impact Augmentations de Prix</h3>
-              <ResponsiveContainer width="100%" height={250} className="sm:h-[350px]">
-                <LineChart data={(() => {
-                  const augmentations = [0, 50, 100, 150, 200];
-                  return augmentations.map(aug => {
-                    let beneficeTotalSimule = 0;
-                    
-                    Object.entries(produits).forEach(([nom, data]) => {
-                      let margeBruteSimulee;
-                      let prixVenteSimule = data.prixVente;
-                      
-                      if ((nom === 'Boeuf' || nom === 'Veau') && data.prixVente) {
-                        prixVenteSimule = data.prixVente + aug;
-                      }
-                      
-                      if (data.editable && data.prixAchat && prixVenteSimule) {
-                        if (data.hasAbats) {
-                          margeBruteSimulee = (((prixVenteSimule + abatsParKg) * (1 - peration)) / data.prixAchat) - 1;
-                        } else {
-                          margeBruteSimulee = (prixVenteSimule / data.prixAchat) - 1;
-                        }
-                      } else {
-                        margeBruteSimulee = margeMoyenne;
-                      }
-                      
-                      const beneficeSimule = margeBruteSimulee * data.repartition * volume;
-                      beneficeTotalSimule += beneficeSimule;
-                    });
-                    
-                    return {
-                      augmentation: `+${aug}`,
-                      beneficeTotal: Math.round(beneficeTotalSimule),
-                      gain: Math.round(beneficeTotalSimule - beneficeTotal)
-                    };
-                  });
-                })()}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="augmentation" tick={{ fontSize: 12 }} />
-                  <YAxis tickFormatter={(value) => `${(value / 1000000).toFixed(1)}M`} tick={{ fontSize: 12 }} />
-                  <Tooltip 
-                    formatter={(value, name) => [
-                      name === 'beneficeTotal' ? value.toLocaleString() : `+${value.toLocaleString()}`,
-                      name === 'beneficeTotal' ? 'Bénéfice Total' : 'Gain'
-                    ]}
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="beneficeTotal" 
-                    stroke="#27ae60" 
-                    strokeWidth={3}
-                    dot={{ fill: '#27ae60', strokeWidth: 2, r: 6 }}
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="gain" 
-                    stroke="#3498db" 
-                    strokeWidth={2}
-                    strokeDasharray="5 5"
-                    dot={{ fill: '#3498db', strokeWidth: 2, r: 4 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-              <div className="mt-3 sm:mt-4 text-xs sm:text-sm text-gray-600">
-                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-0.5 bg-green-600"></div>
-                    <span>Bénéfice Total</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-0.5 bg-blue-500 border-dashed"></div>
-                    <span>Gain par rapport à l'actuel</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Simulation diminutions prix d'achat */}
-            <div className="bg-white p-3 sm:p-4 md:p-6 rounded-lg shadow-md border">
-              <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-blue-700">📉 Impact Diminutions Prix d'Achat</h3>
-              <ResponsiveContainer width="100%" height={250} className="sm:h-[350px]">
-                <LineChart data={(() => {
-                  const diminutions = [0, -50, -100, -150, -200];
-                  return diminutions.map(dim => {
-                    let beneficeTotalSimule = 0;
-                    
-                    Object.entries(produits).forEach(([nom, data]) => {
-                      let margeBruteSimulee;
-                      let prixAchatSimule = data.prixAchat;
-                      
-                      if ((nom === 'Boeuf' || nom === 'Veau') && data.prixAchat) {
-                        prixAchatSimule = data.prixAchat + dim;
-                      }
-                      
-                      if (data.editable && prixAchatSimule && data.prixVente) {
-                        if (data.hasAbats) {
-                          margeBruteSimulee = (((data.prixVente + abatsParKg) * (1 - peration)) / prixAchatSimule) - 1;
-                        } else {
-                          margeBruteSimulee = (data.prixVente / prixAchatSimule) - 1;
-                        }
-                      } else {
-                        margeBruteSimulee = margeMoyenne;
-                      }
-                      
-                      const beneficeSimule = margeBruteSimulee * data.repartition * volume;
-                      beneficeTotalSimule += beneficeSimule;
-                    });
-                    
-                    return {
-                      diminution: dim === 0 ? '0' : `${dim}`,
-                      beneficeTotal: Math.round(beneficeTotalSimule),
-                      gain: Math.round(beneficeTotalSimule - beneficeTotal)
-                    };
-                  });
-                })()}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="diminution" tick={{ fontSize: 12 }} />
-                  <YAxis tickFormatter={(value) => `${(value / 1000000).toFixed(1)}M`} tick={{ fontSize: 12 }} />
-                  <Tooltip 
-                    formatter={(value, name) => [
-                      name === 'beneficeTotal' ? value.toLocaleString() : `+${value.toLocaleString()}`,
-                      name === 'beneficeTotal' ? 'Bénéfice Total' : 'Gain'
-                    ]}
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="beneficeTotal" 
-                    stroke="#3498db" 
-                    strokeWidth={3}
-                    dot={{ fill: '#3498db', strokeWidth: 2, r: 6 }}
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="gain" 
-                    stroke="#27ae60" 
-                    strokeWidth={2}
-                    strokeDasharray="5 5"
-                    dot={{ fill: '#27ae60', strokeWidth: 2, r: 4 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-              <div className="mt-3 sm:mt-4 text-xs sm:text-sm text-gray-600">
-                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-0.5 bg-blue-500"></div>
-                    <span>Bénéfice Total</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-0.5 bg-green-600 border-dashed"></div>
-                    <span>Gain par rapport à l'actuel</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Tableau récapitulatif des simulations */}
-          <div className="bg-white p-3 sm:p-4 md:p-6 rounded-lg shadow-md border">
-            <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-gray-800">📋 Tableau Récapitulatif - Impact sur Bœuf & Veau</h3>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 md:gap-8">
-              
-              {/* Tableau augmentations */}
-              <div className="overflow-x-auto">
-                <h4 className="font-medium text-green-700 mb-3">📈 Augmentations</h4>
-                <table className="w-full text-xs sm:text-sm border-collapse">
-                  <thead>
-                    <tr className="bg-green-100">
-                      <th className="border p-1 sm:p-2 text-left">Augmentation</th>
-                      <th className="border p-1 sm:p-2 text-right">Bénéfice Total</th>
-                      <th className="border p-1 sm:p-2 text-right">Gain</th>
-                      <th className="border p-1 sm:p-2 text-right">% Gain</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[0, 50, 100, 150, 200].map(aug => {
-                      let beneficeTotalSimule = 0;
-                      
-                      Object.entries(produits).forEach(([nom, data]) => {
-                        let margeBruteSimulee;
-                        let prixVenteSimule = data.prixVente;
-                        
-                        if ((nom === 'Boeuf' || nom === 'Veau') && data.prixVente) {
-                          prixVenteSimule = data.prixVente + aug;
-                        }
-                        
-                        if (data.editable && data.prixAchat && prixVenteSimule) {
-                          if (data.hasAbats) {
-                            margeBruteSimulee = (((prixVenteSimule + abatsParKg) * (1 - peration)) / data.prixAchat) - 1;
-                          } else {
-                            margeBruteSimulee = (prixVenteSimule / data.prixAchat) - 1;
-                          }
-                        } else {
-                          margeBruteSimulee = margeMoyenne;
-                        }
-                        
-                        const beneficeSimule = margeBruteSimulee * data.repartition * volume;
-                        beneficeTotalSimule += beneficeSimule;
-                      });
-                      
-                      const gain = beneficeTotalSimule - beneficeTotal;
-                      const pourcentageGain = (gain / beneficeTotal) * 100;
-                      
-                      return (
-                        <tr key={aug} className={aug === 0 ? "bg-gray-100 font-medium" : ""}>
-                          <td className="border p-1 sm:p-2">+{aug}</td>
-                          <td className="border p-1 sm:p-2 text-right">{Math.round(beneficeTotalSimule).toLocaleString()}</td>
-                          <td className="border p-1 sm:p-2 text-right text-green-600">+{Math.round(gain).toLocaleString()}</td>
-                          <td className="border p-1 sm:p-2 text-right text-green-600">+{pourcentageGain.toFixed(1)}%</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Tableau diminutions prix d'achat */}
-              <div className="overflow-x-auto">
-                <h4 className="font-medium text-blue-700 mb-3">📉 Diminutions Prix d'Achat</h4>
-                <table className="w-full text-xs sm:text-sm border-collapse">
-                  <thead>
-                    <tr className="bg-blue-100">
-                      <th className="border p-1 sm:p-2 text-left">Diminution PA</th>
-                      <th className="border p-1 sm:p-2 text-right">Bénéfice Total</th>
-                      <th className="border p-1 sm:p-2 text-right">Gain</th>
-                      <th className="border p-1 sm:p-2 text-right">% Gain</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[0, -50, -100, -150, -200].map(dim => {
-                      let beneficeTotalSimule = 0;
-                      
-                      Object.entries(produits).forEach(([nom, data]) => {
-                        let margeBruteSimulee;
-                        let prixAchatSimule = data.prixAchat;
-                        
-                        if ((nom === 'Boeuf' || nom === 'Veau') && data.prixAchat) {
-                          prixAchatSimule = data.prixAchat + dim;
-                        }
-                        
-                        if (data.editable && prixAchatSimule && data.prixVente) {
-                          if (data.hasAbats) {
-                            margeBruteSimulee = (((data.prixVente + abatsParKg) * (1 - peration)) / prixAchatSimule) - 1;
-                          } else {
-                            margeBruteSimulee = (data.prixVente / prixAchatSimule) - 1;
-                          }
-                        } else {
-                          margeBruteSimulee = margeMoyenne;
-                        }
-                        
-                        const beneficeSimule = margeBruteSimulee * data.repartition * volume;
-                        beneficeTotalSimule += beneficeSimule;
-                      });
-                      
-                      const gain = beneficeTotalSimule - beneficeTotal;
-                      const pourcentageGain = (gain / beneficeTotal) * 100;
-                      
-                      return (
-                        <tr key={dim} className={dim === 0 ? "bg-gray-100 font-medium" : ""}>
-                          <td className="border p-1 sm:p-2">{dim === 0 ? '0' : dim}</td>
-                          <td className="border p-1 sm:p-2 text-right">{Math.round(beneficeTotalSimule).toLocaleString()}</td>
-                          <td className="border p-1 sm:p-2 text-right text-green-600">+{Math.round(gain).toLocaleString()}</td>
-                          <td className="border p-1 sm:p-2 text-right text-green-600">+{pourcentageGain.toFixed(1)}%</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </div>
-
         <div className="mt-4 sm:mt-6 bg-gray-100 p-3 sm:p-4 rounded-lg text-xs sm:text-sm text-gray-600">
           <strong>💡 Informations:</strong><br/>
           • <strong>Formule standard:</strong> Marge brute % = (Prix vente / Prix achat) - 1<br/>
           • <strong>Formule Bœuf/Veau:</strong> Marge brute % = ((Prix vente + Abats par kg) × (1 - Pération)) / Prix achat - 1<br/>
           • <strong>Bénéfice:</strong> Marge brute % × Répartition × Volume point de vente<br/>
           • <strong>Autres et Pack</strong> utilisent la marge moyenne des autres produits<br/>
-          • <strong>Simulations:</strong> Comparaison entre augmentation des prix de vente (+50 à +200) et diminution des prix d'achat (-50 à -200) sur Bœuf & Veau<br/>
+          • <strong>Simulation Volume:</strong> Augmente le volume d'un produit spécifique et ajuste automatiquement les répartitions<br/>
           • <strong>Répartitions:</strong> Somme doit égaler 100% - utilisez le bouton "Normaliser" si nécessaire<br/>
           • Couleurs des marges: 🟢 &gt;20% | 🟡 10-20% | 🔴 &lt;10%
         </div>
