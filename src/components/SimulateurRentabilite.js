@@ -342,14 +342,14 @@ const SimulateurRentabilite = () => {
   const calculerFluxDCFSimulation = () => {
     const flux = [];
     const adjustedVolume = getAdjustedVolume();
-    const adjustedRepartitions = getAdjustedRepartitions();
+    const adjustedProduits = getAdjustedRepartitions();
     
     // Calculer le bénéfice total avec les données de simulation
     let beneficeTotalSimulation = 0;
-    Object.keys(produits).forEach(nom => {
-      if (produits[nom].editable) {
-        const margeBrute = calculerMargeBrute(produits[nom]);
-        const repartition = adjustedRepartitions[nom];
+    Object.keys(adjustedProduits).forEach(nom => {
+      if (adjustedProduits[nom].editable) {
+        const margeBrute = calculerMargeBrute(adjustedProduits[nom]);
+        const repartition = adjustedProduits[nom].repartition;
         const benefice = calculerBenefice(margeBrute, repartition, adjustedVolume);
         beneficeTotalSimulation += benefice;
       }
@@ -357,9 +357,9 @@ const SimulateurRentabilite = () => {
     
     // Calculer la marge moyenne pour les produits non-éditables
     const margeMoyenne = calculerMargeMoyenne();
-    Object.keys(produits).forEach(nom => {
-      if (!produits[nom].editable) {
-        const repartition = adjustedRepartitions[nom];
+    Object.keys(adjustedProduits).forEach(nom => {
+      if (!adjustedProduits[nom].editable) {
+        const repartition = adjustedProduits[nom].repartition;
         const benefice = calculerBenefice(margeMoyenne, repartition, adjustedVolume);
         beneficeTotalSimulation += benefice;
       }
@@ -1038,7 +1038,7 @@ const SimulateurRentabilite = () => {
             <strong>📈 Données de simulation utilisées:</strong>
             <div className="mt-2 text-xs">
               • Volume total: {getAdjustedVolume().toLocaleString()}
-              {activeTab === 'volume' && (
+              {getAdjustedVolume() > volume && (
                 <>
                   <br/>• Produit sélectionné: {selectedProduct}
                   <br/>• Volume ajouté: {additionalVolume.toLocaleString()}
