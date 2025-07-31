@@ -79,7 +79,7 @@ const SimulateurRentabilite = () => {
 
   // Calcul du volume ajusté pour la simulation
   const getAdjustedVolume = () => {
-    if (activeTab === 'volume') {
+    if (additionalVolume > 0) {
       return volume + additionalVolume;
     }
     return volume;
@@ -98,7 +98,7 @@ const SimulateurRentabilite = () => {
 
   // Calcul des répartitions ajustées pour la simulation
   const getAdjustedRepartitions = () => {
-    if (activeTab === 'volume') {
+    if (additionalVolume > 0) {
       const adjustedProduits = { ...produits };
       const totalVolume = volume + additionalVolume;
       
@@ -245,8 +245,8 @@ const SimulateurRentabilite = () => {
   });
 
   // Utiliser les données appropriées selon l'onglet actif
-  const produitsActifs = activeTab === 'volume' ? produitsAvecCalculsSimulation : produitsAvecCalculs;
-  const volumeActif = activeTab === 'volume' ? adjustedVolume : volume;
+  const produitsActifs = additionalVolume > 0 ? produitsAvecCalculsSimulation : produitsAvecCalculs;
+  const volumeActif = additionalVolume > 0 ? adjustedVolume : volume;
   
   const chartData = produitsActifs.map(p => ({
     nom: p.nom,
@@ -260,7 +260,7 @@ const SimulateurRentabilite = () => {
 
   // Fonction helper pour obtenir le bénéfice total approprié selon l'onglet
   const getBeneficeTotalActif = () => {
-    return activeTab === 'volume' ? beneficeTotalSimulation : beneficeTotal;
+    return additionalVolume > 0 ? beneficeTotalSimulation : beneficeTotal;
   };
 
   // Calculs DCF
