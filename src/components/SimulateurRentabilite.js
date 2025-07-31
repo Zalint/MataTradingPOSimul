@@ -30,6 +30,16 @@ const SimulateurRentabilite = () => {
   const [tauxActualisationAnnuel, setTauxActualisationAnnuel] = useState(12); // 12% par défaut
   const [dureeAnalyse, setDureeAnalyse] = useState(60); // 5 ans par défaut
   
+  // États pour le DCF avancé
+  const [capex, setCapex] = useState(1000000); // 1M par défaut
+  const [bfr, setBfr] = useState(500000); // 500k par défaut
+  const [wacc, setWacc] = useState(15); // 15% par défaut
+  const [croissanceTerminale, setCroissanceTerminale] = useState(3); // 3% par défaut
+  const [dette, setDette] = useState(5000000); // 5M par défaut
+  const [tresorerie, setTresorerie] = useState(5000000); // 5M par défaut
+  const [tauxImposition, setTauxImposition] = useState(30); // 30% par défaut
+  const [depreciationAmortissement, setDepreciationAmortissement] = useState(200000); // 200k par défaut
+  
   const [produits, setProduits] = useState({
     'Boeuf': {
       repartition: 0.7017824621363722,
@@ -208,6 +218,14 @@ const SimulateurRentabilite = () => {
     // Reset DCF
     setTauxActualisationAnnuel(12);
     setDureeAnalyse(60);
+    setCapex(1000000);
+    setBfr(500000);
+    setWacc(15);
+    setCroissanceTerminale(3);
+    setDette(5000000);
+    setTresorerie(5000000);
+    setTauxImposition(30);
+    setDepreciationAmortissement(200000);
   };
 
   // Fonction d'export des données
@@ -240,6 +258,14 @@ const SimulateurRentabilite = () => {
         // DCF
         tauxActualisationAnnuel,
         dureeAnalyse,
+        capex,
+        bfr,
+        wacc,
+        croissanceTerminale,
+        dette,
+        tresorerie,
+        tauxImposition,
+        depreciationAmortissement,
         
         // Produits
         produits
@@ -295,6 +321,14 @@ const SimulateurRentabilite = () => {
         setAutresCharges(data.autresCharges || 0);
         setTauxActualisationAnnuel(data.tauxActualisationAnnuel || 12);
         setDureeAnalyse(data.dureeAnalyse || 60);
+        setCapex(data.capex || 1000000);
+        setBfr(data.bfr || 500000);
+        setWacc(data.wacc || 15);
+        setCroissanceTerminale(data.croissanceTerminale || 3);
+        setDette(data.dette || 5000000);
+        setTresorerie(data.tresorerie || 5000000);
+        setTauxImposition(data.tauxImposition || 30);
+        setDepreciationAmortissement(data.depreciationAmortissement || 200000);
         
         // Importer les produits
         if (data.produits) {
@@ -472,6 +506,51 @@ const SimulateurRentabilite = () => {
   // Fonction helper pour obtenir le bénéfice total approprié selon l'onglet
   const getBeneficeTotalActif = () => {
     return additionalVolume > 0 ? beneficeTotalSimulation : beneficeTotal;
+  };
+
+  // Calculs financiers avancés
+  const calculerEBIT = () => {
+    return getBeneficeTotalActif() - chargesTotales;
+  };
+
+  const calculerEBITDA = () => {
+    return calculerEBIT() + depreciationAmortissement;
+  };
+
+  const calculerNOPAT = () => {
+    return calculerEBIT() * (1 - tauxImposition / 100);
+  };
+
+  const calculerFCF = () => {
+    return calculerNOPAT() + depreciationAmortissement - capex - bfr;
+  };
+
+  const calculerValeurTerminale = () => {
+    const fcfFinal = calculerFCF();
+    const waccDecimal = wacc / 100;
+    const croissanceDecimal = croissanceTerminale / 100;
+    return (fcfFinal * (1 + croissanceDecimal)) / (waccDecimal - croissanceDecimal);
+  };
+
+  const calculerEnterpriseValue = () => {
+    const fcf = calculerFCF();
+    const valeurTerminale = calculerValeurTerminale();
+    const waccDecimal = wacc / 100;
+    
+    // Actualisation des FCF sur 5 ans
+    let fcfActualise = 0;
+    for (let annee = 1; annee <= 5; annee++) {
+      fcfActualise += fcf / Math.pow(1 + waccDecimal, annee);
+    }
+    
+    // Actualisation de la valeur terminale
+    const valeurTerminaleActualisee = valeurTerminale / Math.pow(1 + waccDecimal, 5);
+    
+    return fcfActualise + valeurTerminaleActualisee;
+  };
+
+  const calculerEquityValue = () => {
+    return calculerEnterpriseValue() - dette + tresorerie;
   };
 
   // Calculs DCF
@@ -1067,10 +1146,133 @@ const SimulateurRentabilite = () => {
             />
             <div className="text-xs text-gray-500 mt-1">{(dureeAnalyse / 12).toFixed(1)} années</div>
           </div>
-          <div className="flex items-end">
+                      <div className="flex items-end">
             <div className="w-full p-2 sm:p-3 bg-indigo-100 rounded text-sm">
               <div className="text-indigo-800 font-medium">Investissement initial</div>
               <div className="text-indigo-600 text-xs">{chargesFixes.toLocaleString()}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Paramètres financiers avancés */}
+      <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 sm:p-4 md:p-6 mb-4 sm:mb-6 md:mb-8">
+        <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-purple-800">🏦 Paramètres Financiers Avancés</h3>
+        
+        {/* CAPEX et BFR */}
+        <div className="mb-6">
+          <h4 className="text-sm font-semibold text-purple-700 mb-3">💼 Investissements et Fonds de Roulement</h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">CAPEX (annuel)</label>
+              <input 
+                type="number"
+                value={capex}
+                onChange={(e) => setCapex(parseFloat(e.target.value) || 0)}
+                className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
+                style={{ fontSize: '16px' }}
+              />
+              <div className="text-xs text-gray-500 mt-1">Dépenses d'investissement</div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">BFR (annuel)</label>
+              <input 
+                type="number"
+                value={bfr}
+                onChange={(e) => setBfr(parseFloat(e.target.value) || 0)}
+                className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
+                style={{ fontSize: '16px' }}
+              />
+              <div className="text-xs text-gray-500 mt-1">Besoin en fonds de roulement</div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">D&A (annuel)</label>
+              <input 
+                type="number"
+                value={depreciationAmortissement}
+                onChange={(e) => setDepreciationAmortissement(parseFloat(e.target.value) || 0)}
+                className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
+                style={{ fontSize: '16px' }}
+              />
+              <div className="text-xs text-gray-500 mt-1">Dépréciation & Amortissement</div>
+            </div>
+          </div>
+        </div>
+
+        {/* WACC et Croissance */}
+        <div className="mb-6">
+          <h4 className="text-sm font-semibold text-purple-700 mb-3">📊 Coût du Capital et Croissance</h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">WACC (%)</label>
+              <input 
+                type="number"
+                step="0.1"
+                min="0"
+                max="50"
+                value={wacc}
+                onChange={(e) => setWacc(parseFloat(e.target.value) || 0)}
+                className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
+                style={{ fontSize: '16px' }}
+              />
+              <div className="text-xs text-gray-500 mt-1">Coût moyen pondéré du capital</div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Croissance terminale g (%)</label>
+              <input 
+                type="number"
+                step="0.1"
+                min="0"
+                max="10"
+                value={croissanceTerminale}
+                onChange={(e) => setCroissanceTerminale(parseFloat(e.target.value) || 0)}
+                className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
+                style={{ fontSize: '16px' }}
+              />
+              <div className="text-xs text-gray-500 mt-1">Taux de croissance à perpétuité</div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Taux d'imposition (%)</label>
+              <input 
+                type="number"
+                step="0.1"
+                min="0"
+                max="100"
+                value={tauxImposition}
+                onChange={(e) => setTauxImposition(parseFloat(e.target.value) || 0)}
+                className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
+                style={{ fontSize: '16px' }}
+              />
+              <div className="text-xs text-gray-500 mt-1">IS au Sénégal: 30%</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Dette et Trésorerie */}
+        <div>
+          <h4 className="text-sm font-semibold text-purple-700 mb-3">💰 Structure Financière</h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Dette nette</label>
+              <input 
+                type="number"
+                value={dette}
+                onChange={(e) => setDette(parseFloat(e.target.value) || 0)}
+                className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
+                style={{ fontSize: '16px' }}
+              />
+              <div className="text-xs text-gray-500 mt-1">Dette totale de l'entreprise</div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Trésorerie</label>
+              <input 
+                type="number"
+                value={tresorerie}
+                onChange={(e) => setTresorerie(parseFloat(e.target.value) || 0)}
+                className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
+                style={{ fontSize: '16px' }}
+              />
+              <div className="text-xs text-gray-500 mt-1">Liquidités disponibles</div>
             </div>
           </div>
         </div>
