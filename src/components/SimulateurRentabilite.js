@@ -329,118 +329,49 @@ const SimulateurRentabilite = () => {
       loadingMessage.textContent = 'Génération du PDF en cours...';
       document.body.appendChild(loadingMessage);
 
-      // Ajouter des styles temporaires pour améliorer la lisibilité du PDF
-      const originalStyles = {};
-      const elementsToStyle = mainContainerRef.current.querySelectorAll('*');
-      
-      elementsToStyle.forEach(element => {
-        const computedStyle = window.getComputedStyle(element);
-        originalStyles[element] = {
-          fontSize: element.style.fontSize,
-          fontWeight: element.style.fontWeight,
-          color: element.style.color,
-          backgroundColor: element.style.backgroundColor
-        };
-        
-        // Augmenter la taille des polices pour une meilleure lisibilité
-        if (computedStyle.fontSize && parseFloat(computedStyle.fontSize) < 16) {
-          element.style.fontSize = '16px';
-        }
-        
-        // Améliorer le contraste des textes
-        if (computedStyle.color === 'rgb(107, 114, 128)' || computedStyle.color === 'rgb(156, 163, 175)') {
-          element.style.color = '#374151';
-        }
-        
-        // Améliorer la visibilité des tableaux
-        if (element.tagName === 'TABLE' || element.classList.contains('table')) {
-          element.style.border = '2px solid #e5e7eb';
-          element.style.backgroundColor = '#ffffff';
-        }
-      });
-
-      // Attendre un peu pour que les graphiques se rendent correctement
-      await new Promise(resolve => setTimeout(resolve, 1500));
-
-      // Capturer le contenu de la page avec des paramètres optimisés
+      // Capturer le contenu de la page
       const canvas = await html2canvas(mainContainerRef.current, {
-        scale: 3, // Augmenter la résolution pour plus de clarté
+        scale: 2,
         useCORS: true,
         allowTaint: true,
         backgroundColor: '#ffffff',
         width: mainContainerRef.current.scrollWidth,
-        height: mainContainerRef.current.scrollHeight,
-        logging: false, // Désactiver les logs pour de meilleures performances
-        imageTimeout: 15000, // Augmenter le timeout pour les images
-        removeContainer: false,
-        foreignObjectRendering: true, // Améliorer le rendu des éléments complexes
-        scrollX: 0,
-        scrollY: 0
+        height: mainContainerRef.current.scrollHeight
       });
 
-      // Restaurer les styles originaux
-      Object.keys(originalStyles).forEach(element => {
-        const styles = originalStyles[element];
-        element.style.fontSize = styles.fontSize;
-        element.style.fontWeight = styles.fontWeight;
-        element.style.color = styles.color;
-        element.style.backgroundColor = styles.backgroundColor;
-      });
-
-      // Créer le PDF avec une meilleure qualité
-      const imgData = canvas.toDataURL('image/jpeg', 0.95); // Utiliser JPEG avec haute qualité
+      // Créer le PDF
+      const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
       
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
-      const imgWidth = pdfWidth - 30; // Augmenter les marges pour plus de clarté
+      const imgWidth = pdfWidth - 20; // Marge de 10mm de chaque côté
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
       
-      // Ajouter un titre plus détaillé au PDF
-      pdf.setFontSize(24);
+      // Ajouter un titre au PDF
+      pdf.setFontSize(20);
       pdf.setFont('helvetica', 'bold');
-      pdf.setTextColor(44, 62, 80); // Couleur bleu foncé
-      pdf.text('Rapport de Simulation - Mata Trading', 105, 20, { align: 'center' });
+      pdf.text('Rapport de Simulation - Mata Trading', 105, 15, { align: 'center' });
       
-      // Ligne de séparation
-      pdf.setDrawColor(52, 152, 219);
-      pdf.setLineWidth(0.5);
-      pdf.line(30, 25, 180, 25);
-      
-      pdf.setFontSize(14);
+      pdf.setFontSize(12);
       pdf.setFont('helvetica', 'normal');
-      pdf.setTextColor(52, 73, 94);
-      pdf.text(`Généré le: ${new Date().toLocaleString('fr-FR')}`, 105, 35, { align: 'center' });
-      pdf.text(`Onglet actif: ${getTabName(activeTab)}`, 105, 42, { align: 'center' });
+      pdf.text(`Généré le: ${new Date().toLocaleString('fr-FR')}`, 105, 25, { align: 'center' });
+      pdf.text(`Onglet actif: ${getTabName(activeTab)}`, 105, 32, { align: 'center' });
       
-      // Ajouter des informations sur la simulation si applicable
-      if (activeTab === 'volume' && additionalVolume > 0) {
-        pdf.setFontSize(12);
-        pdf.setTextColor(155, 89, 182);
-        pdf.text(`Simulation: +${additionalVolume.toLocaleString()} pour ${selectedProduct}`, 105, 49, { align: 'center' });
-      }
-      
-      // Ajouter l'image du contenu avec de meilleures marges
+      // Ajouter l'image du contenu
       let heightLeft = imgHeight;
-      let position = 55; // Commencer plus bas pour laisser de l'espace au titre
+      let position = 40; // Commencer après le titre
       
-      pdf.addImage(imgData, 'JPEG', 15, position, imgWidth, imgHeight);
+      pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
       heightLeft -= (pdfHeight - position);
       
       // Ajouter des pages supplémentaires si nécessaire
       while (heightLeft >= 0) {
         position = heightLeft - imgHeight;
         pdf.addPage();
-        pdf.addImage(imgData, 'JPEG', 15, position, imgWidth, imgHeight);
+        pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
         heightLeft -= pdfHeight;
       }
-
-      // Ajouter un pied de page sur la dernière page
-      const pageCount = pdf.internal.getNumberOfPages();
-      pdf.setPage(pageCount);
-      pdf.setFontSize(10);
-      pdf.setTextColor(128, 128, 128);
-      pdf.text(`Page ${pageCount} - Mata Trading Simulator`, 105, pdfHeight - 10, { align: 'center' });
 
       // Sauvegarder le PDF
       const fileName = `mata-trading-report-${new Date().toISOString().split('T')[0]}-${activeTab}.pdf`;
@@ -734,73 +665,73 @@ const SimulateurRentabilite = () => {
 
   const renderMainContent = () => (
     <>
-      {/* Paramètres globaux */}
+        {/* Paramètres globaux */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4 md:p-6 mb-4 sm:mb-6 md:mb-8">
         <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-blue-800">🎛️ Paramètres Globaux</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Volume point de vente</label>
-            <input 
-              type="number"
-              value={volume}
-              onChange={(e) => setVolume(parseFloat(e.target.value) || 0)}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Volume point de vente</label>
+              <input 
+                type="number"
+                value={volume}
+                onChange={(e) => setVolume(parseFloat(e.target.value) || 0)}
               className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
               style={{ fontSize: '16px' }}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Abats par kg (Bœuf/Veau)</label>
-            <input 
-              type="number"
-              value={abatsParKg}
-              onChange={(e) => setAbatsParKg(parseFloat(e.target.value) || 0)}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Abats par kg (Bœuf/Veau)</label>
+              <input 
+                type="number"
+                value={abatsParKg}
+                onChange={(e) => setAbatsParKg(parseFloat(e.target.value) || 0)}
               className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
               style={{ fontSize: '16px' }}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Pération % (Bœuf/Veau)</label>
-            <input 
-              type="number"
-              step="0.01"
-              min="0"
-              max="1"
-              value={peration}
-              onChange={(e) => setPeration(parseFloat(e.target.value) || 0)}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Pération % (Bœuf/Veau)</label>
+              <input 
+                type="number"
+                step="0.01"
+                min="0"
+                max="1"
+                value={peration}
+                onChange={(e) => setPeration(parseFloat(e.target.value) || 0)}
               className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
               style={{ fontSize: '16px' }}
-            />
-            <div className="text-xs text-gray-500 mt-1">{(peration * 100).toFixed(1)}%</div>
-          </div>
-          <div className="flex items-end">
-            <button 
-              onClick={resetPrix}
+              />
+              <div className="text-xs text-gray-500 mt-1">{(peration * 100).toFixed(1)}%</div>
+            </div>
+            <div className="flex items-end">
+              <button 
+                onClick={resetPrix}
               className="w-full px-3 sm:px-4 py-2 sm:py-3 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors text-sm sm:text-base min-h-[44px]"
-            >
-              🔄 Reset Tout
-            </button>
+              >
+                🔄 Reset Tout
+              </button>
+            </div>
           </div>
         </div>
-      </div>
 
       
 
-      {/* Actions rapides étendues */}
+        {/* Actions rapides étendues */}
       <div className="bg-gray-100 p-3 sm:p-4 md:p-6 rounded-lg mb-4 sm:mb-6 md:mb-8">
         <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-gray-700">⚡ Actions Rapides</h3>
         <div className="space-y-3 sm:space-y-4">
-          <div>
-            <div className="text-sm font-medium text-gray-600 mb-2">Prix de vente:</div>
-            <div className="flex flex-wrap gap-2">
+            <div>
+              <div className="text-sm font-medium text-gray-600 mb-2">Prix de vente:</div>
+              <div className="flex flex-wrap gap-2">
               <button onClick={() => augmenterTousPrix(50)} className="px-3 py-2 sm:px-4 sm:py-3 bg-green-500 text-white rounded text-sm hover:bg-green-600 min-h-[44px] min-w-[60px]">+50</button>
               <button onClick={() => augmenterTousPrix(100)} className="px-3 py-2 sm:px-4 sm:py-3 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 min-h-[44px] min-w-[60px]">+100</button>
               <button onClick={() => augmenterTousPrix(200)} className="px-3 py-2 sm:px-4 sm:py-3 bg-red-500 text-white rounded text-sm hover:bg-red-600 min-h-[44px] min-w-[60px]">+200</button>
               <button onClick={() => augmenterTousPrix(-100)} className="px-3 py-2 sm:px-4 sm:py-3 bg-yellow-500 text-white rounded text-sm hover:bg-yellow-600 min-h-[44px] min-w-[60px]">-100</button>
+              </div>
             </div>
-          </div>
-          <div>
-            <div className="text-sm font-medium text-gray-600 mb-2">Prix d'achat:</div>
-            <div className="flex flex-wrap gap-2">
+            <div>
+              <div className="text-sm font-medium text-gray-600 mb-2">Prix d'achat:</div>
+              <div className="flex flex-wrap gap-2">
               <button onClick={() => augmenterTousPrix(50, 'prixAchat')} className="px-3 py-2 sm:px-4 sm:py-3 bg-green-600 text-white rounded text-sm hover:bg-green-700 min-h-[44px] min-w-[60px]">+50</button>
               <button onClick={() => augmenterTousPrix(-50, 'prixAchat')} className="px-3 py-2 sm:px-4 sm:py-3 bg-orange-500 text-white rounded text-sm hover:bg-orange-600 min-h-[44px] min-w-[60px]">-50</button>
             </div>
@@ -820,36 +751,36 @@ const SimulateurRentabilite = () => {
               </label>
               <button onClick={generatePDF} className="px-3 py-2 sm:px-4 sm:py-3 bg-orange-500 text-white rounded text-sm hover:bg-orange-600 min-h-[44px] min-w-[80px]">📄 PDF</button>
               <button onClick={resetPrix} className="px-3 py-2 sm:px-4 sm:py-3 bg-red-500 text-white rounded text-sm hover:bg-red-600 min-h-[44px] min-w-[80px]">🔄 Reset</button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Résumé global */}
+        {/* Résumé global */}
       <div className="bg-green-50 border border-green-200 rounded-lg p-3 sm:p-4 md:p-6 mb-4 sm:mb-6 md:mb-8">
         <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-green-800">📊 Résumé Global</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-          <div>
-            <div className="text-sm text-gray-600">Volume point de vente:</div>
+            <div>
+              <div className="text-sm text-gray-600">Volume point de vente:</div>
             <div className="text-lg sm:text-xl font-bold text-gray-800">{adjustedVolume.toLocaleString()}</div>
             {activeTab === 'volume' && (
               <div className="text-xs text-blue-600">(+{additionalVolume.toLocaleString()})</div>
             )}
-          </div>
-          <div>
-            <div className="text-sm text-gray-600">Bénéfice Total:</div>
+            </div>
+            <div>
+              <div className="text-sm text-gray-600">Bénéfice Total:</div>
             <div className="text-lg sm:text-xl font-bold text-green-600">{Math.round(getBeneficeTotalActif()).toLocaleString()}</div>
-          </div>
-          <div>
-            <div className="text-sm text-gray-600">Marge Moyenne:</div>
+            </div>
+            <div>
+              <div className="text-sm text-gray-600">Marge Moyenne:</div>
             <div className="text-lg sm:text-xl font-bold text-blue-600">{(margeMoyenne * 100).toFixed(2)}%</div>
-          </div>
-          <div>
-            <div className="text-sm text-gray-600">Paramètres Bœuf/Veau:</div>
-            <div className="text-sm text-gray-700">Abats: {abatsParKg} | Pération: {(peration * 100).toFixed(1)}%</div>
+            </div>
+            <div>
+              <div className="text-sm text-gray-600">Paramètres Bœuf/Veau:</div>
+              <div className="text-sm text-gray-700">Abats: {abatsParKg} | Pération: {(peration * 100).toFixed(1)}%</div>
+            </div>
           </div>
         </div>
-      </div>
     </>
   );
 
@@ -1638,94 +1569,94 @@ const SimulateurRentabilite = () => {
                     <th className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-medium text-white uppercase tracking-wider">Prix V</th>
                     <th className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-medium text-white uppercase tracking-wider">Marge %</th>
                     <th className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-medium text-white uppercase tracking-wider">Bénéfice</th>
-                  </tr>
-                </thead>
+              </tr>
+            </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {produitsActifs.map((produit, index) => {
-                    const isEditable = produit.editable;
+                const isEditable = produit.editable;
                     const pourcentageTotal = (produit.benefice / getBeneficeTotalActif()) * 100;
-                    
-                    return (
-                      <tr key={produit.nom} className={index % 2 === 0 ? "bg-gray-50" : "bg-white"}>
+                
+                return (
+                  <tr key={produit.nom} className={index % 2 === 0 ? "bg-gray-50" : "bg-white"}>
                         <td className="px-2 sm:px-4 py-3 text-xs sm:text-sm font-semibold text-gray-800">
                           <div>{produit.nom}</div>
-                          {produit.hasAbats && <div className="text-xs text-blue-600">🥩 Avec abats</div>}
-                          {!isEditable && <div className="text-xs text-gray-500">(calculé)</div>}
+                      {produit.hasAbats && <div className="text-xs text-blue-600">🥩 Avec abats</div>}
+                      {!isEditable && <div className="text-xs text-gray-500">(calculé)</div>}
                           {activeTab === 'volume' && produit.nom === selectedProduct && (
                             <div className="text-xs text-purple-600">📈 Volume augmenté</div>
                           )}
-                        </td>
+                    </td>
                         <td className="px-2 sm:px-4 py-3 text-center">
-                          <input 
-                            type="number"
-                            step="0.001"
-                            min="0"
-                            max="1"
-                            value={produit.repartition}
-                            onChange={(e) => updatePrix(produit.nom, 'repartition', e.target.value)}
+                      <input 
+                        type="number"
+                        step="0.001"
+                        min="0"
+                        max="1"
+                        value={produit.repartition}
+                        onChange={(e) => updatePrix(produit.nom, 'repartition', e.target.value)}
                             className="w-16 sm:w-20 p-1 sm:p-2 text-center border border-gray-300 rounded text-xs sm:text-sm"
                             style={{ fontSize: '16px' }}
-                          />
-                          <div className="text-xs text-gray-500 mt-1">
+                      />
+                      <div className="text-xs text-gray-500 mt-1">
                             {(produit.repartition * 100).toFixed(1)}%
                           </div>
                           <div className="text-xs text-blue-600 mt-1">
                             {Math.round(produit.repartition * adjustedVolume).toLocaleString()}
-                          </div>
-                        </td>
+                      </div>
+                    </td>
                         <td className="px-2 sm:px-4 py-3 text-center">
-                          {isEditable ? (
-                            <input 
-                              type="number"
-                              value={produit.prixAchat || ''}
-                              onChange={(e) => updatePrix(produit.nom, 'prixAchat', e.target.value)}
+                      {isEditable ? (
+                        <input 
+                          type="number"
+                          value={produit.prixAchat || ''}
+                          onChange={(e) => updatePrix(produit.nom, 'prixAchat', e.target.value)}
                               className="w-16 sm:w-20 p-1 sm:p-2 text-center border border-gray-300 rounded text-xs sm:text-sm"
                               style={{ fontSize: '16px' }}
-                            />
-                          ) : (
-                            <span className="text-gray-400">-</span>
-                          )}
-                        </td>
+                        />
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </td>
                         <td className="px-2 sm:px-4 py-3 text-center">
-                          {isEditable ? (
-                            <input 
-                              type="number"
-                              value={produit.prixVente || ''}
-                              onChange={(e) => updatePrix(produit.nom, 'prixVente', e.target.value)}
+                      {isEditable ? (
+                        <input 
+                          type="number"
+                          value={produit.prixVente || ''}
+                          onChange={(e) => updatePrix(produit.nom, 'prixVente', e.target.value)}
                               className="w-16 sm:w-20 p-1 sm:p-2 text-center border border-gray-300 rounded text-xs sm:text-sm"
                               style={{ fontSize: '16px' }}
-                            />
-                          ) : (
-                            <span className="text-gray-400">-</span>
-                          )}
-                        </td>
+                        />
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </td>
                         <td className="px-2 sm:px-4 py-3 text-center">
                           <span className={`text-xs sm:text-sm font-bold ${
-                            produit.margeBrute > 0.2 ? "text-green-600" : 
-                            produit.margeBrute > 0.1 ? "text-yellow-600" : "text-red-600"
+                        produit.margeBrute > 0.2 ? "text-green-600" : 
+                        produit.margeBrute > 0.1 ? "text-yellow-600" : "text-red-600"
                           }`}>
                             {(produit.margeBrute * 100).toFixed(1)}%
-                          </span>
-                        </td>
+                      </span>
+                    </td>
                         <td className="px-2 sm:px-4 py-3 text-center">
                           <div className="text-xs sm:text-sm font-bold text-green-600">
-                            {Math.round(produit.benefice).toLocaleString()}
+                      {Math.round(produit.benefice).toLocaleString()}
                           </div>
                           <div className={`px-1 sm:px-2 py-0.5 rounded-full text-xs font-bold text-white ${
-                            pourcentageTotal > 50 ? 'bg-red-500' : 
-                            pourcentageTotal > 20 ? 'bg-yellow-500' : 'bg-blue-500'
-                          }`}>
-                            {pourcentageTotal.toFixed(1)}%
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
+                        pourcentageTotal > 50 ? 'bg-red-500' : 
+                        pourcentageTotal > 20 ? 'bg-yellow-500' : 'bg-blue-500'
+                      }`}>
+                        {pourcentageTotal.toFixed(1)}%
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
+              </div>
+            </div>
 
         <div className="mt-4 sm:mt-6 bg-gray-100 p-3 sm:p-4 rounded-lg text-xs sm:text-sm text-gray-600">
           <strong>💡 Informations:</strong><br/>
