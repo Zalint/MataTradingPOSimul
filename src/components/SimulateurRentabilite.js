@@ -31,14 +31,14 @@ const SimulateurRentabilite = () => {
   const [dureeAnalyse, setDureeAnalyse] = useState(60); // 5 ans par défaut
   
   // États pour le DCF avancé
-  const [capex, setCapex] = useState(1000000); // 1M par défaut
-  const [bfr, setBfr] = useState(500000); // 500k par défaut
+  const [capex, setCapex] = useState(24000000); // 24M par défaut (10% du CA annuel)
+  const [bfr, setBfr] = useState(18000000); // 18M par défaut (7.5% du CA annuel)
   const [wacc, setWacc] = useState(15); // 15% par défaut
   const [croissanceTerminale, setCroissanceTerminale] = useState(3); // 3% par défaut
   const [dette, setDette] = useState(5000000); // 5M par défaut
   const [tresorerie, setTresorerie] = useState(5000000); // 5M par défaut
   const [tauxImposition, setTauxImposition] = useState(30); // 30% par défaut
-  const [depreciationAmortissement, setDepreciationAmortissement] = useState(200000); // 200k par défaut
+  const [depreciationAmortissement, setDepreciationAmortissement] = useState(12000000); // 12M par défaut (50% du CAPEX)
   
   const [produits, setProduits] = useState({
     'Boeuf': {
@@ -218,14 +218,14 @@ const SimulateurRentabilite = () => {
     // Reset DCF
     setTauxActualisationAnnuel(12);
     setDureeAnalyse(60);
-    setCapex(1000000);
-    setBfr(500000);
+    setCapex(24000000);
+    setBfr(18000000);
     setWacc(15);
     setCroissanceTerminale(3);
     setDette(5000000);
     setTresorerie(5000000);
     setTauxImposition(30);
-    setDepreciationAmortissement(200000);
+    setDepreciationAmortissement(12000000);
   };
 
   // Fonction d'export des données
@@ -328,7 +328,7 @@ const SimulateurRentabilite = () => {
         setDette(data.dette || 5000000);
         setTresorerie(data.tresorerie || 5000000);
         setTauxImposition(data.tauxImposition || 30);
-        setDepreciationAmortissement(data.depreciationAmortissement || 200000);
+        setDepreciationAmortissement(data.depreciationAmortissement || 12000000);
         
         // Importer les produits
         if (data.produits) {
