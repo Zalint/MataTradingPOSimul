@@ -1764,7 +1764,7 @@ const SimulateurRentabilite = () => {
         </div>
 
         {/* Indicateurs financiers */}
-        <div>
+        <div className="mb-6">
           <h4 className="text-sm font-semibold text-teal-700 mb-3">📈 Indicateurs Financiers</h4>
           <div className="space-y-4">
             <div className="bg-white p-4 rounded border">
@@ -1794,6 +1794,69 @@ const SimulateurRentabilite = () => {
               <div className="text-sm text-gray-600">
                 Flux de trésorerie disponible. Il représente les liquidités générées par l'activité après 
                 déduction des investissements nécessaires : FCF = NOPAT + D&A - CAPEX - ΔBFR.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Calculs DCF */}
+        <div>
+          <h4 className="text-sm font-semibold text-teal-700 mb-3">🧮 Calculs DCF Détaillés</h4>
+          <div className="space-y-4">
+            <div className="bg-white p-4 rounded border">
+              <div className="font-medium text-gray-800 mb-2">💰 Flux Actualisé</div>
+              <div className="text-sm text-gray-600">
+                <strong>Formule :</strong> Flux Actualisé = Flux Net × (1 + Taux d'actualisation mensuel)<sup>-mois</sup><br/><br/>
+                <strong>Explication :</strong> Le flux actualisé représente la valeur présente d'un flux de trésorerie futur. 
+                Plus le flux est éloigné dans le temps, plus sa valeur actuelle est réduite par l'actualisation.<br/><br/>
+                <strong>Exemple :</strong> Si le flux net mensuel est de 1,000,000 et le taux d'actualisation mensuel de 1% :<br/>
+                • Mois 1 : 1,000,000 × (1.01)<sup>-1</sup> = 990,099<br/>
+                • Mois 12 : 1,000,000 × (1.01)<sup>-12</sup> = 887,449<br/>
+                • Mois 60 : 1,000,000 × (1.01)<sup>-60</sup> = 550,449
+              </div>
+            </div>
+            <div className="bg-white p-4 rounded border">
+              <div className="font-medium text-gray-800 mb-2">📊 VAN (NPV - Net Present Value)</div>
+              <div className="text-sm text-gray-600">
+                <strong>Formule :</strong> VAN = Σ(Flux Actualisés) = Investissement Initial + Σ(Flux Mensuels Actualisés)<br/><br/>
+                <strong>Explication :</strong> La VAN représente la valeur nette créée par le projet. Une VAN positive indique 
+                que le projet génère plus de valeur que le coût du capital investi.<br/><br/>
+                <strong>Interprétation :</strong><br/>
+                • VAN &gt; 0 : Projet rentable<br/>
+                • VAN = 0 : Projet à l'équilibre<br/>
+                • VAN &lt; 0 : Projet non rentable
+              </div>
+            </div>
+            <div className="bg-white p-4 rounded border">
+              <div className="font-medium text-gray-800 mb-2">📈 TRI (IRR - Internal Rate of Return)</div>
+              <div className="text-sm text-gray-600">
+                <strong>Définition :</strong> Le TRI est le taux d'actualisation qui rend la VAN égale à zéro.<br/><br/>
+                <strong>Calcul :</strong> Résolution itérative de l'équation :<br/>
+                VAN = 0 = Investissement Initial + Σ(Flux Net × (1 + TRI)<sup>-mois</sup>)<br/><br/>
+                <strong>Interprétation :</strong> Le TRI représente le taux de rendement annuel du projet. 
+                Il doit être supérieur au coût du capital (WACC) pour que le projet soit viable.
+              </div>
+            </div>
+            <div className="bg-white p-4 rounded border">
+              <div className="font-medium text-gray-800 mb-2">📊 Indice de Profitabilité (PI)</div>
+              <div className="text-sm text-gray-600">
+                <strong>Formule :</strong> PI = (VAN + Investissement Initial) ÷ Investissement Initial<br/><br/>
+                <strong>Explication :</strong> L'indice de profitabilité mesure le rapport entre la valeur créée 
+                et l'investissement initial.<br/><br/>
+                <strong>Interprétation :</strong><br/>
+                • PI &gt; 1 : Projet viable (créateur de valeur)<br/>
+                • PI = 1 : Projet à l'équilibre<br/>
+                • PI &lt; 1 : Projet non viable
+              </div>
+            </div>
+            <div className="bg-white p-4 rounded border">
+              <div className="font-medium text-gray-800 mb-2">⏱️ Délai de Récupération Actualisé</div>
+              <div className="text-sm text-gray-600">
+                <strong>Définition :</strong> Temps nécessaire pour que le cumul des flux actualisés devienne positif.<br/><br/>
+                <strong>Calcul :</strong> Recherche du premier mois où Cumul Actualisé ≥ 0<br/><br/>
+                <strong>Explication :</strong> Contrairement au délai de récupération simple, cette méthode 
+                prend en compte la valeur temporelle de l'argent. Plus le délai est court, plus le projet 
+                est attractif en termes de liquidité.
               </div>
             </div>
           </div>
