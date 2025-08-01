@@ -42,52 +42,52 @@ const SimulateurRentabilite = () => {
   
   const [produits, setProduits] = useState({
     'Boeuf': {
-      repartition: 0.7017824621363722,
+      repartition: 0.701782462,
       prixAchat: 3150,
       prixVente: 3550,
       editable: true,
       hasAbats: true
     },
     'Veau': {
-      repartition: 0.04459239053187431,
+      repartition: 0.044592391,
       prixAchat: 3350,
       prixVente: 3900,
       editable: true,
       hasAbats: true
     },
     'Ovin': {
-      repartition: 0.05224405260523153,
+      repartition: 0.052244053,
       prixAchat: 4000,
       prixVente: 4500,
       editable: true,
       hasAbats: false
     },
-    'Poulet': {
-      repartition: 0.10293212414146351,
-      prixAchat: 2600,
-      prixVente: 3400,
-      editable: true,
-      hasAbats: false
-    },
     'Oeuf': {
-      repartition: 0.047725982941789515,
+      repartition: 0.0477725983,
       prixAchat: 2250,
       prixVente: 2500,
       editable: true,
       hasAbats: false
     },
     'Autres': {
-      repartition: 0.036695010434228736,
+      repartition: 0.03669501,
       prixAchat: null,
       prixVente: null,
       editable: false,
       hasAbats: false
     },
     'Pack': {
-      repartition: 0.014027977209040234,
+      repartition: 0.014027977,
       prixAchat: null,
       prixVente: null,
       editable: false,
+      hasAbats: false
+    },
+    'Poulet': {
+      repartition: 0.102932124,
+      prixAchat: 2600,
+      prixVente: 3400,
+      editable: true,
       hasAbats: false
     }
   });
@@ -102,13 +102,13 @@ const SimulateurRentabilite = () => {
 
   // Répartitions originales (fixes)
   const originalRepartitions = {
-    'Boeuf': 0.7017824621363722,
-    'Veau': 0.04459239053187431,
-    'Ovin': 0.05224405260523153,
-    'Poulet': 0.10293212414146351,
-    'Oeuf': 0.047725982941789515,
-    'Autres': 0.036695010434228736,
-    'Pack': 0.014027977209040234
+    'Boeuf': 0.701782462,
+    'Veau': 0.044592391,
+    'Ovin': 0.052244053,
+    'Oeuf': 0.0477725983,
+    'Autres': 0.03669501,
+    'Pack': 0.014027977,
+    'Poulet': 0.102932124
   };
 
   // Calcul des répartitions ajustées pour la simulation
@@ -191,13 +191,13 @@ const SimulateurRentabilite = () => {
 
   const resetPrix = () => {
     setProduits({
-      'Boeuf': { repartition: 0.7017824621363722, prixAchat: 3150, prixVente: 3550, editable: true, hasAbats: true },
-      'Veau': { repartition: 0.04459239053187431, prixAchat: 3350, prixVente: 3900, editable: true, hasAbats: true },
-      'Ovin': { repartition: 0.05224405260523153, prixAchat: 4000, prixVente: 4500, editable: true, hasAbats: false },
-      'Poulet': { repartition: 0.10293212414146351, prixAchat: 2600, prixVente: 3400, editable: true, hasAbats: false },
-      'Oeuf': { repartition: 0.047725982941789515, prixAchat: 2250, prixVente: 2500, editable: true, hasAbats: false },
-      'Autres': { repartition: 0.036695010434228736, prixAchat: null, prixVente: null, editable: false, hasAbats: false },
-      'Pack': { repartition: 0.014027977209040234, prixAchat: null, prixVente: null, editable: false, hasAbats: false }
+      'Boeuf': { repartition: 0.701782462, prixAchat: 3150, prixVente: 3550, editable: true, hasAbats: true },
+      'Veau': { repartition: 0.044592391, prixAchat: 3350, prixVente: 3900, editable: true, hasAbats: true },
+      'Ovin': { repartition: 0.052244053, prixAchat: 4000, prixVente: 4500, editable: true, hasAbats: false },
+      'Oeuf': { repartition: 0.0477725983, prixAchat: 2250, prixVente: 2500, editable: true, hasAbats: false },
+      'Autres': { repartition: 0.03669501, prixAchat: null, prixVente: null, editable: false, hasAbats: false },
+      'Pack': { repartition: 0.014027977, prixAchat: null, prixVente: null, editable: false, hasAbats: false },
+      'Poulet': { repartition: 0.102932124, prixAchat: 2600, prixVente: 3400, editable: true, hasAbats: false }
     });
     setVolume(20000000);
     setAbatsParKg(200);
