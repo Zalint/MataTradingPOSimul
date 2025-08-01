@@ -239,6 +239,19 @@ const SimulateurRentabilite = () => {
     setSelectedProduct('Poulet');
   };
 
+  // Fonction pour synchroniser toutes les répartitions
+  const synchronizeRepartitions = () => {
+    setProduits(prev => {
+      const updatedProduits = { ...prev };
+      Object.keys(originalRepartitions).forEach(nom => {
+        if (updatedProduits[nom]) {
+          updatedProduits[nom].repartition = originalRepartitions[nom];
+        }
+      });
+      return updatedProduits;
+    });
+  };
+
   // Fonction d'export des données
   const exportData = () => {
     const dataToExport = {
@@ -860,6 +873,12 @@ const SimulateurRentabilite = () => {
                 </div>
               </div>
             )}
+            <div>
+              <div className="text-sm font-medium text-gray-600 mb-2">Répartitions:</div>
+              <div className="flex flex-wrap gap-2">
+                <button onClick={synchronizeRepartitions} className="px-3 py-2 sm:px-4 sm:py-3 bg-cyan-500 text-white rounded text-sm hover:bg-cyan-600 min-h-[44px] min-w-[80px]">🔄 Sync Répartitions</button>
+              </div>
+            </div>
           </div>
         </div>
 
