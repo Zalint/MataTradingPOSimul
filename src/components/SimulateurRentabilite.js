@@ -94,7 +94,7 @@ const SimulateurRentabilite = () => {
 
   // Calcul du volume ajusté pour la simulation
   const getAdjustedVolume = () => {
-    if (additionalVolume > 0) {
+    if (activeTab === 'volume' && additionalVolume > 0) {
       return volume + additionalVolume;
     }
     return volume;
@@ -113,7 +113,7 @@ const SimulateurRentabilite = () => {
 
   // Calcul des répartitions ajustées pour la simulation
   const getAdjustedRepartitions = () => {
-    if (additionalVolume > 0) {
+    if (activeTab === 'volume' && additionalVolume > 0) {
       const adjustedProduits = { ...produits };
       const totalVolume = volume + additionalVolume;
       
@@ -491,8 +491,8 @@ const SimulateurRentabilite = () => {
   });
 
   // Utiliser les données appropriées selon l'onglet actif
-  const produitsActifs = additionalVolume > 0 ? produitsAvecCalculsSimulation : produitsAvecCalculs;
-  const volumeActif = additionalVolume > 0 ? adjustedVolume : volume;
+  const produitsActifs = activeTab === 'volume' ? produitsAvecCalculsSimulation : produitsAvecCalculs;
+  const volumeActif = activeTab === 'volume' ? adjustedVolume : volume;
   
   const chartData = produitsActifs.map(p => ({
     nom: p.nom,
@@ -506,7 +506,7 @@ const SimulateurRentabilite = () => {
 
   // Fonction helper pour obtenir le bénéfice total approprié selon l'onglet
   const getBeneficeTotalActif = () => {
-    return additionalVolume > 0 ? beneficeTotalSimulation : beneficeTotal;
+    return activeTab === 'volume' ? beneficeTotalSimulation : beneficeTotal;
   };
 
   // Calculs financiers avancés
@@ -850,14 +850,14 @@ const SimulateurRentabilite = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
             <div>
               <div className="text-sm text-gray-600">Volume point de vente:</div>
-            <div className="text-lg sm:text-xl font-bold text-gray-800">{adjustedVolume.toLocaleString()}</div>
+            <div className="text-lg sm:text-xl font-bold text-gray-800">{activeTab === 'volume' ? adjustedVolume.toLocaleString() : volume.toLocaleString()}</div>
             {activeTab === 'volume' && (
               <div className="text-xs text-blue-600">(+{additionalVolume.toLocaleString()})</div>
             )}
             </div>
             <div>
               <div className="text-sm text-gray-600">Bénéfice Total:</div>
-            <div className="text-lg sm:text-xl font-bold text-green-600">{Math.round(getBeneficeTotalActif()).toLocaleString()}</div>
+            <div className="text-lg sm:text-xl font-bold text-green-600">{Math.round(activeTab === 'volume' ? getBeneficeTotalActif() : beneficeTotal).toLocaleString()}</div>
             </div>
             <div>
               <div className="text-sm text-gray-600">Marge Moyenne:</div>
