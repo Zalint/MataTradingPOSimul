@@ -1910,7 +1910,10 @@ const SimulateurRentabilite = () => {
                  {/* Onglets */}
          <div className="flex border-b border-gray-200 mb-6">
            <button
-             onClick={() => setActiveTab('main')}
+             onClick={() => {
+               setActiveTab('main');
+               setAdditionalVolume(0);
+             }}
              className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
                activeTab === 'main'
                  ? 'bg-blue-500 text-white'
