@@ -1696,7 +1696,12 @@ const SimulateurRentabilite = () => {
         {/* Paramètres financiers */}
         <div className="mb-6">
           <h4 className="text-sm font-semibold text-teal-700 mb-3">🏦 Paramètres Financiers DCF</h4>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="bg-white p-3 rounded border">
+              <div className="font-medium text-gray-800">Taux d'actualisation annuel</div>
+              <div className="text-lg font-bold text-red-600">12%</div>
+              <div className="text-sm text-gray-600">Taux mensuel: 0.949%</div>
+            </div>
             <div className="bg-white p-3 rounded border">
               <div className="font-medium text-gray-800">CAPEX (annuel)</div>
               <div className="text-lg font-bold text-purple-600">24,000,000</div>
@@ -1804,15 +1809,25 @@ const SimulateurRentabilite = () => {
           <h4 className="text-sm font-semibold text-teal-700 mb-3">🧮 Calculs DCF Détaillés</h4>
           <div className="space-y-4">
             <div className="bg-white p-4 rounded border">
+              <div className="font-medium text-gray-800 mb-2">📊 Taux d'Actualisation Mensuel</div>
+              <div className="text-sm text-gray-600">
+                <strong>Formule :</strong> Taux mensuel = (1 + Taux annuel)<sup>1/12</sup> - 1<br/><br/>
+                <strong>Calcul par défaut :</strong> (1 + 12%)<sup>1/12</sup> - 1 = 0.949% par mois<br/><br/>
+                <strong>Explication :</strong> Le taux annuel de 12% est converti en taux mensuel équivalent. 
+                Cette conversion utilise la formule de capitalisation composée pour maintenir la cohérence 
+                entre les périodes annuelles et mensuelles.
+              </div>
+            </div>
+            <div className="bg-white p-4 rounded border">
               <div className="font-medium text-gray-800 mb-2">💰 Flux Actualisé</div>
               <div className="text-sm text-gray-600">
                 <strong>Formule :</strong> Flux Actualisé = Flux Net × (1 + Taux d'actualisation mensuel)<sup>-mois</sup><br/><br/>
                 <strong>Explication :</strong> Le flux actualisé représente la valeur présente d'un flux de trésorerie futur. 
                 Plus le flux est éloigné dans le temps, plus sa valeur actuelle est réduite par l'actualisation.<br/><br/>
-                <strong>Exemple :</strong> Si le flux net mensuel est de 1,000,000 et le taux d'actualisation mensuel de 1% :<br/>
-                • Mois 1 : 1,000,000 × (1.01)<sup>-1</sup> = 990,099<br/>
-                • Mois 12 : 1,000,000 × (1.01)<sup>-12</sup> = 887,449<br/>
-                • Mois 60 : 1,000,000 × (1.01)<sup>-60</sup> = 550,449
+                <strong>Exemple avec notre taux par défaut (0.949%) :</strong> Si le flux net mensuel est de 1,000,000 :<br/>
+                • Mois 1 : 1,000,000 × (1.00949)<sup>-1</sup> = 990,599<br/>
+                • Mois 12 : 1,000,000 × (1.00949)<sup>-12</sup> = 892,857<br/>
+                • Mois 60 : 1,000,000 × (1.00949)<sup>-60</sup> = 567,426
               </div>
             </div>
             <div className="bg-white p-4 rounded border">
