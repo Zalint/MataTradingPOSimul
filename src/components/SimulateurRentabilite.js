@@ -94,7 +94,7 @@ const SimulateurRentabilite = () => {
 
   // Calcul du volume ajusté pour la simulation
   const getAdjustedVolume = () => {
-    if (activeTab === 'volume' && additionalVolume > 0) {
+    if (additionalVolume > 0) {
       return volume + additionalVolume;
     }
     return volume;
@@ -113,7 +113,7 @@ const SimulateurRentabilite = () => {
 
   // Calcul des répartitions ajustées pour la simulation
   const getAdjustedRepartitions = () => {
-    if (activeTab === 'volume' && additionalVolume > 0) {
+    if (additionalVolume > 0) {
       const adjustedProduits = { ...produits };
       const totalVolume = volume + additionalVolume;
       
@@ -226,6 +226,17 @@ const SimulateurRentabilite = () => {
     setTresorerie(5000000);
     setTauxImposition(30);
     setDepreciationAmortissement(12000000);
+  };
+
+  // Fonction pour forcer la simulation principale (additionalVolume = 0)
+  const forceMainSimulation = () => {
+    setAdditionalVolume(0);
+  };
+
+  // Fonction pour réinitialiser la simulation volume
+  const resetVolumeSimulation = () => {
+    setAdditionalVolume(0);
+    setSelectedProduct('Poulet');
   };
 
   // Fonction d'export des données
@@ -491,8 +502,8 @@ const SimulateurRentabilite = () => {
   });
 
   // Utiliser les données appropriées selon l'onglet actif
-  const produitsActifs = activeTab === 'volume' ? produitsAvecCalculsSimulation : produitsAvecCalculs;
-  const volumeActif = activeTab === 'volume' ? adjustedVolume : volume;
+  const produitsActifs = additionalVolume > 0 ? produitsAvecCalculsSimulation : produitsAvecCalculs;
+  const volumeActif = additionalVolume > 0 ? adjustedVolume : volume;
   
   const chartData = produitsActifs.map(p => ({
     nom: p.nom,
@@ -506,7 +517,7 @@ const SimulateurRentabilite = () => {
 
   // Fonction helper pour obtenir le bénéfice total approprié selon l'onglet
   const getBeneficeTotalActif = () => {
-    return activeTab === 'volume' ? beneficeTotalSimulation : beneficeTotal;
+    return additionalVolume > 0 ? beneficeTotalSimulation : beneficeTotal;
   };
 
   // Calculs financiers avancés
@@ -841,6 +852,14 @@ const SimulateurRentabilite = () => {
               <button onClick={resetPrix} className="px-3 py-2 sm:px-4 sm:py-3 bg-red-500 text-white rounded text-sm hover:bg-red-600 min-h-[44px] min-w-[80px]">🔄 Reset</button>
               </div>
             </div>
+            {additionalVolume > 0 && (
+              <div>
+                <div className="text-sm font-medium text-gray-600 mb-2">Simulation Volume:</div>
+                <div className="flex flex-wrap gap-2">
+                  <button onClick={forceMainSimulation} className="px-3 py-2 sm:px-4 sm:py-3 bg-teal-500 text-white rounded text-sm hover:bg-teal-600 min-h-[44px] min-w-[80px]">🏠 Retour Principal</button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -850,14 +869,14 @@ const SimulateurRentabilite = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
             <div>
               <div className="text-sm text-gray-600">Volume point de vente:</div>
-            <div className="text-lg sm:text-xl font-bold text-gray-800">{activeTab === 'volume' ? adjustedVolume.toLocaleString() : volume.toLocaleString()}</div>
-            {activeTab === 'volume' && (
+            <div className="text-lg sm:text-xl font-bold text-gray-800">{additionalVolume > 0 ? adjustedVolume.toLocaleString() : volume.toLocaleString()}</div>
+            {additionalVolume > 0 && (
               <div className="text-xs text-blue-600">(+{additionalVolume.toLocaleString()})</div>
             )}
             </div>
             <div>
               <div className="text-sm text-gray-600">Bénéfice Total:</div>
-            <div className="text-lg sm:text-xl font-bold text-green-600">{Math.round(activeTab === 'volume' ? getBeneficeTotalActif() : beneficeTotal).toLocaleString()}</div>
+            <div className="text-lg sm:text-xl font-bold text-green-600">{Math.round(getBeneficeTotalActif()).toLocaleString()}</div>
             </div>
             <div>
               <div className="text-sm text-gray-600">Marge Moyenne:</div>
