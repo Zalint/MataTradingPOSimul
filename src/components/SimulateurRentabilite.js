@@ -2,17 +2,21 @@ import React, { useState, useRef } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import FormulesHypotheses from './FormulesHypotheses';
 
 const SimulateurRentabilite = () => {
   const mainContainerRef = useRef(null);
   const [activeTab, setActiveTab] = useState('main'); // 'main', 'volume', 'charges', 'dcf', 'dcfSimulation' ou 'faq'
+  const [pageFluxDCF, setPageFluxDCF] = useState(1);
+  const [pageFluxDCFSimulation, setPageFluxDCFSimulation] = useState(1);
+  const [itemsPerPage] = useState(12);
   const [volume, setVolume] = useState(20000000);
   const [abatsParKg, setAbatsParKg] = useState(200);
   const [peration, setPeration] = useState(0.1);
   
   // Nouveaux états pour la simulation de volume
   const [selectedProduct, setSelectedProduct] = useState('Poulet');
-  const [additionalVolume, setAdditionalVolume] = useState(5000000);
+  const [additionalVolume, setAdditionalVolume] = useState(0);
   
   // États pour les charges
   const [chargesFixes, setChargesFixes] = useState(5000000);
@@ -31,14 +35,14 @@ const SimulateurRentabilite = () => {
   const [dureeAnalyse, setDureeAnalyse] = useState(60); // 5 ans par défaut
   
   // États pour le DCF avancé
-  const [capex, setCapex] = useState(24000000); // 24M par défaut (10% du CA annuel)
-  const [bfr, setBfr] = useState(18000000); // 18M par défaut (7.5% du CA annuel)
-  const [wacc, setWacc] = useState(15); // 15% par défaut
+  const [capex, setCapex] = useState(10000000); // 10M par défaut (corrigé)
+  const [bfr, setBfr] = useState(0); // 0 par défaut (modèle consignation - pas d'investissement en stocks)
+  const [wacc, setWacc] = useState(12); // 12% par défaut (corrigé)
   const [croissanceTerminale, setCroissanceTerminale] = useState(3); // 3% par défaut
   const [dette, setDette] = useState(5000000); // 5M par défaut
   const [tresorerie, setTresorerie] = useState(5000000); // 5M par défaut
   const [tauxImposition, setTauxImposition] = useState(30); // 30% par défaut
-  const [depreciationAmortissement, setDepreciationAmortissement] = useState(12000000); // 12M par défaut (50% du CAPEX)
+  const [depreciationAmortissement, setDepreciationAmortissement] = useState(2500000); // 2.5M par défaut (25% du CAPEX)
   
   const [produits, setProduits] = useState({
     'Boeuf': {
@@ -145,7 +149,7 @@ const SimulateurRentabilite = () => {
     );
     const marges = produitsEditables.map(([nom, data]) => {
       if (data.hasAbats) {
-        return (((data.prixVente + abatsParKg) * (1 - peration)) / data.prixAchat) - 1;
+        return ((data.prixVente * (1 - peration) + abatsParKg) / data.prixAchat) - 1;
       } else {
         return (data.prixVente / data.prixAchat) - 1;
       }
@@ -157,7 +161,7 @@ const SimulateurRentabilite = () => {
     if (!produitData.prixVente || !produitData.prixAchat) return 0;
     
     if (produitData.hasAbats) {
-      return (((produitData.prixVente + abatsParKg) * (1 - peration)) / produitData.prixAchat) - 1;
+      return ((produitData.prixVente * (1 - peration) + abatsParKg) / produitData.prixAchat) - 1;
     } else {
       return (produitData.prixVente / produitData.prixAchat) - 1;
     }
@@ -218,14 +222,14 @@ const SimulateurRentabilite = () => {
     // Reset DCF
     setTauxActualisationAnnuel(12);
     setDureeAnalyse(60);
-    setCapex(24000000);
-    setBfr(18000000);
-    setWacc(15);
+    setCapex(10000000);
+    setBfr(0);
+    setWacc(12);
     setCroissanceTerminale(3);
     setDette(5000000);
     setTresorerie(5000000);
     setTauxImposition(30);
-    setDepreciationAmortissement(12000000);
+    setDepreciationAmortissement(2500000);
   };
 
   // Fonction pour forcer la simulation principale (additionalVolume = 0)
@@ -241,15 +245,19 @@ const SimulateurRentabilite = () => {
 
   // Fonction pour synchroniser toutes les répartitions
   const synchronizeRepartitions = () => {
-    setProduits(prev => {
-      const updatedProduits = { ...prev };
-      Object.keys(originalRepartitions).forEach(nom => {
-        if (updatedProduits[nom]) {
-          updatedProduits[nom].repartition = originalRepartitions[nom];
-        }
-      });
-      return updatedProduits;
+    // Forcer un reset complet avec les nouvelles répartitions
+    setProduits({
+      'Boeuf': { repartition: 0.701782462, prixAchat: 3150, prixVente: 3550, editable: true, hasAbats: true },
+      'Veau': { repartition: 0.044592391, prixAchat: 3350, prixVente: 3900, editable: true, hasAbats: true },
+      'Ovin': { repartition: 0.052244053, prixAchat: 4000, prixVente: 4500, editable: true, hasAbats: false },
+      'Oeuf': { repartition: 0.0477725983, prixAchat: 2250, prixVente: 2500, editable: true, hasAbats: false },
+      'Autres': { repartition: 0.03669501, prixAchat: null, prixVente: null, editable: false, hasAbats: false },
+      'Pack': { repartition: 0.014027977, prixAchat: null, prixVente: null, editable: false, hasAbats: false },
+      'Poulet': { repartition: 0.102932124, prixAchat: 2600, prixVente: 3400, editable: true, hasAbats: false }
     });
+    // Forcer aussi un reset du volume de simulation
+    setAdditionalVolume(0);
+    setSelectedProduct('Poulet');
   };
 
   // Fonction d'export des données
@@ -460,6 +468,31 @@ const SimulateurRentabilite = () => {
     }
   };
 
+  // Fonction d'export des flux de trésorerie
+  const exportFluxTresorerie = (fluxData, nomFichier) => {
+    const csvContent = [
+      ['Mois', 'Bénéfice Brut', 'Charges Fixes', 'Flux Net', 'Flux Actualisé', 'Cumul Actualisé'],
+      ...fluxData.map(flux => [
+        flux.mois === 0 ? 'Mois 0' : `Mois ${flux.mois}`,
+        flux.beneficeBrut.toLocaleString(),
+        flux.chargesFixes.toLocaleString(),
+        flux.fluxNet.toLocaleString(),
+        flux.fluxActualise.toLocaleString(),
+        flux.cumulActualise.toLocaleString()
+      ])
+    ].map(row => row.join(',')).join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', nomFichier);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   // Fonction helper pour obtenir le nom de l'onglet
   const getTabName = (tab) => {
     const tabNames = {
@@ -547,13 +580,24 @@ const SimulateurRentabilite = () => {
   };
 
   const calculerFCF = () => {
-    return calculerNOPAT() + depreciationAmortissement - capex - bfr;
+    // FCF = NOPAT + D&A - CAPEX - ΔBFR
+    // Calcul en mensuel puis conversion en annuel
+    const nopatMensuel = calculerEBIT() * (1 - tauxImposition / 100);
+    const capexMensuel = capex / 12;
+    // On n'ajoute pas D&A car il est déjà inclus dans les charges (amortissement des charges fixes)
+    return (nopatMensuel - capexMensuel) * 12;
   };
 
   const calculerValeurTerminale = () => {
     const fcfFinal = calculerFCF();
     const waccDecimal = wacc / 100;
     const croissanceDecimal = croissanceTerminale / 100;
+    
+    // Si FCF est négatif, pas de valeur terminale
+    if (fcfFinal <= 0) {
+      return 0;
+    }
+    
     return (fcfFinal * (1 + croissanceDecimal)) / (waccDecimal - croissanceDecimal);
   };
 
@@ -562,14 +606,19 @@ const SimulateurRentabilite = () => {
     const valeurTerminale = calculerValeurTerminale();
     const waccDecimal = wacc / 100;
     
+    // Si FCF est négatif, l'entreprise n'est pas viable
+    if (fcf <= 0) {
+      return 0;
+    }
+    
     // Actualisation des FCF sur 5 ans
     let fcfActualise = 0;
     for (let annee = 1; annee <= 5; annee++) {
       fcfActualise += fcf / Math.pow(1 + waccDecimal, annee);
     }
     
-    // Actualisation de la valeur terminale
-    const valeurTerminaleActualisee = valeurTerminale / Math.pow(1 + waccDecimal, 5);
+    // Actualisation de la valeur terminale (seulement si positive)
+    const valeurTerminaleActualisee = valeurTerminale > 0 ? valeurTerminale / Math.pow(1 + waccDecimal, 5) : 0;
     
     return fcfActualise + valeurTerminaleActualisee;
   };
@@ -846,8 +895,8 @@ const SimulateurRentabilite = () => {
               <div className="flex flex-wrap gap-2">
               <button onClick={() => augmenterTousPrix(50, 'prixAchat')} className="px-3 py-2 sm:px-4 sm:py-3 bg-green-600 text-white rounded text-sm hover:bg-green-700 min-h-[44px] min-w-[60px]">+50</button>
               <button onClick={() => augmenterTousPrix(-50, 'prixAchat')} className="px-3 py-2 sm:px-4 sm:py-3 bg-orange-500 text-white rounded text-sm hover:bg-orange-600 min-h-[44px] min-w-[60px]">-50</button>
+              </div>
             </div>
-          </div>
           <div>
             <div className="text-sm font-medium text-gray-600 mb-2">Export/Import/PDF:</div>
             <div className="flex flex-wrap gap-2">
@@ -863,20 +912,28 @@ const SimulateurRentabilite = () => {
               </label>
               <button onClick={generatePDF} className="px-3 py-2 sm:px-4 sm:py-3 bg-orange-500 text-white rounded text-sm hover:bg-orange-600 min-h-[44px] min-w-[80px]">📄 PDF</button>
               <button onClick={resetPrix} className="px-3 py-2 sm:px-4 sm:py-3 bg-red-500 text-white rounded text-sm hover:bg-red-600 min-h-[44px] min-w-[80px]">🔄 Reset</button>
+            </div>
+          </div>
+            {additionalVolume > 0 && (
+            <div>
+                <div className="text-sm font-medium text-gray-600 mb-2">Simulation Volume:</div>
+              <div className="flex flex-wrap gap-2">
+                  <button onClick={forceMainSimulation} className="px-3 py-2 sm:px-4 sm:py-3 bg-teal-500 text-white rounded text-sm hover:bg-teal-600 min-h-[44px] min-w-[80px]">🏠 Retour Principal</button>
               </div>
             </div>
-            {additionalVolume > 0 && (
-              <div>
-                <div className="text-sm font-medium text-gray-600 mb-2">Simulation Volume:</div>
-                <div className="flex flex-wrap gap-2">
-                  <button onClick={forceMainSimulation} className="px-3 py-2 sm:px-4 sm:py-3 bg-teal-500 text-white rounded text-sm hover:bg-teal-600 min-h-[44px] min-w-[80px]">🏠 Retour Principal</button>
-                </div>
-              </div>
             )}
             <div>
               <div className="text-sm font-medium text-gray-600 mb-2">Répartitions:</div>
               <div className="flex flex-wrap gap-2">
-                <button onClick={synchronizeRepartitions} className="px-3 py-2 sm:px-4 sm:py-3 bg-cyan-500 text-white rounded text-sm hover:bg-cyan-600 min-h-[44px] min-w-[80px]">🔄 Sync Répartitions</button>
+                <button 
+                  onClick={() => {
+                    synchronizeRepartitions();
+                    alert('Répartitions synchronisées ! Boeuf: 70.18%, Poulet: 10.29%, etc.');
+                  }} 
+                  className="px-3 py-2 sm:px-4 sm:py-3 bg-red-500 text-white rounded text-sm hover:bg-red-600 min-h-[44px] min-w-[80px] font-bold"
+                >
+                  🔄 CORRIGER RÉPARTITIONS
+                </button>
               </div>
             </div>
           </div>
@@ -946,7 +1003,7 @@ const SimulateurRentabilite = () => {
             </div>
           </div>
         </div>
-        
+
                 {/* Aperçu des changements */}
         <div className="mt-4 p-3 bg-white rounded border">
           <h4 className="text-sm font-semibold text-purple-800 mb-2">📊 Aperçu des Changements</h4>
@@ -978,7 +1035,7 @@ const SimulateurRentabilite = () => {
             Volume total: {volume.toLocaleString()} → {adjustedVolume.toLocaleString()} (+{additionalVolume.toLocaleString()})
           </div>
         </div>
-      </div>
+        </div>
 
       {/* Contenu identique au premier onglet mais avec les données ajustées */}
       {renderMainContent()}
@@ -997,18 +1054,18 @@ const SimulateurRentabilite = () => {
            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
              <div>
                <label className="block text-sm font-medium text-gray-700 mb-1">Charges fixes</label>
-               <input 
-                 type="number"
+                      <input 
+                        type="number"
                  value={chargesFixes}
                  onChange={(e) => setChargesFixes(parseFloat(e.target.value) || 0)}
                  className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
                  style={{ fontSize: '16px' }}
                />
-             </div>
+                      </div>
              <div>
                <label className="block text-sm font-medium text-gray-700 mb-1">Durée amortissement (mois)</label>
-               <input 
-                 type="number"
+                        <input 
+                          type="number"
                  min="1"
                  value={dureeAmortissement}
                  onChange={(e) => setDureeAmortissement(parseInt(e.target.value) || 1)}
@@ -1026,14 +1083,14 @@ const SimulateurRentabilite = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Salaire</label>
-              <input 
-                type="number"
+                        <input 
+                          type="number"
                 value={salaire}
                 onChange={(e) => setSalaire(parseFloat(e.target.value) || 0)}
                 className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
                 style={{ fontSize: '16px' }}
               />
-            </div>
+                        </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Électricité</label>
               <input 
@@ -1142,7 +1199,7 @@ const SimulateurRentabilite = () => {
                (getBeneficeTotalActif() - chargesTotales) > 0 ? 'text-green-600' : 'text-red-600'
              }`}>
                {((getBeneficeTotalActif() - chargesTotales) / getBeneficeTotalActif() * 100).toFixed(1)}%
-             </div>
+                      </div>
            </div>
          </div>
        </div>
@@ -1192,7 +1249,7 @@ const SimulateurRentabilite = () => {
             </div>
           </div>
         </div>
-      </div>
+        </div>
 
       {/* Paramètres financiers avancés */}
       <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 sm:p-4 md:p-6 mb-4 sm:mb-6 md:mb-8">
@@ -1236,8 +1293,8 @@ const SimulateurRentabilite = () => {
               <div className="text-xs text-gray-500 mt-1">Dépréciation & Amortissement</div>
             </div>
           </div>
-        </div>
-
+          </div>
+          
         {/* WACC et Croissance */}
         <div className="mb-6">
           <h4 className="text-sm font-semibold text-purple-700 mb-3">📊 Coût du Capital et Croissance</h4>
@@ -1317,11 +1374,95 @@ const SimulateurRentabilite = () => {
         </div>
       </div>
 
+      {/* Calculs Financiers Avancés */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4 md:p-6 mb-4 sm:mb-6 md:mb-8">
+        <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-blue-800">🏦 Calculs Financiers Avancés</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+          <div className="cursor-help" title={`EBIT = Bénéfice Total - Charges Opérationnelles
+Bénéfice Total: ${Math.round(getBeneficeTotalActif()).toLocaleString()} FCFA
+Charges Opérationnelles: ${Math.round(chargesTotales).toLocaleString()} FCFA
+EBIT Mensuel: ${Math.round(calculerEBIT()).toLocaleString()} FCFA
+EBIT Annuel: ${Math.round(calculerEBIT() * 12).toLocaleString()} FCFA`}>
+            <div className="text-sm text-gray-600">EBIT (annuel):</div>
+            <div className="text-lg sm:text-xl font-bold text-blue-600">
+              {Math.round(calculerEBIT() * 12).toLocaleString()}
+            </div>
+            <div className="text-xs text-gray-500">Bénéfice avant intérêts et impôts</div>
+          </div>
+          <div className="cursor-help" title={`EBITDA = EBIT + D&A
+EBIT: ${Math.round(calculerEBIT() * 12).toLocaleString()} FCFA
+D&A: ${Math.round(depreciationAmortissement).toLocaleString()} FCFA
+EBITDA: ${Math.round(calculerEBITDA() * 12).toLocaleString()} FCFA`}>
+            <div className="text-sm text-gray-600">EBITDA (annuel):</div>
+            <div className="text-lg sm:text-xl font-bold text-green-600">
+              {Math.round(calculerEBITDA() * 12).toLocaleString()}
+            </div>
+            <div className="text-xs text-gray-500">Bénéfice avant intérêts, impôts, D&A</div>
+          </div>
+          <div className="cursor-help" title={`NOPAT = EBIT × (1 - Taux d'imposition)
+EBIT: ${Math.round(calculerEBIT() * 12).toLocaleString()} FCFA
+Taux d'imposition: ${tauxImposition}%
+NOPAT: ${Math.round(calculerNOPAT() * 12).toLocaleString()} FCFA`}>
+            <div className="text-sm text-gray-600">NOPAT (annuel):</div>
+            <div className="text-lg sm:text-xl font-bold text-purple-600">
+              {Math.round(calculerNOPAT() * 12).toLocaleString()}
+            </div>
+            <div className="text-xs text-gray-500">Résultat net d'exploitation après impôts</div>
+          </div>
+          <div className="cursor-help" title={`FCF = NOPAT - CAPEX
+NOPAT: ${Math.round(calculerNOPAT() * 12).toLocaleString()} FCFA
+CAPEX: ${Math.round(capex).toLocaleString()} FCFA
+FCF: ${Math.round(calculerFCF() * 12).toLocaleString()} FCFA`}>
+            <div className="text-sm text-gray-600">FCF (annuel):</div>
+            <div className={`text-lg sm:text-xl font-bold ${
+              calculerFCF() * 12 > 0 ? 'text-green-600' : 'text-red-600'
+            }`}>
+              {Math.round(calculerFCF() * 12).toLocaleString()}
+            </div>
+            <div className="text-xs text-gray-500">Flux de trésorerie disponible</div>
+          </div>
+        </div>
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+          <div>
+            <div className="text-sm text-gray-600">D&A (annuel):</div>
+            <div className="text-lg sm:text-xl font-bold text-yellow-600">
+              {Math.round(depreciationAmortissement).toLocaleString()}
+            </div>
+            <div className="text-xs text-gray-500">Dépréciation & Amortissement</div>
+          </div>
+          <div>
+            <div className="text-sm text-gray-600">Valeur Terminale:</div>
+            <div className="text-lg sm:text-xl font-bold text-indigo-600">
+              {Math.round(calculerValeurTerminale()).toLocaleString()}
+            </div>
+            <div className="text-xs text-gray-500">Valeur à perpétuité</div>
+          </div>
+          <div>
+            <div className="text-sm text-gray-600">Enterprise Value:</div>
+            <div className="text-lg sm:text-xl font-bold text-orange-600">
+              {Math.round(calculerEnterpriseValue()).toLocaleString()}
+            </div>
+            <div className="text-xs text-gray-500">Valeur d'entreprise</div>
+          </div>
+          <div>
+            <div className="text-sm text-gray-600">Equity Value:</div>
+            <div className="text-lg sm:text-xl font-bold text-teal-600">
+              {Math.round(calculerEquityValue()).toLocaleString()}
+            </div>
+            <div className="text-xs text-gray-500">Valeur des capitaux propres</div>
+          </div>
+        </div>
+      </div>
+
       {/* Indicateurs DCF */}
       <div className="bg-green-50 border border-green-200 rounded-lg p-3 sm:p-4 md:p-6 mb-4 sm:mb-6 md:mb-8">
         <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-green-800">📈 Indicateurs DCF</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-          <div>
+          <div className="cursor-help" title={`VAN = Σ(Flux Actualisés)
+Investissement Initial: ${Math.round(chargesFixes).toLocaleString()} FCFA
+Taux d'actualisation: ${tauxActualisationAnnuel}% (${(tauxActualisationMensuel * 100).toFixed(3)}% mensuel)
+VAN: ${indicateursDCF.van.toLocaleString()} FCFA
+Interprétation: ${indicateursDCF.van > 0 ? 'Projet rentable' : 'Projet non rentable'}`}>
             <div className="text-sm text-gray-600">VAN (NPV):</div>
             <div className={`text-lg sm:text-xl font-bold ${
               indicateursDCF.van > 0 ? 'text-green-600' : 'text-red-600'
@@ -1332,7 +1473,11 @@ const SimulateurRentabilite = () => {
               {indicateursDCF.van > 0 ? 'Projet rentable' : 'Projet non rentable'}
             </div>
           </div>
-          <div>
+          <div className="cursor-help" title={`TRI = Taux qui rend VAN = 0
+TRI Mensuel: ${(indicateursDCF.triMensuel * 100).toFixed(3)}%
+TRI Annuel: ${(indicateursDCF.triAnnuel * 100).toFixed(2)}%
+Taux d'actualisation: ${tauxActualisationAnnuel}%
+Comparaison: TRI ${indicateursDCF.triAnnuel > (tauxActualisationAnnuel / 100) ? '>' : '<'} Taux d'actualisation`}>
             <div className="text-sm text-gray-600">TRI annuel:</div>
             <div className={`text-lg sm:text-xl font-bold ${
               indicateursDCF.triAnnuel > (tauxActualisationAnnuel / 100) ? 'text-green-600' : 'text-red-600'
@@ -1374,7 +1519,16 @@ const SimulateurRentabilite = () => {
 
       {/* Flux de trésorerie détaillés */}
       <div className="bg-white p-3 sm:p-4 md:p-6 rounded-lg shadow-md border mb-4 sm:mb-6 md:mb-8">
-        <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-gray-800">💰 Flux de Trésorerie Détailés</h3>
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-base sm:text-lg font-semibold text-gray-800">💰 Flux de Trésorerie Détailés</h3>
+          <button
+            onClick={() => exportFluxTresorerie(fluxDCF, `flux-tresorerie-dcf-${new Date().toISOString().split('T')[0]}.csv`)}
+            className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+          >
+            📊 Exporter CSV
+          </button>
+        </div>
+        
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gradient-to-r from-indigo-500 to-indigo-600">
@@ -1388,7 +1542,7 @@ const SimulateurRentabilite = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {fluxDCF.slice(0, 13).map((flux, index) => (
+              {fluxDCF.slice((pageFluxDCF - 1) * itemsPerPage, pageFluxDCF * itemsPerPage).map((flux, index) => (
                 <tr key={flux.mois} className={index % 2 === 0 ? "bg-gray-50" : "bg-white"}>
                   <td className="px-2 sm:px-4 py-3 text-xs sm:text-sm font-semibold text-gray-800">
                     {flux.mois === 0 ? 'Mois 0' : `Mois ${flux.mois}`}
@@ -1416,16 +1570,45 @@ const SimulateurRentabilite = () => {
                   </td>
                 </tr>
               ))}
-              {fluxDCF.length > 13 && (
-                <tr className="bg-gray-100">
-                  <td colSpan="6" className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm text-gray-600">
-                    ... et {fluxDCF.length - 13} mois supplémentaires
-                  </td>
-                </tr>
-              )}
             </tbody>
           </table>
         </div>
+
+        {/* Pagination */}
+        {fluxDCF.length > itemsPerPage && (
+          <div className="mt-4 flex justify-between items-center">
+            <div className="text-sm text-gray-600">
+              Affichage {((pageFluxDCF - 1) * itemsPerPage) + 1} à {Math.min(pageFluxDCF * itemsPerPage, fluxDCF.length)} sur {fluxDCF.length} mois
+            </div>
+            <div className="flex space-x-2">
+              <button
+                onClick={() => setPageFluxDCF(Math.max(1, pageFluxDCF - 1))}
+                disabled={pageFluxDCF === 1}
+                className={`px-3 py-1 rounded text-sm font-medium ${
+                  pageFluxDCF === 1 
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
+              >
+                ← Précédent
+              </button>
+              <span className="px-3 py-1 text-sm text-gray-600">
+                Page {pageFluxDCF} sur {Math.ceil(fluxDCF.length / itemsPerPage)}
+              </span>
+              <button
+                onClick={() => setPageFluxDCF(Math.min(Math.ceil(fluxDCF.length / itemsPerPage), pageFluxDCF + 1))}
+                disabled={pageFluxDCF === Math.ceil(fluxDCF.length / itemsPerPage)}
+                className={`px-3 py-1 rounded text-sm font-medium ${
+                  pageFluxDCF === Math.ceil(fluxDCF.length / itemsPerPage)
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
+              >
+                Suivant →
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Graphique des flux de trésorerie */}
@@ -1433,7 +1616,7 @@ const SimulateurRentabilite = () => {
         <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-gray-800">📊 Évolution des Flux de Trésorerie</h3>
         <ResponsiveContainer width="100%" height={300}>
           <LineChart data={fluxDCF.slice(0, 25)}>
-            <CartesianGrid strokeDasharray="3 3" />
+                  <CartesianGrid strokeDasharray="3 3" />
             <XAxis 
               dataKey="mois" 
               tick={{ fontSize: 12 }}
@@ -1443,26 +1626,26 @@ const SimulateurRentabilite = () => {
               tick={{ fontSize: 12 }}
               tickFormatter={(value) => `${(value / 1000000).toFixed(1)}M`}
             />
-            <Tooltip 
-              formatter={(value, name) => [
+                  <Tooltip 
+                    formatter={(value, name) => [
                 value.toLocaleString(), 
                 name === 'fluxNet' ? 'Flux Net' : 
                 name === 'fluxActualise' ? 'Flux Actualisé' : 
                 name === 'cumulActualise' ? 'Cumul Actualisé' : name
-              ]}
-            />
-            <Line 
-              type="monotone" 
+                    ]}
+                  />
+                  <Line 
+                    type="monotone" 
               dataKey="fluxNet" 
               stroke="#3498db" 
               strokeWidth={2}
               name="Flux Net"
-            />
-            <Line 
-              type="monotone" 
+                  />
+                  <Line 
+                    type="monotone" 
               dataKey="fluxActualise" 
               stroke="#e74c3c" 
-              strokeWidth={2}
+                    strokeWidth={2}
               name="Flux Actualisé"
             />
             <Line 
@@ -1471,10 +1654,13 @@ const SimulateurRentabilite = () => {
               stroke="#2ecc71" 
               strokeWidth={3}
               name="Cumul Actualisé"
-            />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
+                                    />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+
+      {/* Formules et Hypothèses DCF */}
+      <FormulesHypotheses />
 
       {/* Contenu identique au premier onglet mais avec les données ajustées */}
       {renderMainContent()}
@@ -1500,7 +1686,7 @@ const SimulateurRentabilite = () => {
               style={{ fontSize: '16px' }}
             />
             <div className="text-xs text-gray-500 mt-1">Taux mensuel: {(tauxActualisationMensuel * 100).toFixed(3)}%</div>
-          </div>
+                  </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Durée d'analyse (mois)</label>
             <input 
@@ -1518,10 +1704,10 @@ const SimulateurRentabilite = () => {
             <div className="w-full p-2 sm:p-3 bg-purple-100 rounded text-sm">
               <div className="text-purple-800 font-medium">Investissement initial</div>
               <div className="text-purple-600 text-xs">{chargesFixes.toLocaleString()}</div>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-        
+
         {/* Informations sur la simulation */}
         <div className="mt-4 p-3 bg-purple-100 rounded">
           <div className="text-sm text-purple-800">
@@ -1539,11 +1725,110 @@ const SimulateurRentabilite = () => {
         </div>
       </div>
 
+      {/* Calculs Financiers Avancés - Simulation */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4 md:p-6 mb-4 sm:mb-6 md:mb-8">
+        <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-blue-800">🏦 Calculs Financiers Avancés - Simulation</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+          <div className="cursor-help" title={`EBIT = Bénéfice Total - Charges Opérationnelles
+Bénéfice Total: ${Math.round(getBeneficeTotalActif()).toLocaleString()} FCFA
+Charges Opérationnelles: ${Math.round(chargesTotales).toLocaleString()} FCFA
+EBIT Mensuel: ${Math.round(calculerEBIT()).toLocaleString()} FCFA
+EBIT Annuel: ${Math.round(calculerEBIT() * 12).toLocaleString()} FCFA`}>
+            <div className="text-sm text-gray-600">EBIT (annuel):</div>
+            <div className="text-lg sm:text-xl font-bold text-blue-600">
+              {Math.round(calculerEBIT() * 12).toLocaleString()}
+            </div>
+            <div className="text-xs text-gray-500">Bénéfice avant intérêts et impôts</div>
+          </div>
+          <div className="cursor-help" title={`EBITDA = EBIT + D&A
+EBIT: ${Math.round(calculerEBIT() * 12).toLocaleString()} FCFA
+D&A: ${Math.round(depreciationAmortissement).toLocaleString()} FCFA
+EBITDA: ${Math.round(calculerEBITDA() * 12).toLocaleString()} FCFA`}>
+            <div className="text-sm text-gray-600">EBITDA (annuel):</div>
+            <div className="text-lg sm:text-xl font-bold text-green-600">
+              {Math.round(calculerEBITDA() * 12).toLocaleString()}
+            </div>
+            <div className="text-xs text-gray-500">Bénéfice avant intérêts, impôts, D&A</div>
+          </div>
+          <div className="cursor-help" title={`NOPAT = EBIT × (1 - Taux d'imposition)
+EBIT: ${Math.round(calculerEBIT() * 12).toLocaleString()} FCFA
+Taux d'imposition: ${tauxImposition}%
+NOPAT: ${Math.round(calculerNOPAT() * 12).toLocaleString()} FCFA`}>
+            <div className="text-sm text-gray-600">NOPAT (annuel):</div>
+            <div className="text-lg sm:text-xl font-bold text-purple-600">
+              {Math.round(calculerNOPAT() * 12).toLocaleString()}
+            </div>
+            <div className="text-xs text-gray-500">Résultat net d'exploitation après impôts</div>
+          </div>
+          <div className="cursor-help" title={`FCF = NOPAT - CAPEX
+NOPAT: ${Math.round(calculerNOPAT() * 12).toLocaleString()} FCFA
+CAPEX: ${Math.round(capex).toLocaleString()} FCFA
+FCF: ${Math.round(calculerFCF() * 12).toLocaleString()} FCFA`}>
+            <div className="text-sm text-gray-600">FCF (annuel):</div>
+            <div className={`text-lg sm:text-xl font-bold ${
+              calculerFCF() * 12 > 0 ? 'text-green-600' : 'text-red-600'
+            }`}>
+              {Math.round(calculerFCF() * 12).toLocaleString()}
+            </div>
+            <div className="text-xs text-gray-500">Flux de trésorerie disponible</div>
+          </div>
+        </div>
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+          <div className="cursor-help" title={`D&A = 25% du CAPEX - Simulation
+CAPEX: ${Math.round(capex).toLocaleString()} FCFA
+D&A: ${Math.round(depreciationAmortissement).toLocaleString()} FCFA
+D&A Mensuel: ${Math.round(depreciationAmortissement / 12).toLocaleString()} FCFA`}>
+            <div className="text-sm text-gray-600">D&A (annuel):</div>
+            <div className="text-lg sm:text-xl font-bold text-yellow-600">
+              {Math.round(depreciationAmortissement).toLocaleString()}
+            </div>
+            <div className="text-xs text-gray-500">Dépréciation & Amortissement</div>
+          </div>
+          <div className="cursor-help" title={`Valeur Terminale = FCF × (1 + g) / (WACC - g) - Simulation
+FCF: ${Math.round(calculerFCF() * 12).toLocaleString()} FCFA
+WACC: ${wacc}%
+Croissance g: ${croissanceTerminale}%
+VT: ${Math.round(calculerValeurTerminale()).toLocaleString()} FCFA`}>
+            <div className="text-sm text-gray-600">Valeur Terminale:</div>
+            <div className="text-lg sm:text-xl font-bold text-indigo-600">
+              {Math.round(calculerValeurTerminale()).toLocaleString()}
+            </div>
+            <div className="text-xs text-gray-500">Valeur à perpétuité</div>
+          </div>
+          <div className="cursor-help" title={`Enterprise Value = Σ(FCF actualisés) + VT actualisée - Simulation
+FCF Annuel: ${Math.round(calculerFCF() * 12).toLocaleString()} FCFA
+WACC: ${wacc}%
+Valeur Terminale: ${Math.round(calculerValeurTerminale()).toLocaleString()} FCFA
+EV: ${Math.round(calculerEnterpriseValue()).toLocaleString()} FCFA`}>
+            <div className="text-sm text-gray-600">Enterprise Value:</div>
+            <div className="text-lg sm:text-xl font-bold text-orange-600">
+              {Math.round(calculerEnterpriseValue()).toLocaleString()}
+            </div>
+            <div className="text-xs text-gray-500">Valeur d'entreprise</div>
+          </div>
+          <div className="cursor-help" title={`Equity Value = Enterprise Value - Dette + Trésorerie - Simulation
+Enterprise Value: ${Math.round(calculerEnterpriseValue()).toLocaleString()} FCFA
+Dette: ${Math.round(dette).toLocaleString()} FCFA
+Trésorerie: ${Math.round(tresorerie).toLocaleString()} FCFA
+Equity Value: ${Math.round(calculerEquityValue()).toLocaleString()} FCFA`}>
+            <div className="text-sm text-gray-600">Equity Value:</div>
+            <div className="text-lg sm:text-xl font-bold text-teal-600">
+              {Math.round(calculerEquityValue()).toLocaleString()}
+            </div>
+            <div className="text-xs text-gray-500">Valeur des capitaux propres</div>
+          </div>
+        </div>
+      </div>
+
       {/* Indicateurs DCF */}
       <div className="bg-green-50 border border-green-200 rounded-lg p-3 sm:p-4 md:p-6 mb-4 sm:mb-6 md:mb-8">
         <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-green-800">📈 Indicateurs DCF - Simulation</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-          <div>
+          <div className="cursor-help" title={`VAN = Σ(Flux Actualisés) - Simulation
+Investissement Initial: ${Math.round(chargesFixes).toLocaleString()} FCFA
+Taux d'actualisation: ${tauxActualisationAnnuel}% (${(tauxActualisationMensuel * 100).toFixed(3)}% mensuel)
+VAN: ${indicateursDCFSimulation.van.toLocaleString()} FCFA
+Interprétation: ${indicateursDCFSimulation.van > 0 ? 'Projet rentable' : 'Projet non rentable'}`}>
             <div className="text-sm text-gray-600">VAN (NPV):</div>
             <div className={`text-lg sm:text-xl font-bold ${
               indicateursDCFSimulation.van > 0 ? 'text-green-600' : 'text-red-600'
@@ -1554,7 +1839,11 @@ const SimulateurRentabilite = () => {
               {indicateursDCFSimulation.van > 0 ? 'Projet rentable' : 'Projet non rentable'}
             </div>
           </div>
-          <div>
+          <div className="cursor-help" title={`TRI = Taux qui rend VAN = 0 - Simulation
+TRI Mensuel: ${(indicateursDCFSimulation.triMensuel * 100).toFixed(3)}%
+TRI Annuel: ${(indicateursDCFSimulation.triAnnuel * 100).toFixed(2)}%
+Taux d'actualisation: ${tauxActualisationAnnuel}%
+Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel / 100) ? '>' : '<'} Taux d'actualisation`}>
             <div className="text-sm text-gray-600">TRI annuel:</div>
             <div className={`text-lg sm:text-xl font-bold ${
               indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel / 100) ? 'text-green-600' : 'text-red-600'
@@ -1596,7 +1885,16 @@ const SimulateurRentabilite = () => {
 
       {/* Flux de trésorerie détaillés */}
       <div className="bg-white p-3 sm:p-4 md:p-6 rounded-lg shadow-md border mb-4 sm:mb-6 md:mb-8">
-        <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-gray-800">💰 Flux de Trésorerie Détailés - Simulation</h3>
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-base sm:text-lg font-semibold text-gray-800">💰 Flux de Trésorerie Détailés - Simulation</h3>
+          <button
+            onClick={() => exportFluxTresorerie(fluxDCFSimulation, `flux-tresorerie-dcf-simulation-${new Date().toISOString().split('T')[0]}.csv`)}
+            className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+          >
+            📊 Exporter CSV
+          </button>
+        </div>
+        
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gradient-to-r from-purple-500 to-purple-600">
@@ -1610,7 +1908,7 @@ const SimulateurRentabilite = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {fluxDCFSimulation.slice(0, 13).map((flux, index) => (
+              {fluxDCFSimulation.slice((pageFluxDCFSimulation - 1) * itemsPerPage, pageFluxDCFSimulation * itemsPerPage).map((flux, index) => (
                 <tr key={flux.mois} className={index % 2 === 0 ? "bg-gray-50" : "bg-white"}>
                   <td className="px-2 sm:px-4 py-3 text-xs sm:text-sm font-semibold text-gray-800">
                     {flux.mois === 0 ? 'Mois 0' : `Mois ${flux.mois}`}
@@ -1638,16 +1936,45 @@ const SimulateurRentabilite = () => {
                   </td>
                 </tr>
               ))}
-              {fluxDCFSimulation.length > 13 && (
-                <tr className="bg-gray-100">
-                  <td colSpan="6" className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm text-gray-600">
-                    ... et {fluxDCFSimulation.length - 13} mois supplémentaires
-                  </td>
-                </tr>
-              )}
             </tbody>
           </table>
         </div>
+
+        {/* Pagination */}
+        {fluxDCFSimulation.length > itemsPerPage && (
+          <div className="mt-4 flex justify-between items-center">
+            <div className="text-sm text-gray-600">
+              Affichage {((pageFluxDCFSimulation - 1) * itemsPerPage) + 1} à {Math.min(pageFluxDCFSimulation * itemsPerPage, fluxDCFSimulation.length)} sur {fluxDCFSimulation.length} mois
+            </div>
+            <div className="flex space-x-2">
+              <button
+                onClick={() => setPageFluxDCFSimulation(Math.max(1, pageFluxDCFSimulation - 1))}
+                disabled={pageFluxDCFSimulation === 1}
+                className={`px-3 py-1 rounded text-sm font-medium ${
+                  pageFluxDCFSimulation === 1 
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                    : 'bg-purple-600 text-white hover:bg-purple-700'
+                }`}
+              >
+                ← Précédent
+              </button>
+              <span className="px-3 py-1 text-sm text-gray-600">
+                Page {pageFluxDCFSimulation} sur {Math.ceil(fluxDCFSimulation.length / itemsPerPage)}
+              </span>
+              <button
+                onClick={() => setPageFluxDCFSimulation(Math.min(Math.ceil(fluxDCFSimulation.length / itemsPerPage), pageFluxDCFSimulation + 1))}
+                disabled={pageFluxDCFSimulation === Math.ceil(fluxDCFSimulation.length / itemsPerPage)}
+                className={`px-3 py-1 rounded text-sm font-medium ${
+                  pageFluxDCFSimulation === Math.ceil(fluxDCFSimulation.length / itemsPerPage)
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                    : 'bg-purple-600 text-white hover:bg-purple-700'
+                }`}
+              >
+                Suivant →
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Graphique des flux de trésorerie */}
@@ -1655,7 +1982,7 @@ const SimulateurRentabilite = () => {
         <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-gray-800">📊 Évolution des Flux de Trésorerie - Simulation</h3>
         <ResponsiveContainer width="100%" height={300}>
           <LineChart data={fluxDCFSimulation.slice(0, 25)}>
-            <CartesianGrid strokeDasharray="3 3" />
+                  <CartesianGrid strokeDasharray="3 3" />
             <XAxis 
               dataKey="mois" 
               tick={{ fontSize: 12 }}
@@ -1665,26 +1992,26 @@ const SimulateurRentabilite = () => {
               tick={{ fontSize: 12 }}
               tickFormatter={(value) => `${(value / 1000000).toFixed(1)}M`}
             />
-            <Tooltip 
-              formatter={(value, name) => [
+                  <Tooltip 
+                    formatter={(value, name) => [
                 value.toLocaleString(), 
                 name === 'fluxNet' ? 'Flux Net' : 
                 name === 'fluxActualise' ? 'Flux Actualisé' : 
                 name === 'cumulActualise' ? 'Cumul Actualisé' : name
-              ]}
-            />
-            <Line 
-              type="monotone" 
+                    ]}
+                  />
+                  <Line 
+                    type="monotone" 
               dataKey="fluxNet" 
-              stroke="#3498db" 
+                    stroke="#3498db" 
               strokeWidth={2}
               name="Flux Net"
-            />
-            <Line 
-              type="monotone" 
+                  />
+                  <Line 
+                    type="monotone" 
               dataKey="fluxActualise" 
               stroke="#e74c3c" 
-              strokeWidth={2}
+                    strokeWidth={2}
               name="Flux Actualisé"
             />
             <Line 
@@ -1693,10 +2020,13 @@ const SimulateurRentabilite = () => {
               stroke="#2ecc71" 
               strokeWidth={3}
               name="Cumul Actualisé"
-            />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+                  </div>
+
+      {/* Formules et Hypothèses DCF */}
+      <FormulesHypotheses />
 
       {/* Contenu identique au premier onglet mais avec les données ajustées */}
       {renderMainContent()}
@@ -1717,19 +2047,19 @@ const SimulateurRentabilite = () => {
               <div className="font-medium text-gray-800">CA (Chiffre d'Affaires) Mensuel</div>
               <div className="text-lg font-bold text-blue-600">20,000,000</div>
               <div className="text-sm text-gray-600">Volume de vente mensuel total de tous les produits</div>
-            </div>
+                  </div>
             <div className="bg-white p-3 rounded border">
               <div className="font-medium text-gray-800">CA Annuel</div>
               <div className="text-lg font-bold text-blue-600">240,000,000</div>
               <div className="text-sm text-gray-600">20,000,000 × 12 mois</div>
-            </div>
+                </div>
             <div className="bg-white p-3 rounded border">
               <div className="font-medium text-gray-800">Bénéfice Mensuel Approximatif</div>
               <div className="text-lg font-bold text-green-600">~2,000,000</div>
               <div className="text-sm text-gray-600">Environ 10% du CA mensuel</div>
+              </div>
             </div>
           </div>
-        </div>
 
         {/* Paramètres financiers */}
         <div className="mb-6">
@@ -1843,7 +2173,7 @@ const SimulateurRentabilite = () => {
         </div>
 
         {/* Calculs DCF */}
-        <div>
+              <div>
           <h4 className="text-sm font-semibold text-teal-700 mb-3">🧮 Calculs DCF Détaillés</h4>
           <div className="space-y-4">
             <div className="bg-white p-4 rounded border">
@@ -2038,7 +2368,7 @@ const SimulateurRentabilite = () => {
               </PieChart>
             </ResponsiveContainer>
           </div>
-        </div>
+              </div>
 
         {/* Graphique des marges */}
         <div className="bg-white p-3 sm:p-4 md:p-6 rounded-lg shadow-md border mb-4 sm:mb-6 md:mb-8">
@@ -2067,14 +2397,14 @@ const SimulateurRentabilite = () => {
                     <th className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-medium text-white uppercase tracking-wider">Prix V</th>
                     <th className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-medium text-white uppercase tracking-wider">Marge %</th>
                     <th className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-medium text-white uppercase tracking-wider">Bénéfice</th>
-              </tr>
-            </thead>
+                    </tr>
+                  </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {produitsActifs.map((produit, index) => {
                 const isEditable = produit.editable;
                     const pourcentageTotal = (produit.benefice / getBeneficeTotalActif()) * 100;
-                
-                return (
+                      
+                      return (
                   <tr key={produit.nom} className={index % 2 === 0 ? "bg-gray-50" : "bg-white"}>
                         <td className="px-2 sm:px-4 py-3 text-xs sm:text-sm font-semibold text-gray-800">
                           <div>{produit.nom}</div>
@@ -2147,14 +2477,14 @@ const SimulateurRentabilite = () => {
                         {pourcentageTotal.toFixed(1)}%
                       </div>
                     </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-              </div>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
             </div>
+          </div>
+        </div>
 
         <div className="mt-4 sm:mt-6 bg-gray-100 p-3 sm:p-4 rounded-lg text-xs sm:text-sm text-gray-600">
           <strong>💡 Informations:</strong><br/>
