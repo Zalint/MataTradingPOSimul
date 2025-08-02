@@ -1043,7 +1043,7 @@ const SimulateurRentabilite = () => {
             </div>
             <div>
               <div className="text-sm text-gray-600">Paramètres Bœuf/Veau:</div>
-              <div className="text-sm text-gray-700">Abats: {abatsParKg} | Pération: {(peration * 100).toFixed(1)}%</div>
+              <div className="text-sm text-gray-700">Foie, Yell, Filet (Bœuf/Veau): {abatsParKg} | Pération: {(peration * 100).toFixed(1)}%</div>
             </div>
           </div>
         </div>
