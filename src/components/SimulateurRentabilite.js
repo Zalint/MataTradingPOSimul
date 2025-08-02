@@ -12,7 +12,7 @@ const SimulateurRentabilite = () => {
   const [itemsPerPage] = useState(12);
   const [volume, setVolume] = useState('20000000');
   const [abatsParKg, setAbatsParKg] = useState('200');
-  const [peration, setPeration] = useState('0.1');
+  const [peration, setPeration] = useState('0.13');
   
   // Nouveaux états pour la simulation de volume
   const [selectedProduct, setSelectedProduct] = useState('Poulet');
@@ -232,7 +232,7 @@ const SimulateurRentabilite = () => {
     });
     setVolume('20000000');
     setAbatsParKg('200');
-    setPeration('0.1');
+    setPeration('0.13');
     setAdditionalVolume('0');
     setSelectedProduct('Poulet');
     // Reset des charges
