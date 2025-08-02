@@ -10,39 +10,39 @@ const SimulateurRentabilite = () => {
   const [pageFluxDCF, setPageFluxDCF] = useState(1);
   const [pageFluxDCFSimulation, setPageFluxDCFSimulation] = useState(1);
   const [itemsPerPage] = useState(12);
-  const [volume, setVolume] = useState(20000000);
-  const [abatsParKg, setAbatsParKg] = useState(200);
-  const [peration, setPeration] = useState(0.1);
+  const [volume, setVolume] = useState('20000000');
+  const [abatsParKg, setAbatsParKg] = useState('200');
+  const [peration, setPeration] = useState('0.1');
   
   // Nouveaux états pour la simulation de volume
   const [selectedProduct, setSelectedProduct] = useState('Poulet');
-  const [additionalVolume, setAdditionalVolume] = useState(0);
+  const [additionalVolume, setAdditionalVolume] = useState('0');
   
   // États pour les charges
-  const [chargesFixes, setChargesFixes] = useState(5000000);
-  const [dureeAmortissement, setDureeAmortissement] = useState(24); // Durée en mois
-  const [salaire, setSalaire] = useState(250000);
-  const [electricite, setElectricite] = useState(25000);
-  const [eau, setEau] = useState(5000);
-  const [internet, setInternet] = useState(10000);
-  const [sacsLivraison, setSacsLivraison] = useState(30000);
-  const [chargesTransport, setChargesTransport] = useState(150000);
-  const [loyer, setLoyer] = useState(250000);
-  const [autresCharges, setAutresCharges] = useState(0);
+  const [chargesFixes, setChargesFixes] = useState('5000000');
+  const [dureeAmortissement, setDureeAmortissement] = useState('24'); // Durée en mois
+  const [salaire, setSalaire] = useState('250000');
+  const [electricite, setElectricite] = useState('25000');
+  const [eau, setEau] = useState('5000');
+  const [internet, setInternet] = useState('10000');
+  const [sacsLivraison, setSacsLivraison] = useState('30000');
+  const [chargesTransport, setChargesTransport] = useState('150000');
+  const [loyer, setLoyer] = useState('250000');
+  const [autresCharges, setAutresCharges] = useState('0');
   
   // États pour le DCF
-  const [tauxActualisationAnnuel, setTauxActualisationAnnuel] = useState(12); // 12% par défaut
-  const [dureeAnalyse, setDureeAnalyse] = useState(60); // 5 ans par défaut
+  const [tauxActualisationAnnuel, setTauxActualisationAnnuel] = useState('12'); // 12% par défaut
+  const [dureeAnalyse, setDureeAnalyse] = useState('60'); // 5 ans par défaut
   
   // États pour le DCF avancé
-  const [capex, setCapex] = useState(10000000); // 10M par défaut (corrigé)
-  const [bfr, setBfr] = useState(0); // 0 par défaut (modèle consignation - pas d'investissement en stocks)
-  const [wacc, setWacc] = useState(12); // 12% par défaut (corrigé)
-  const [croissanceTerminale, setCroissanceTerminale] = useState(3); // 3% par défaut
-  const [dette, setDette] = useState(5000000); // 5M par défaut
-  const [tresorerie, setTresorerie] = useState(5000000); // 5M par défaut
-  const [tauxImposition, setTauxImposition] = useState(30); // 30% par défaut
-  const [depreciationAmortissement, setDepreciationAmortissement] = useState(2500000); // 2.5M par défaut (25% du CAPEX)
+  const [capex, setCapex] = useState('5000000'); // 5M par défaut
+  const [bfr, setBfr] = useState('2500000'); // 2.5M par défaut
+  const [wacc, setWacc] = useState('12'); // 12% par défaut (corrigé)
+  const [croissanceTerminale, setCroissanceTerminale] = useState('3'); // 3% par défaut
+  const [dette, setDette] = useState('0'); // 0 par défaut
+  const [tresorerie, setTresorerie] = useState('500000'); // 500K par défaut
+  const [tauxImposition, setTauxImposition] = useState('30'); // 30% par défaut
+  const [depreciationAmortissement, setDepreciationAmortissement] = useState('1250000'); // 1.25M par défaut (25% du CAPEX)
   
   const [produits, setProduits] = useState({
     'Boeuf': {
@@ -96,12 +96,39 @@ const SimulateurRentabilite = () => {
     }
   });
 
+  // Fonctions helper pour convertir les chaînes en nombres
+  const getNumericValue = (value) => parseFloat(value) || 0;
+  const getNumericVolume = () => getNumericValue(volume);
+  const getNumericAbatsParKg = () => getNumericValue(abatsParKg);
+  const getNumericPeration = () => getNumericValue(peration);
+  const getNumericAdditionalVolume = () => getNumericValue(additionalVolume);
+  const getNumericChargesFixes = () => getNumericValue(chargesFixes);
+  const getNumericDureeAmortissement = () => getNumericValue(dureeAmortissement);
+  const getNumericSalaire = () => getNumericValue(salaire);
+  const getNumericElectricite = () => getNumericValue(electricite);
+  const getNumericEau = () => getNumericValue(eau);
+  const getNumericInternet = () => getNumericValue(internet);
+  const getNumericSacsLivraison = () => getNumericValue(sacsLivraison);
+  const getNumericChargesTransport = () => getNumericValue(chargesTransport);
+  const getNumericLoyer = () => getNumericValue(loyer);
+  const getNumericAutresCharges = () => getNumericValue(autresCharges);
+  const getNumericTauxActualisationAnnuel = () => getNumericValue(tauxActualisationAnnuel);
+  const getNumericDureeAnalyse = () => getNumericValue(dureeAnalyse);
+  const getNumericCapex = () => getNumericValue(capex);
+  const getNumericBfr = () => getNumericValue(bfr);
+  const getNumericWacc = () => getNumericValue(wacc);
+  const getNumericCroissanceTerminale = () => getNumericValue(croissanceTerminale);
+  const getNumericDette = () => getNumericValue(dette);
+  const getNumericTresorerie = () => getNumericValue(tresorerie);
+  const getNumericTauxImposition = () => getNumericValue(tauxImposition);
+  const getNumericDepreciationAmortissement = () => getNumericValue(depreciationAmortissement);
+
   // Calcul du volume ajusté pour la simulation
   const getAdjustedVolume = () => {
-    if (additionalVolume > 0) {
-      return volume + additionalVolume;
+    if (getNumericAdditionalVolume() > 0) {
+      return getNumericVolume() + getNumericAdditionalVolume();
     }
-    return volume;
+    return getNumericVolume();
   };
 
   // Répartitions originales (fixes)
@@ -117,19 +144,19 @@ const SimulateurRentabilite = () => {
 
   // Calcul des répartitions ajustées pour la simulation
   const getAdjustedRepartitions = () => {
-    if (additionalVolume > 0) {
+    if (getNumericAdditionalVolume() > 0) {
       const adjustedProduits = { ...produits };
-      const totalVolume = volume + additionalVolume;
+      const totalVolume = getNumericVolume() + getNumericAdditionalVolume();
       
       // Calculer les volumes absolus de chaque produit
       const volumes = {};
       Object.keys(adjustedProduits).forEach(nom => {
         if (nom === selectedProduct) {
           // Pour le produit sélectionné : volume original + volume ajouté
-          volumes[nom] = originalRepartitions[nom] * volume + additionalVolume;
+          volumes[nom] = originalRepartitions[nom] * getNumericVolume() + getNumericAdditionalVolume();
         } else {
           // Pour les autres produits : volume original (inchangé)
-          volumes[nom] = originalRepartitions[nom] * volume;
+          volumes[nom] = originalRepartitions[nom] * getNumericVolume();
         }
       });
       
@@ -149,7 +176,7 @@ const SimulateurRentabilite = () => {
     );
     const marges = produitsEditables.map(([nom, data]) => {
       if (data.hasAbats) {
-        return ((data.prixVente * (1 - peration) + abatsParKg) / data.prixAchat) - 1;
+        return ((data.prixVente * (1 - getNumericPeration()) + getNumericAbatsParKg()) / data.prixAchat) - 1;
       } else {
         return (data.prixVente / data.prixAchat) - 1;
       }
@@ -161,7 +188,7 @@ const SimulateurRentabilite = () => {
     if (!produitData.prixVente || !produitData.prixAchat) return 0;
     
     if (produitData.hasAbats) {
-      return ((produitData.prixVente * (1 - peration) + abatsParKg) / produitData.prixAchat) - 1;
+      return ((produitData.prixVente * (1 - getNumericPeration()) + getNumericAbatsParKg()) / produitData.prixAchat) - 1;
     } else {
       return (produitData.prixVente / produitData.prixAchat) - 1;
     }
@@ -203,43 +230,43 @@ const SimulateurRentabilite = () => {
       'Pack': { repartition: 0.014027977, prixAchat: null, prixVente: null, editable: false, hasAbats: false },
       'Poulet': { repartition: 0.102932124, prixAchat: 2600, prixVente: 3400, editable: true, hasAbats: false }
     });
-    setVolume(20000000);
-    setAbatsParKg(200);
-    setPeration(0.1);
-    setAdditionalVolume(5000000);
+    setVolume('20000000');
+    setAbatsParKg('200');
+    setPeration('0.1');
+    setAdditionalVolume('0');
     setSelectedProduct('Poulet');
     // Reset des charges
-    setChargesFixes(5000000);
-    setDureeAmortissement(24);
-    setSalaire(250000);
-    setElectricite(25000);
-    setEau(5000);
-    setInternet(10000);
-    setSacsLivraison(30000);
-    setChargesTransport(150000);
-    setLoyer(250000);
-    setAutresCharges(0);
+    setChargesFixes('5000000');
+    setDureeAmortissement('24');
+    setSalaire('250000');
+    setElectricite('25000');
+    setEau('5000');
+    setInternet('10000');
+    setSacsLivraison('30000');
+    setChargesTransport('150000');
+    setLoyer('250000');
+    setAutresCharges('0');
     // Reset DCF
-    setTauxActualisationAnnuel(12);
-    setDureeAnalyse(60);
-    setCapex(10000000);
-    setBfr(0);
-    setWacc(12);
-    setCroissanceTerminale(3);
-    setDette(5000000);
-    setTresorerie(5000000);
-    setTauxImposition(30);
-    setDepreciationAmortissement(2500000);
+    setTauxActualisationAnnuel('12');
+    setDureeAnalyse('60');
+    setCapex('5000000');
+    setBfr('2500000');
+    setWacc('12');
+    setCroissanceTerminale('3');
+    setDette('0');
+    setTresorerie('500000');
+    setTauxImposition('30');
+    setDepreciationAmortissement('1250000');
   };
 
   // Fonction pour forcer la simulation principale (additionalVolume = 0)
   const forceMainSimulation = () => {
-    setAdditionalVolume(0);
+    setAdditionalVolume('0');
   };
 
   // Fonction pour réinitialiser la simulation volume
   const resetVolumeSimulation = () => {
-    setAdditionalVolume(0);
+    setAdditionalVolume('0');
     setSelectedProduct('Poulet');
   };
 
@@ -256,7 +283,7 @@ const SimulateurRentabilite = () => {
       'Poulet': { repartition: 0.102932124, prixAchat: 2600, prixVente: 3400, editable: true, hasAbats: false }
     });
     // Forcer aussi un reset du volume de simulation
-    setAdditionalVolume(0);
+    setAdditionalVolume('0');
     setSelectedProduct('Poulet');
   };
 
@@ -511,8 +538,8 @@ const SimulateurRentabilite = () => {
   const adjustedProduits = getAdjustedRepartitions();
   
   // Calcul des charges totales
-  const chargesMensuelles = salaire + electricite + eau + internet + sacsLivraison + chargesTransport + loyer + autresCharges;
-  const amortissementChargesFixes = chargesFixes / dureeAmortissement; // Amortissement sur la durée définie
+  const chargesMensuelles = getNumericSalaire() + getNumericElectricite() + getNumericEau() + getNumericInternet() + getNumericSacsLivraison() + getNumericChargesTransport() + getNumericLoyer() + getNumericAutresCharges();
+  const amortissementChargesFixes = getNumericChargesFixes() / getNumericDureeAmortissement(); // Amortissement sur la durée définie
   const chargesTotales = amortissementChargesFixes + chargesMensuelles;
   
   // Calcul avec les données originales (pour l'affichage principal et DCF simple)
@@ -525,7 +552,7 @@ const SimulateurRentabilite = () => {
       margeBrute = margeMoyenne;
     }
     
-    const benefice = calculerBenefice(margeBrute, data.repartition, volume);
+    const benefice = calculerBenefice(margeBrute, data.repartition, getNumericVolume());
     beneficeTotal += benefice;
     
     return { nom, ...data, margeBrute, benefice };
@@ -548,8 +575,8 @@ const SimulateurRentabilite = () => {
   });
 
   // Utiliser les données appropriées selon l'onglet actif
-  const produitsActifs = additionalVolume > 0 ? produitsAvecCalculsSimulation : produitsAvecCalculs;
-  const volumeActif = additionalVolume > 0 ? adjustedVolume : volume;
+  const produitsActifs = getNumericAdditionalVolume() > 0 ? produitsAvecCalculsSimulation : produitsAvecCalculs;
+  const volumeActif = getNumericAdditionalVolume() > 0 ? adjustedVolume : getNumericVolume();
   
   const chartData = produitsActifs.map(p => ({
     nom: p.nom,
@@ -563,7 +590,7 @@ const SimulateurRentabilite = () => {
 
   // Fonction helper pour obtenir le bénéfice total approprié selon l'onglet
   const getBeneficeTotalActif = () => {
-    return additionalVolume > 0 ? beneficeTotalSimulation : beneficeTotal;
+    return getNumericAdditionalVolume() > 0 ? beneficeTotalSimulation : beneficeTotal;
   };
 
   // Calculs financiers avancés
@@ -572,26 +599,26 @@ const SimulateurRentabilite = () => {
   };
 
   const calculerEBITDA = () => {
-    return calculerEBIT() + depreciationAmortissement;
+    return calculerEBIT() + getNumericDepreciationAmortissement();
   };
 
   const calculerNOPAT = () => {
-    return calculerEBIT() * (1 - tauxImposition / 100);
+    return calculerEBIT() * (1 - getNumericTauxImposition() / 100);
   };
 
   const calculerFCF = () => {
     // FCF = NOPAT + D&A - CAPEX - ΔBFR
     // Calcul en mensuel puis conversion en annuel
-    const nopatMensuel = calculerEBIT() * (1 - tauxImposition / 100);
-    const capexMensuel = capex / 12;
+    const nopatMensuel = calculerEBIT() * (1 - getNumericTauxImposition() / 100);
+    const capexMensuel = getNumericCapex() / 12;
     // On n'ajoute pas D&A car il est déjà inclus dans les charges (amortissement des charges fixes)
     return (nopatMensuel - capexMensuel) * 12;
   };
 
   const calculerValeurTerminale = () => {
     const fcfFinal = calculerFCF();
-    const waccDecimal = wacc / 100;
-    const croissanceDecimal = croissanceTerminale / 100;
+    const waccDecimal = getNumericWacc() / 100;
+    const croissanceDecimal = getNumericCroissanceTerminale() / 100;
     
     // Si FCF est négatif, pas de valeur terminale
     if (fcfFinal <= 0) {
@@ -604,7 +631,7 @@ const SimulateurRentabilite = () => {
   const calculerEnterpriseValue = () => {
     const fcf = calculerFCF();
     const valeurTerminale = calculerValeurTerminale();
-    const waccDecimal = wacc / 100;
+    const waccDecimal = getNumericWacc() / 100;
     
     // Si FCF est négatif, l'entreprise n'est pas viable
     if (fcf <= 0) {
@@ -624,18 +651,18 @@ const SimulateurRentabilite = () => {
   };
 
   const calculerEquityValue = () => {
-    return calculerEnterpriseValue() - dette + tresorerie;
+    return calculerEnterpriseValue() - getNumericDette() + getNumericTresorerie();
   };
 
   // Calculs DCF
-  const tauxActualisationMensuel = Math.pow(1 + tauxActualisationAnnuel / 100, 1/12) - 1;
+  const tauxActualisationMensuel = Math.pow(1 + getNumericTauxActualisationAnnuel() / 100, 1/12) - 1;
   
   // Calcul des flux de trésorerie mensuels
   const calculerFluxDCF = () => {
     const flux = [];
     const beneficeBrutMensuel = beneficeTotal;
     const chargesFixesMensuelles = chargesTotales;
-    const investissementInitial = -chargesFixes; // Décaissement initial
+    const investissementInitial = -getNumericChargesFixes(); // Décaissement initial
     
     // Mois 0 : investissement initial
     flux.push({
@@ -649,7 +676,7 @@ const SimulateurRentabilite = () => {
     
     // Mois 1 à dureeAnalyse
     let cumulActualise = investissementInitial;
-    for (let mois = 1; mois <= dureeAnalyse; mois++) {
+    for (let mois = 1; mois <= getNumericDureeAnalyse(); mois++) {
       const fluxNet = beneficeBrutMensuel - chargesFixesMensuelles;
       const facteurActualisation = Math.pow(1 + tauxActualisationMensuel, -mois);
       const fluxActualise = fluxNet * facteurActualisation;
@@ -686,7 +713,7 @@ const SimulateurRentabilite = () => {
       for (let i = 0; i < maxIterations; i++) {
         let vanTest = fluxDCF[0].fluxNet; // Investissement initial
         
-        for (let mois = 1; mois <= dureeAnalyse; mois++) {
+        for (let mois = 1; mois <= getNumericDureeAnalyse(); mois++) {
           const fluxNet = fluxDCF[mois].fluxNet;
           const facteurActualisation = Math.pow(1 + triMensuel, -mois);
           vanTest += fluxNet * facteurActualisation;
@@ -732,7 +759,7 @@ const SimulateurRentabilite = () => {
     const flux = [];
     const beneficeBrutMensuel = beneficeTotalSimulation;
     const chargesFixesMensuelles = chargesTotales;
-    const investissementInitial = -chargesFixes; // Décaissement initial
+    const investissementInitial = -getNumericChargesFixes(); // Décaissement initial
     
     // Mois 0 : investissement initial
     flux.push({
@@ -746,7 +773,7 @@ const SimulateurRentabilite = () => {
     
     // Mois 1 à dureeAnalyse
     let cumulActualise = investissementInitial;
-    for (let mois = 1; mois <= dureeAnalyse; mois++) {
+    for (let mois = 1; mois <= getNumericDureeAnalyse(); mois++) {
       const fluxNet = beneficeBrutMensuel - chargesFixesMensuelles;
       const facteurActualisation = Math.pow(1 + tauxActualisationMensuel, -mois);
       const fluxActualise = fluxNet * facteurActualisation;
@@ -783,7 +810,7 @@ const SimulateurRentabilite = () => {
       for (let i = 0; i < maxIterations; i++) {
         let vanTest = fluxDCFSimulation[0].fluxNet; // Investissement initial
         
-        for (let mois = 1; mois <= dureeAnalyse; mois++) {
+        for (let mois = 1; mois <= getNumericDureeAnalyse(); mois++) {
           const fluxNet = fluxDCFSimulation[mois].fluxNet;
           const facteurActualisation = Math.pow(1 + triMensuel, -mois);
           vanTest += fluxNet * facteurActualisation;
@@ -835,17 +862,17 @@ const SimulateurRentabilite = () => {
               <input 
                 type="number"
                 value={volume}
-                onChange={(e) => setVolume(parseFloat(e.target.value) || 0)}
+                onChange={(e) => setVolume(e.target.value)}
               className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
               style={{ fontSize: '16px' }}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Abats par kg (Bœuf/Veau)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Foie, Yell, Filet (Bœuf/Veau)</label>
               <input 
                 type="number"
                 value={abatsParKg}
-                onChange={(e) => setAbatsParKg(parseFloat(e.target.value) || 0)}
+                onChange={(e) => setAbatsParKg(e.target.value)}
               className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
               style={{ fontSize: '16px' }}
               />
@@ -858,11 +885,11 @@ const SimulateurRentabilite = () => {
                 min="0"
                 max="1"
                 value={peration}
-                onChange={(e) => setPeration(parseFloat(e.target.value) || 0)}
+                onChange={(e) => setPeration(e.target.value)}
               className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
               style={{ fontSize: '16px' }}
               />
-              <div className="text-xs text-gray-500 mt-1">{(peration * 100).toFixed(1)}%</div>
+              <div className="text-xs text-gray-500 mt-1">{(getNumericPeration() * 100).toFixed(1)}%</div>
             </div>
             <div className="flex items-end">
               <button 
@@ -897,24 +924,24 @@ const SimulateurRentabilite = () => {
               <button onClick={() => augmenterTousPrix(-50, 'prixAchat')} className="px-3 py-2 sm:px-4 sm:py-3 bg-orange-500 text-white rounded text-sm hover:bg-orange-600 min-h-[44px] min-w-[60px]">-50</button>
               </div>
             </div>
-          <div>
-            <div className="text-sm font-medium text-gray-600 mb-2">Export/Import/PDF:</div>
-            <div className="flex flex-wrap gap-2">
-              <button onClick={exportData} className="px-3 py-2 sm:px-4 sm:py-3 bg-purple-500 text-white rounded text-sm hover:bg-purple-600 min-h-[44px] min-w-[80px]">📤 Exporter</button>
-              <label className="px-3 py-2 sm:px-4 sm:py-3 bg-indigo-500 text-white rounded text-sm hover:bg-indigo-600 min-h-[44px] min-w-[80px] cursor-pointer text-center">
-                📥 Importer
-                <input 
-                  type="file" 
-                  accept=".json"
-                  onChange={importData}
-                  className="hidden"
-                />
-              </label>
-              <button onClick={generatePDF} className="px-3 py-2 sm:px-4 sm:py-3 bg-orange-500 text-white rounded text-sm hover:bg-orange-600 min-h-[44px] min-w-[80px]">📄 PDF</button>
-              <button onClick={resetPrix} className="px-3 py-2 sm:px-4 sm:py-3 bg-red-500 text-white rounded text-sm hover:bg-red-600 min-h-[44px] min-w-[80px]">🔄 Reset</button>
+                      <div>
+              <div className="text-sm font-medium text-gray-600 mb-2">Export/Import/PDF:</div>
+              <div className="flex flex-wrap gap-2">
+                <button onClick={exportData} className="px-3 py-2 sm:px-4 sm:py-3 bg-purple-500 text-white rounded text-sm hover:bg-purple-600 min-h-[44px] min-w-[80px]">📤 Exporter</button>
+                <label className="px-3 py-2 sm:px-4 sm:py-3 bg-indigo-500 text-white rounded text-sm hover:bg-indigo-600 min-h-[44px] min-w-[80px] cursor-pointer text-center">
+                  📥 Importer
+                  <input 
+                    type="file" 
+                    accept=".json"
+                    onChange={importData}
+                    className="hidden"
+                  />
+                </label>
+                <button onClick={generatePDF} className="px-3 py-2 sm:px-4 sm:py-3 bg-orange-500 text-white rounded text-sm hover:bg-orange-600 min-h-[44px] min-w-[80px]">📄 PDF</button>
+                <button onClick={resetPrix} className="px-3 py-2 sm:px-4 sm:py-3 bg-red-500 text-white rounded text-sm hover:bg-red-600 min-h-[44px] min-w-[80px]">🔄 Reset</button>
+              </div>
             </div>
-          </div>
-            {additionalVolume > 0 && (
+            {getNumericAdditionalVolume() > 0 && (
             <div>
                 <div className="text-sm font-medium text-gray-600 mb-2">Simulation Volume:</div>
               <div className="flex flex-wrap gap-2">
@@ -991,7 +1018,7 @@ const SimulateurRentabilite = () => {
             <input 
               type="number"
               value={additionalVolume}
-              onChange={(e) => setAdditionalVolume(parseFloat(e.target.value) || 0)}
+              onChange={(e) => setAdditionalVolume(e.target.value)}
               className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
               style={{ fontSize: '16px' }}
             />
@@ -999,7 +1026,7 @@ const SimulateurRentabilite = () => {
           <div className="flex items-end">
             <div className="w-full p-2 sm:p-3 bg-purple-100 rounded text-sm">
               <div className="text-purple-800 font-medium">Volume total: {adjustedVolume.toLocaleString()}</div>
-              <div className="text-purple-600 text-xs">Base: {volume.toLocaleString()} + Ajout: {additionalVolume.toLocaleString()}</div>
+              <div className="text-purple-600 text-xs">Base: {getNumericVolume().toLocaleString()} + Ajout: {getNumericAdditionalVolume().toLocaleString()}</div>
             </div>
           </div>
         </div>
@@ -1012,7 +1039,7 @@ const SimulateurRentabilite = () => {
               <div className="text-xs text-gray-600 mb-1">Volume {selectedProduct}:</div>
                               <div className="text-sm">
                 <span className="text-gray-500">Avant: </span>
-                <span className="font-medium">{(originalRepartitions[selectedProduct] * volume).toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                <span className="font-medium">{(originalRepartitions[selectedProduct] * getNumericVolume()).toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
               </div>
               <div className="text-sm">
                 <span className="text-green-600">Après: </span>
@@ -1032,7 +1059,7 @@ const SimulateurRentabilite = () => {
             </div>
           </div>
           <div className="mt-2 text-xs text-gray-500">
-            Volume total: {volume.toLocaleString()} → {adjustedVolume.toLocaleString()} (+{additionalVolume.toLocaleString()})
+            Volume total: {getNumericVolume().toLocaleString()} → {adjustedVolume.toLocaleString()} (+{getNumericAdditionalVolume().toLocaleString()})
           </div>
         </div>
         </div>
@@ -1057,7 +1084,7 @@ const SimulateurRentabilite = () => {
                       <input 
                         type="number"
                  value={chargesFixes}
-                 onChange={(e) => setChargesFixes(parseFloat(e.target.value) || 0)}
+                 onChange={(e) => setChargesFixes(e.target.value)}
                  className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
                  style={{ fontSize: '16px' }}
                />
@@ -1068,11 +1095,11 @@ const SimulateurRentabilite = () => {
                           type="number"
                  min="1"
                  value={dureeAmortissement}
-                 onChange={(e) => setDureeAmortissement(parseInt(e.target.value) || 1)}
+                 onChange={(e) => setDureeAmortissement(e.target.value)}
                  className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
                  style={{ fontSize: '16px' }}
                />
-               <div className="text-xs text-gray-500 mt-1">{(dureeAmortissement / 12).toFixed(1)} années</div>
+               <div className="text-xs text-gray-500 mt-1">{(getNumericDureeAmortissement() / 12).toFixed(1)} années</div>
              </div>
            </div>
          </div>
@@ -1086,7 +1113,7 @@ const SimulateurRentabilite = () => {
                         <input 
                           type="number"
                 value={salaire}
-                onChange={(e) => setSalaire(parseFloat(e.target.value) || 0)}
+                onChange={(e) => setSalaire(e.target.value)}
                 className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
                 style={{ fontSize: '16px' }}
               />
@@ -1096,7 +1123,7 @@ const SimulateurRentabilite = () => {
               <input 
                 type="number"
                 value={electricite}
-                onChange={(e) => setElectricite(parseFloat(e.target.value) || 0)}
+                onChange={(e) => setElectricite(e.target.value)}
                 className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
                 style={{ fontSize: '16px' }}
               />
@@ -1106,7 +1133,7 @@ const SimulateurRentabilite = () => {
               <input 
                 type="number"
                 value={eau}
-                onChange={(e) => setEau(parseFloat(e.target.value) || 0)}
+                onChange={(e) => setEau(e.target.value)}
                 className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
                 style={{ fontSize: '16px' }}
               />
@@ -1116,7 +1143,7 @@ const SimulateurRentabilite = () => {
               <input 
                 type="number"
                 value={internet}
-                onChange={(e) => setInternet(parseFloat(e.target.value) || 0)}
+                onChange={(e) => setInternet(e.target.value)}
                 className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
                 style={{ fontSize: '16px' }}
               />
@@ -1126,7 +1153,7 @@ const SimulateurRentabilite = () => {
               <input 
                 type="number"
                 value={sacsLivraison}
-                onChange={(e) => setSacsLivraison(parseFloat(e.target.value) || 0)}
+                onChange={(e) => setSacsLivraison(e.target.value)}
                 className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
                 style={{ fontSize: '16px' }}
               />
@@ -1136,7 +1163,7 @@ const SimulateurRentabilite = () => {
               <input 
                 type="number"
                 value={chargesTransport}
-                onChange={(e) => setChargesTransport(parseFloat(e.target.value) || 0)}
+                onChange={(e) => setChargesTransport(e.target.value)}
                 className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
                 style={{ fontSize: '16px' }}
               />
@@ -1146,7 +1173,7 @@ const SimulateurRentabilite = () => {
               <input 
                 type="number"
                 value={loyer}
-                onChange={(e) => setLoyer(parseFloat(e.target.value) || 0)}
+                onChange={(e) => setLoyer(e.target.value)}
                 className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
                 style={{ fontSize: '16px' }}
               />
@@ -1156,7 +1183,7 @@ const SimulateurRentabilite = () => {
               <input 
                 type="number"
                 value={autresCharges}
-                onChange={(e) => setAutresCharges(parseFloat(e.target.value) || 0)}
+                onChange={(e) => setAutresCharges(e.target.value)}
                 className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
                 style={{ fontSize: '16px' }}
               />
@@ -1223,7 +1250,7 @@ const SimulateurRentabilite = () => {
               min="0"
               max="50"
               value={tauxActualisationAnnuel}
-              onChange={(e) => setTauxActualisationAnnuel(parseFloat(e.target.value) || 0)}
+              onChange={(e) => setTauxActualisationAnnuel(e.target.value)}
               className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
               style={{ fontSize: '16px' }}
             />
@@ -1236,16 +1263,16 @@ const SimulateurRentabilite = () => {
               min="12"
               max="120"
               value={dureeAnalyse}
-              onChange={(e) => setDureeAnalyse(parseInt(e.target.value) || 60)}
+              onChange={(e) => setDureeAnalyse(e.target.value)}
               className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
               style={{ fontSize: '16px' }}
             />
-            <div className="text-xs text-gray-500 mt-1">{(dureeAnalyse / 12).toFixed(1)} années</div>
+            <div className="text-xs text-gray-500 mt-1">{(getNumericDureeAnalyse() / 12).toFixed(1)} années</div>
           </div>
                       <div className="flex items-end">
             <div className="w-full p-2 sm:p-3 bg-indigo-100 rounded text-sm">
               <div className="text-indigo-800 font-medium">Investissement initial</div>
-              <div className="text-indigo-600 text-xs">{chargesFixes.toLocaleString()}</div>
+              <div className="text-indigo-600 text-xs">{getNumericChargesFixes().toLocaleString()}</div>
             </div>
           </div>
         </div>
@@ -1264,7 +1291,7 @@ const SimulateurRentabilite = () => {
               <input 
                 type="number"
                 value={capex}
-                onChange={(e) => setCapex(parseFloat(e.target.value) || 0)}
+                onChange={(e) => setCapex(e.target.value)}
                 className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
                 style={{ fontSize: '16px' }}
               />
@@ -1275,7 +1302,7 @@ const SimulateurRentabilite = () => {
               <input 
                 type="number"
                 value={bfr}
-                onChange={(e) => setBfr(parseFloat(e.target.value) || 0)}
+                onChange={(e) => setBfr(e.target.value)}
                 className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
                 style={{ fontSize: '16px' }}
               />
@@ -1286,7 +1313,7 @@ const SimulateurRentabilite = () => {
               <input 
                 type="number"
                 value={depreciationAmortissement}
-                onChange={(e) => setDepreciationAmortissement(parseFloat(e.target.value) || 0)}
+                onChange={(e) => setDepreciationAmortissement(e.target.value)}
                 className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
                 style={{ fontSize: '16px' }}
               />
@@ -1307,7 +1334,7 @@ const SimulateurRentabilite = () => {
                 min="0"
                 max="50"
                 value={wacc}
-                onChange={(e) => setWacc(parseFloat(e.target.value) || 0)}
+                onChange={(e) => setWacc(e.target.value)}
                 className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
                 style={{ fontSize: '16px' }}
               />
@@ -1321,7 +1348,7 @@ const SimulateurRentabilite = () => {
                 min="0"
                 max="10"
                 value={croissanceTerminale}
-                onChange={(e) => setCroissanceTerminale(parseFloat(e.target.value) || 0)}
+                onChange={(e) => setCroissanceTerminale(e.target.value)}
                 className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
                 style={{ fontSize: '16px' }}
               />
@@ -1335,7 +1362,7 @@ const SimulateurRentabilite = () => {
                 min="0"
                 max="100"
                 value={tauxImposition}
-                onChange={(e) => setTauxImposition(parseFloat(e.target.value) || 0)}
+                onChange={(e) => setTauxImposition(e.target.value)}
                 className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
                 style={{ fontSize: '16px' }}
               />
@@ -1353,7 +1380,7 @@ const SimulateurRentabilite = () => {
               <input 
                 type="number"
                 value={dette}
-                onChange={(e) => setDette(parseFloat(e.target.value) || 0)}
+                onChange={(e) => setDette(e.target.value)}
                 className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
                 style={{ fontSize: '16px' }}
               />
@@ -1364,7 +1391,7 @@ const SimulateurRentabilite = () => {
               <input 
                 type="number"
                 value={tresorerie}
-                onChange={(e) => setTresorerie(parseFloat(e.target.value) || 0)}
+                onChange={(e) => setTresorerie(e.target.value)}
                 className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
                 style={{ fontSize: '16px' }}
               />
@@ -1681,7 +1708,7 @@ Comparaison: TRI ${indicateursDCF.triAnnuel > (tauxActualisationAnnuel / 100) ? 
               min="0"
               max="50"
               value={tauxActualisationAnnuel}
-              onChange={(e) => setTauxActualisationAnnuel(parseFloat(e.target.value) || 0)}
+              onChange={(e) => setTauxActualisationAnnuel(e.target.value)}
               className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
               style={{ fontSize: '16px' }}
             />
@@ -1694,7 +1721,7 @@ Comparaison: TRI ${indicateursDCF.triAnnuel > (tauxActualisationAnnuel / 100) ? 
               min="12"
               max="120"
               value={dureeAnalyse}
-              onChange={(e) => setDureeAnalyse(parseInt(e.target.value) || 60)}
+              onChange={(e) => setDureeAnalyse(e.target.value)}
               className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
               style={{ fontSize: '16px' }}
             />
