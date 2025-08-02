@@ -599,7 +599,7 @@ const SimulateurRentabilite = () => {
   };
 
   const calculerEBITDA = () => {
-    return calculerEBIT() + getNumericDepreciationAmortissement();
+    return calculerEBIT() + (getNumericDepreciationAmortissement() / 12); // D&A mensuel
   };
 
   const calculerNOPAT = () => {
@@ -609,10 +609,23 @@ const SimulateurRentabilite = () => {
   const calculerFCF = () => {
     // FCF = NOPAT + D&A - CAPEX - ΔBFR
     // Calcul en mensuel puis conversion en annuel
-    const nopatMensuel = calculerEBIT() * (1 - getNumericTauxImposition() / 100);
+    const ebitMensuel = calculerEBIT();
+    const tauxImposition = getNumericTauxImposition() / 100;
+    const nopatMensuel = ebitMensuel * (1 - tauxImposition);
     const capexMensuel = getNumericCapex() / 12;
-    // On n'ajoute pas D&A car il est déjà inclus dans les charges (amortissement des charges fixes)
-    return (nopatMensuel - capexMensuel) * 12;
+    const fcfMensuel = nopatMensuel - capexMensuel;
+    const fcfAnnuel = fcfMensuel * 12;
+    
+    console.log('=== CALCUL FCF ===');
+    console.log(`EBIT mensuel: ${ebitMensuel.toLocaleString()} FCFA`);
+    console.log(`Taux d'imposition: ${getNumericTauxImposition()}% (${tauxImposition})`);
+    console.log(`NOPAT mensuel: ${ebitMensuel.toLocaleString()} × (1 - ${tauxImposition}) = ${nopatMensuel.toLocaleString()} FCFA`);
+    console.log(`CAPEX mensuel: ${getNumericCapex().toLocaleString()} / 12 = ${capexMensuel.toLocaleString()} FCFA`);
+    console.log(`FCF mensuel: ${nopatMensuel.toLocaleString()} - ${capexMensuel.toLocaleString()} = ${fcfMensuel.toLocaleString()} FCFA`);
+    console.log(`FCF annuel: ${fcfMensuel.toLocaleString()} × 12 = ${fcfAnnuel.toLocaleString()} FCFA`);
+    console.log('==================');
+    
+    return fcfAnnuel;
   };
 
   const calculerValeurTerminale = () => {
@@ -625,7 +638,20 @@ const SimulateurRentabilite = () => {
       return 0;
     }
     
-    return (fcfFinal * (1 + croissanceDecimal)) / (waccDecimal - croissanceDecimal);
+    const fcfAvecCroissance = fcfFinal * (1 + croissanceDecimal);
+    const denominateur = waccDecimal - croissanceDecimal;
+    const valeurTerminale = fcfAvecCroissance / denominateur;
+    
+    console.log('=== CALCUL VALEUR TERMINALE ===');
+    console.log(`FCF annuel: ${fcfFinal.toLocaleString()} FCFA`);
+    console.log(`WACC: ${getNumericWacc()}% (${waccDecimal})`);
+    console.log(`Croissance g: ${getNumericCroissanceTerminale()}% (${croissanceDecimal})`);
+    console.log(`FCF avec croissance: ${fcfFinal.toLocaleString()} × (1 + ${croissanceDecimal}) = ${fcfAvecCroissance.toLocaleString()} FCFA`);
+    console.log(`Dénominateur: ${waccDecimal} - ${croissanceDecimal} = ${denominateur}`);
+    console.log(`Valeur Terminale: ${fcfAvecCroissance.toLocaleString()} / ${denominateur} = ${valeurTerminale.toLocaleString()} FCFA`);
+    console.log('================================');
+    
+    return valeurTerminale;
   };
 
   const calculerEnterpriseValue = () => {
@@ -638,20 +664,50 @@ const SimulateurRentabilite = () => {
       return 0;
     }
     
+    console.log('=== CALCUL ENTERPRISE VALUE ===');
+    console.log(`FCF annuel: ${fcf.toLocaleString()} FCFA`);
+    console.log(`WACC: ${getNumericWacc()}% (${waccDecimal})`);
+    console.log(`Valeur Terminale: ${valeurTerminale.toLocaleString()} FCFA`);
+    
     // Actualisation des FCF sur 5 ans
     let fcfActualise = 0;
+    console.log('\n--- FCF actualisés sur 5 ans ---');
     for (let annee = 1; annee <= 5; annee++) {
-      fcfActualise += fcf / Math.pow(1 + waccDecimal, annee);
+      const coeffActualisation = Math.pow(1 + waccDecimal, annee);
+      const fcfAnnee = fcf / coeffActualisation;
+      fcfActualise += fcfAnnee;
+      console.log(`Année ${annee}: ${fcf.toLocaleString()} / ${coeffActualisation.toFixed(4)} = ${fcfAnnee.toLocaleString()} FCFA`);
     }
+    console.log(`Total FCF actualisés: ${fcfActualise.toLocaleString()} FCFA`);
     
     // Actualisation de la valeur terminale (seulement si positive)
-    const valeurTerminaleActualisee = valeurTerminale > 0 ? valeurTerminale / Math.pow(1 + waccDecimal, 5) : 0;
+    const coeffActualisationVT = Math.pow(1 + waccDecimal, 5);
+    const valeurTerminaleActualisee = valeurTerminale > 0 ? valeurTerminale / coeffActualisationVT : 0;
+    console.log(`\n--- Valeur Terminale actualisée ---`);
+    console.log(`Coeff d'actualisation (année 5): ${coeffActualisationVT.toFixed(4)}`);
+    console.log(`VT actualisée: ${valeurTerminale.toLocaleString()} / ${coeffActualisationVT.toFixed(4)} = ${valeurTerminaleActualisee.toLocaleString()} FCFA`);
     
-    return fcfActualise + valeurTerminaleActualisee;
+    const enterpriseValue = fcfActualise + valeurTerminaleActualisee;
+    console.log(`\nEnterprise Value: ${fcfActualise.toLocaleString()} + ${valeurTerminaleActualisee.toLocaleString()} = ${enterpriseValue.toLocaleString()} FCFA`);
+    console.log('================================');
+    
+    return enterpriseValue;
   };
 
   const calculerEquityValue = () => {
-    return calculerEnterpriseValue() - getNumericDette() + getNumericTresorerie();
+    const enterpriseValue = calculerEnterpriseValue();
+    const dette = getNumericDette();
+    const tresorerie = getNumericTresorerie();
+    const equityValue = enterpriseValue - dette + tresorerie;
+    
+    console.log('=== CALCUL EQUITY VALUE ===');
+    console.log(`Enterprise Value: ${enterpriseValue.toLocaleString()} FCFA`);
+    console.log(`Dette: ${dette.toLocaleString()} FCFA`);
+    console.log(`Trésorerie: ${tresorerie.toLocaleString()} FCFA`);
+    console.log(`Equity Value: ${enterpriseValue.toLocaleString()} - ${dette.toLocaleString()} + ${tresorerie.toLocaleString()} = ${equityValue.toLocaleString()} FCFA`);
+    console.log('==========================');
+    
+    return equityValue;
   };
 
   // Calculs DCF
@@ -1418,7 +1474,7 @@ EBIT Annuel: ${Math.round(calculerEBIT() * 12).toLocaleString()} FCFA`}>
           </div>
           <div className="cursor-help" title={`EBITDA = EBIT + D&A
 EBIT: ${Math.round(calculerEBIT() * 12).toLocaleString()} FCFA
-D&A: ${Math.round(depreciationAmortissement).toLocaleString()} FCFA
+D&A: ${Math.round(getNumericDepreciationAmortissement()).toLocaleString()} FCFA
 EBITDA: ${Math.round(calculerEBITDA() * 12).toLocaleString()} FCFA`}>
             <div className="text-sm text-gray-600">EBITDA (annuel):</div>
             <div className="text-lg sm:text-xl font-bold text-green-600">
@@ -1436,15 +1492,15 @@ NOPAT: ${Math.round(calculerNOPAT() * 12).toLocaleString()} FCFA`}>
             </div>
             <div className="text-xs text-gray-500">Résultat net d'exploitation après impôts</div>
           </div>
-          <div className="cursor-help" title={`FCF = NOPAT - CAPEX
-NOPAT: ${Math.round(calculerNOPAT() * 12).toLocaleString()} FCFA
-CAPEX: ${Math.round(capex).toLocaleString()} FCFA
-FCF: ${Math.round(calculerFCF() * 12).toLocaleString()} FCFA`}>
+          <div className="cursor-help" title={`FCF = (NOPAT mensuel - CAPEX mensuel) × 12
+NOPAT mensuel: ${Math.round(calculerNOPAT()).toLocaleString()} FCFA
+CAPEX mensuel: ${Math.round(getNumericCapex() / 12).toLocaleString()} FCFA
+FCF annuel: ${Math.round(calculerFCF()).toLocaleString()} FCFA`}>
             <div className="text-sm text-gray-600">FCF (annuel):</div>
             <div className={`text-lg sm:text-xl font-bold ${
-              calculerFCF() * 12 > 0 ? 'text-green-600' : 'text-red-600'
+              calculerFCF() > 0 ? 'text-green-600' : 'text-red-600'
             }`}>
-              {Math.round(calculerFCF() * 12).toLocaleString()}
+              {Math.round(calculerFCF()).toLocaleString()}
             </div>
             <div className="text-xs text-gray-500">Flux de trésorerie disponible</div>
           </div>
@@ -1453,25 +1509,41 @@ FCF: ${Math.round(calculerFCF() * 12).toLocaleString()} FCFA`}>
           <div>
             <div className="text-sm text-gray-600">D&A (annuel):</div>
             <div className="text-lg sm:text-xl font-bold text-yellow-600">
-              {Math.round(depreciationAmortissement).toLocaleString()}
+              {Math.round(getNumericDepreciationAmortissement()).toLocaleString()}
             </div>
             <div className="text-xs text-gray-500">Dépréciation & Amortissement</div>
           </div>
-          <div>
+          <div className="cursor-help" title={`Valeur Terminale = FCF × (1 + g) / (WACC - g)
+FCF: ${Math.round(calculerFCF()).toLocaleString()} FCFA
+Croissance g: ${getNumericCroissanceTerminale()}%
+WACC: ${getNumericWacc()}%
+Calcul: (${Math.round(calculerFCF()).toLocaleString()} × 1.${getNumericCroissanceTerminale()}) / (${getNumericWacc()/100} - ${getNumericCroissanceTerminale()/100})
+Valeur Terminale: ${Math.round(calculerValeurTerminale()).toLocaleString()} FCFA
+Interprétation: Valeur de l'entreprise à perpétuité après 5 ans`}>
             <div className="text-sm text-gray-600">Valeur Terminale:</div>
             <div className="text-lg sm:text-xl font-bold text-indigo-600">
               {Math.round(calculerValeurTerminale()).toLocaleString()}
             </div>
             <div className="text-xs text-gray-500">Valeur à perpétuité</div>
           </div>
-          <div>
+          <div className="cursor-help" title={`Enterprise Value = Σ(FCF actualisés sur 5 ans) + VT actualisée
+FCF annuel: ${Math.round(calculerFCF()).toLocaleString()} FCFA
+WACC: ${getNumericWacc()}%
+Valeur Terminale: ${Math.round(calculerValeurTerminale()).toLocaleString()} FCFA
+Enterprise Value: ${Math.round(calculerEnterpriseValue()).toLocaleString()} FCFA
+Interprétation: Valeur totale de l'entreprise`}>
             <div className="text-sm text-gray-600">Enterprise Value:</div>
             <div className="text-lg sm:text-xl font-bold text-orange-600">
               {Math.round(calculerEnterpriseValue()).toLocaleString()}
             </div>
             <div className="text-xs text-gray-500">Valeur d'entreprise</div>
           </div>
-          <div>
+          <div className="cursor-help" title={`Equity Value = Enterprise Value - Dette + Trésorerie
+Enterprise Value: ${Math.round(calculerEnterpriseValue()).toLocaleString()} FCFA
+Dette: ${Math.round(getNumericDette()).toLocaleString()} FCFA
+Trésorerie: ${Math.round(getNumericTresorerie()).toLocaleString()} FCFA
+Equity Value: ${Math.round(calculerEquityValue()).toLocaleString()} FCFA
+Interprétation: Valeur pour les actionnaires`}>
             <div className="text-sm text-gray-600">Equity Value:</div>
             <div className="text-lg sm:text-xl font-bold text-teal-600">
               {Math.round(calculerEquityValue()).toLocaleString()}
@@ -1790,12 +1862,12 @@ NOPAT: ${Math.round(calculerNOPAT() * 12).toLocaleString()} FCFA`}>
           <div className="cursor-help" title={`FCF = NOPAT - CAPEX
 NOPAT: ${Math.round(calculerNOPAT() * 12).toLocaleString()} FCFA
 CAPEX: ${Math.round(capex).toLocaleString()} FCFA
-FCF: ${Math.round(calculerFCF() * 12).toLocaleString()} FCFA`}>
+FCF: ${Math.round(calculerFCF()).toLocaleString()} FCFA`}>
             <div className="text-sm text-gray-600">FCF (annuel):</div>
             <div className={`text-lg sm:text-xl font-bold ${
-              calculerFCF() * 12 > 0 ? 'text-green-600' : 'text-red-600'
+              calculerFCF() > 0 ? 'text-green-600' : 'text-red-600'
             }`}>
-              {Math.round(calculerFCF() * 12).toLocaleString()}
+              {Math.round(calculerFCF()).toLocaleString()}
             </div>
             <div className="text-xs text-gray-500">Flux de trésorerie disponible</div>
           </div>
@@ -1807,12 +1879,12 @@ D&A: ${Math.round(depreciationAmortissement).toLocaleString()} FCFA
 D&A Mensuel: ${Math.round(depreciationAmortissement / 12).toLocaleString()} FCFA`}>
             <div className="text-sm text-gray-600">D&A (annuel):</div>
             <div className="text-lg sm:text-xl font-bold text-yellow-600">
-              {Math.round(depreciationAmortissement).toLocaleString()}
+              {Math.round(getNumericDepreciationAmortissement()).toLocaleString()}
             </div>
             <div className="text-xs text-gray-500">Dépréciation & Amortissement</div>
           </div>
           <div className="cursor-help" title={`Valeur Terminale = FCF × (1 + g) / (WACC - g) - Simulation
-FCF: ${Math.round(calculerFCF() * 12).toLocaleString()} FCFA
+FCF: ${Math.round(calculerFCF()).toLocaleString()} FCFA
 WACC: ${wacc}%
 Croissance g: ${croissanceTerminale}%
 VT: ${Math.round(calculerValeurTerminale()).toLocaleString()} FCFA`}>
@@ -1823,7 +1895,7 @@ VT: ${Math.round(calculerValeurTerminale()).toLocaleString()} FCFA`}>
             <div className="text-xs text-gray-500">Valeur à perpétuité</div>
           </div>
           <div className="cursor-help" title={`Enterprise Value = Σ(FCF actualisés) + VT actualisée - Simulation
-FCF Annuel: ${Math.round(calculerFCF() * 12).toLocaleString()} FCFA
+FCF Annuel: ${Math.round(calculerFCF()).toLocaleString()} FCFA
 WACC: ${wacc}%
 Valeur Terminale: ${Math.round(calculerValeurTerminale()).toLocaleString()} FCFA
 EV: ${Math.round(calculerEnterpriseValue()).toLocaleString()} FCFA`}>
@@ -2099,18 +2171,18 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
             </div>
             <div className="bg-white p-3 rounded border">
               <div className="font-medium text-gray-800">CAPEX (annuel)</div>
-              <div className="text-lg font-bold text-purple-600">24,000,000</div>
-              <div className="text-sm text-gray-600">10% du CA annuel (240M × 10%)</div>
+              <div className="text-lg font-bold text-purple-600">5,000,000</div>
+              <div className="text-sm text-gray-600">2.08% du CA annuel (240M × 2.08%)</div>
             </div>
             <div className="bg-white p-3 rounded border">
               <div className="font-medium text-gray-800">BFR (annuel)</div>
-              <div className="text-lg font-bold text-orange-600">18,000,000</div>
-              <div className="text-sm text-gray-600">7.5% du CA annuel (240M × 7.5%)</div>
+              <div className="text-lg font-bold text-orange-600">2,500,000</div>
+              <div className="text-sm text-gray-600">1.04% du CA annuel (240M × 1.04%)</div>
             </div>
             <div className="bg-white p-3 rounded border">
               <div className="font-medium text-gray-800">D&A (annuel)</div>
-              <div className="text-lg font-bold text-indigo-600">12,000,000</div>
-              <div className="text-sm text-gray-600">50% du CAPEX (24M × 50%)</div>
+              <div className="text-lg font-bold text-indigo-600">1,250,000</div>
+              <div className="text-sm text-gray-600">25% du CAPEX (5M × 25%)</div>
             </div>
           </div>
         </div>
@@ -2271,6 +2343,142 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
             </div>
           </div>
         </div>
+
+        {/* Gordon Growth Model */}
+        <div className="mb-6">
+          <h4 className="text-sm font-semibold text-teal-700 mb-3">🌱 Gordon Growth Model - Explication Complète</h4>
+          <div className="space-y-4">
+            <div className="bg-white p-4 rounded border">
+              <div className="font-medium text-gray-800 mb-2">📚 Définition et Concept</div>
+              <div className="text-sm text-gray-600">
+                Le <strong>Gordon Growth Model</strong> est une méthode de valorisation qui calcule la valeur d'un actif 
+                en se basant sur ses flux futurs qui croissent à un taux constant et perpétuel. Il est particulièrement 
+                utilisé pour calculer la <strong>Valeur Terminale</strong> dans les modèles DCF.
+              </div>
+            </div>
+            
+            <div className="bg-white p-4 rounded border">
+              <div className="font-medium text-gray-800 mb-2">📊 Formule de Base</div>
+              <div className="text-sm text-gray-600">
+                <strong>Formule :</strong> Valeur = D₁ / (r - g)<br/><br/>
+                Où :<br/>
+                • <strong>D₁</strong> = Dividende (ou FCF) de l'année prochaine<br/>
+                • <strong>r</strong> = Taux de rendement requis (WACC)<br/>
+                • <strong>g</strong> = Taux de croissance perpétuelle<br/><br/>
+                <strong>Dans notre cas :</strong> Valeur Terminale = FCF × (1 + g) / (WACC - g)
+              </div>
+            </div>
+
+            <div className="bg-white p-4 rounded border">
+              <div className="font-medium text-gray-800 mb-2">🔍 Dérivation Mathématique</div>
+              <div className="text-sm text-gray-600">
+                <strong>1. Série géométrique infinie :</strong><br/>
+                Si on a des flux qui croissent à 3% par an indéfiniment :<br/>
+                • Année 1: FCF × 1.03<br/>
+                • Année 2: FCF × 1.03²<br/>
+                • Année 3: FCF × 1.03³<br/>
+                • ...<br/><br/>
+                <strong>2. Actualisation de chaque flux :</strong><br/>
+                Valeur = FCF×1.03/(1+r) + FCF×1.03²/(1+r)² + FCF×1.03³/(1+r)³ + ...<br/><br/>
+                <strong>3. Formule de la série géométrique :</strong><br/>
+                S = a / (1 - q)<br/>
+                Où : a = premier terme = FCF × 1.03 / (1 + r)<br/>
+                q = raison = 1.03 / (1 + r)<br/><br/>
+                <strong>4. Simplification :</strong><br/>
+                Valeur = [FCF × 1.03 / (1 + r)] / [1 - (1.03 / (1 + r))]<br/>
+                Valeur = [FCF × 1.03] / [(1 + r) - 1.03]<br/>
+                Valeur = FCF × 1.03 / (r - 0.03)<br/>
+                Valeur = FCF × (1 + g) / (r - g)
+              </div>
+            </div>
+
+            <div className="bg-white p-4 rounded border">
+              <div className="font-medium text-gray-800 mb-2">🎯 Interprétation Intuitive</div>
+              <div className="text-sm text-gray-600">
+                <strong>Sans croissance (g = 0%) :</strong><br/>
+                Valeur = FCF / r<br/>
+                • Tu paies pour recevoir FCF chaque année<br/>
+                • Le rendement est r%<br/><br/>
+                <strong>Avec croissance (g &gt; 0%) :</strong><br/>
+                Valeur = FCF × (1 + g) / (r - g)<br/>
+                • Tu paies pour recevoir FCF qui croît à g%<br/>
+                • Le rendement net est (r - g)%<br/><br/>
+                <strong>Logique économique :</strong><br/>
+                • Tu investis pour recevoir des flux croissants<br/>
+                • Le rendement brut est r (12%)<br/>
+                • La croissance g (3%) "compense" une partie du rendement<br/>
+                • Le rendement net est donc (r - g) = 9%
+              </div>
+            </div>
+
+            <div className="bg-white p-4 rounded border">
+              <div className="font-medium text-gray-800 mb-2">⚠️ Conditions d'Utilisation</div>
+              <div className="text-sm text-gray-600">
+                <strong>1. Croissance stable :</strong><br/>
+                • Le taux g doit être <strong>constant</strong> et <strong>soutenable</strong><br/>
+                • Pas de croissance explosive ou cyclique<br/><br/>
+                <strong>2. Croissance inférieure au rendement :</strong><br/>
+                • <strong>g &lt; r</strong> (sinon la valeur devient infinie)<br/>
+                • En pratique : g &lt; 3-4% pour être réaliste<br/><br/>
+                <strong>3. Horizon infini :</strong><br/>
+                • L'entreprise doit être considérée comme <strong>perpétuelle</strong><br/>
+                • Pas de liquidation prévue
+              </div>
+            </div>
+
+            <div className="bg-white p-4 rounded border">
+              <div className="font-medium text-gray-800 mb-2">📈 Exemple Concret dans Notre Modèle</div>
+              <div className="text-sm text-gray-600">
+                <strong>Paramètres :</strong><br/>
+                • FCF = 5,729,200 FCFA (annuel)<br/>
+                • r (WACC) = 12%<br/>
+                • g = 3%<br/><br/>
+                <strong>Calcul :</strong><br/>
+                Valeur Terminale = 5,729,200 × (1 + 0.03) / (0.12 - 0.03)<br/>
+                Valeur Terminale = 5,901,076 / 0.09<br/>
+                Valeur Terminale = 65,567,509 FCFA<br/><br/>
+                <strong>Interprétation :</strong><br/>
+                • Tu investis pour recevoir des flux qui croissent de 3% par an<br/>
+                • Le rendement brut est 12%<br/>
+                • Le rendement net est 9% (12% - 3%)<br/>
+                • La valeur terminale représente la valeur de tous les flux futurs
+              </div>
+            </div>
+
+            <div className="bg-white p-4 rounded border">
+              <div className="font-medium text-gray-800 mb-2">🔄 Pourquoi (r - g) ?</div>
+              <div className="text-sm text-gray-600">
+                <strong>Exemple concret :</strong><br/>
+                • Tu investis 100 FCFA<br/>
+                • Tu reçois 12 FCFA (rendement 12%)<br/>
+                • Mais les flux croissent de 3% par an<br/>
+                • <strong>Rendement net</strong> = 12% - 3% = 9%<br/><br/>
+                <strong>Logique :</strong><br/>
+                • WACC = Ce que tu veux gagner (12%)<br/>
+                • g = Ce que l'entreprise croît (3%)<br/>
+                • WACC - g = Le "surplus" que tu gagnes réellement (9%)
+              </div>
+            </div>
+
+            <div className="bg-white p-4 rounded border">
+              <div className="font-medium text-gray-800 mb-2">📊 Avantages et Limitations</div>
+              <div className="text-sm text-gray-600">
+                <strong>✅ Avantages :</strong><br/>
+                • <strong>Simple</strong> à comprendre et utiliser<br/>
+                • <strong>Intuitif</strong> économiquement<br/>
+                • <strong>Standard</strong> en finance<br/><br/>
+                <strong>⚠️ Limitations :</strong><br/>
+                • <strong>Hypothèse forte</strong> de croissance perpétuelle<br/>
+                • <strong>Sensible</strong> aux paramètres g et r<br/>
+                • <strong>Pas adapté</strong> aux entreprises en forte croissance ou en déclin<br/><br/>
+                <strong>Comparaison avec d'autres méthodes :</strong><br/>
+                • <strong>Gordon</strong> : Croissance constante, Simple, Précision moyenne<br/>
+                • <strong>DCF détaillé</strong> : Croissance variable, Complexe, Précision élevée<br/>
+                • <strong>Multiples</strong> : N/A, Simple, Précision faible
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </>
   );
@@ -2376,25 +2584,62 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
 
           {/* Graphique en secteurs de la répartition */}
           <div className="bg-white p-3 sm:p-4 md:p-6 rounded-lg shadow-md border">
-            <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-gray-800">🥧 Répartition des Bénéfices</h3>
-            <ResponsiveContainer width="100%" height={250} className="sm:h-[300px]">
+            <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-gray-800">🥧 Répartition des Volumes</h3>
+            <ResponsiveContainer width="100%" height={400} className="sm:h-[450px]">
               <PieChart>
                 <Pie
                   data={chartData}
                   cx="50%"
                   cy="50%"
-                  outerRadius={60}
-                  dataKey="benefice"
-                  label={({nom, percent, volume}) => `${nom}: ${(percent * 100).toFixed(1)}% (${volume.toLocaleString()})`}
+                  outerRadius={100}
+                  dataKey="repartition"
+                  label={false}
                 >
                   {chartData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={pieColors[index % pieColors.length]} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(value) => [value.toLocaleString(), 'Bénéfice']} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
+                <Tooltip 
+                  formatter={(value) => [value.toFixed(1) + '%', 'Répartition Volume']}
+                  labelFormatter={(name) => `Produit: ${name}`}
+                  contentStyle={{
+                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                    border: '1px solid #ccc',
+                    borderRadius: '8px',
+                    padding: '8px',
+                    fontSize: '12px'
+                  }}
+                />
+                              </PieChart>
+              </ResponsiveContainer>
+              
+              {/* Légende personnalisée */}
+              <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                {chartData.map((entry, index) => {
+                  const volumePercentage = entry.repartition.toFixed(1);
+                  const beneficePercentage = ((entry.benefice / chartData.reduce((sum, item) => sum + item.benefice, 0)) * 100).toFixed(1);
+                  return (
+                    <div key={entry.nom} className="flex items-center space-x-2 p-2 bg-gray-50 rounded">
+                      <div 
+                        className="w-4 h-4 rounded-full" 
+                        style={{ backgroundColor: pieColors[index % pieColors.length] }}
+                      ></div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-semibold text-gray-800 truncate" title={entry.nom}>
+                          {entry.nom}
+                        </div>
+                        <div className="text-xs text-gray-600">
+                          Volume: {volumePercentage}% • Bénéfice: {beneficePercentage}%
+                        </div>
+                        <div className="text-xs text-blue-600">
+                          {entry.benefice.toLocaleString()} FCFA
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
               </div>
 
         {/* Graphique des marges */}
@@ -2455,8 +2700,8 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
                       <div className="text-xs text-gray-500 mt-1">
                             {(produit.repartition * 100).toFixed(1)}%
                           </div>
-                          <div className="text-xs text-blue-600 mt-1">
-                            {Math.round(produit.repartition * adjustedVolume).toLocaleString()}
+                          <div className="text-xs text-blue-600 mt-1 font-semibold">
+                            {Math.round(produit.repartition * adjustedVolume).toLocaleString()} FCFA
                       </div>
                     </td>
                         <td className="px-2 sm:px-4 py-3 text-center">
@@ -2495,7 +2740,7 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
                     </td>
                         <td className="px-2 sm:px-4 py-3 text-center">
                           <div className="text-xs sm:text-sm font-bold text-green-600">
-                      {Math.round(produit.benefice).toLocaleString()}
+                      {Math.round(produit.benefice).toLocaleString()} FCFA
                           </div>
                           <div className={`px-1 sm:px-2 py-0.5 rounded-full text-xs font-bold text-white ${
                         pourcentageTotal > 50 ? 'bg-red-500' : 
