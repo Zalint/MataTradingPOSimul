@@ -1900,7 +1900,6 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
                 <button
                   onClick={() => {
                     navigator.clipboard.writeText(interpretationText);
-                    alert('Analyse copiée dans le presse-papiers !');
                   }}
                   className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
                   title="Copier l'analyse"
@@ -1943,7 +1942,6 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
                     const keyData = genererKeyData();
                     const keyDataText = JSON.stringify(keyData, null, 2);
                     navigator.clipboard.writeText(keyDataText);
-                    alert('Données clés copiées dans le presse-papiers !');
                   }}
                   className="px-3 py-1 text-sm bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
                   title="Copier les données clés"
@@ -2212,7 +2210,6 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
                 <button
                   onClick={() => {
                     navigator.clipboard.writeText(analyseContextuelleText);
-                    alert('Analyse contextuelle copiée dans le presse-papiers !');
                   }}
                   className="px-3 py-1 text-sm bg-indigo-500 text-white rounded hover:bg-indigo-600 transition-colors"
                   title="Copier l'analyse contextuelle"
@@ -2301,7 +2298,6 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
                 <button
                   onClick={() => {
                     navigator.clipboard.writeText(analyseCompleteText);
-                    alert('Analyse complète copiée dans le presse-papiers !');
                   }}
                   className="px-3 py-1 text-sm bg-emerald-500 text-white rounded hover:bg-emerald-600 transition-colors"
                   title="Copier l'analyse complète"
