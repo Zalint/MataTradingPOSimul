@@ -1,0 +1,5 @@
+[33m2106dca[m[33m ([m[1;36mHEAD -> [m[1;32mmaster[m[33m)[m Sécurisation: Remplacement clé API par variable d'environnement
+[33md7ea876[m Ajout ROI et refonte analyse MATA Trading - Point de vente basé sur données réelles
+[33m0d1568b[m[33m ([m[1;31morigin/master[m[33m)[m Fix: Correction graphiques sensibilité - parfaite cohérence avec UI après bump
+[33m1633ad2[m Mettre Pération % (Bœuf/Veau) par défaut à 13% au lieu de 10%
+[33me98b82c[m wip

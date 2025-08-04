@@ -5,6 +5,12 @@ import html2canvas from 'html2canvas';
 import FormulesHypotheses from './FormulesHypotheses';
 
 const SimulateurRentabilite = () => {
+  // Debug: Vérifier les variables d'environnement au démarrage
+  console.log('🚀 DEBUG - Variables d\'environnement au démarrage:');
+  console.log('🔑 REACT_APP_OPENAI_API_KEY:', process.env.REACT_APP_OPENAI_API_KEY);
+  console.log('🔑 Longueur de la clé:', process.env.REACT_APP_OPENAI_API_KEY ? process.env.REACT_APP_OPENAI_API_KEY.length : 'undefined');
+  console.log('🔑 Toutes les variables env:', process.env);
+  
   const mainContainerRef = useRef(null);
   const [activeTab, setActiveTab] = useState('main'); // 'main', 'volume', 'charges', 'dcf', 'dcfSimulation' ou 'faq'
   const [pageFluxDCF, setPageFluxDCF] = useState(1);
@@ -31,6 +37,15 @@ const SimulateurRentabilite = () => {
   const [analyseContextuelleLoading, setAnalyseContextuelleLoading] = useState(false);
   const [analyseContextuelleText, setAnalyseContextuelleText] = useState('');
   const [contexteSupplementaire, setContexteSupplementaire] = useState('');
+  
+  // États pour l'analyse complète personnalisée
+  const [analyseCompleteVisible, setAnalyseCompleteVisible] = useState(false);
+  const [analyseCompleteLoading, setAnalyseCompleteLoading] = useState(false);
+  const [analyseCompleteText, setAnalyseCompleteText] = useState('');
+  const [contextePersonnalise, setContextePersonnalise] = useState('');
+  
+  // État pour le modèle ChatGPT sélectionné
+  const [modeleChatGPT, setModeleChatGPT] = useState('gpt-4');
 
   // État pour garder les prix originaux pour les graphiques de sensibilité
   const [produitsOriginaux] = useState({
@@ -344,6 +359,11 @@ const SimulateurRentabilite = () => {
     setInterpretationVisible(true);
     
     try {
+      // Debug: Vérifier la clé API
+      console.log('🔍 DEBUG - Clé API depuis .env:', process.env.REACT_APP_OPENAI_API_KEY);
+      console.log('🔍 DEBUG - Longueur de la clé:', process.env.REACT_APP_OPENAI_API_KEY ? process.env.REACT_APP_OPENAI_API_KEY.length : 'undefined');
+      console.log('🔍 DEBUG - Début de la clé:', process.env.REACT_APP_OPENAI_API_KEY ? process.env.REACT_APP_OPENAI_API_KEY.substring(0, 20) + '...' : 'undefined');
+      
       // Préparer les données pour l'analyse
       const roiData = calculerROI();
       const donneesAnalyse = {
@@ -448,7 +468,7 @@ Positionnez ce point de vente comme le modèle de référence validé pour MATA 
           'Authorization': `Bearer ${process.env.REACT_APP_OPENAI_API_KEY}`
         },
         body: JSON.stringify({
-          model: 'gpt-4',
+          model: modeleChatGPT,
           messages: [
             {
               role: 'user',
@@ -486,15 +506,13 @@ Positionnez ce point de vente comme le modèle de référence validé pour MATA 
     setAnalyseContextuelleVisible(true);
     
     try {
-      // Préparer les données pour l'analyse (mêmes que l'analyse originale)
+      // Préparer les données pour l'analyse (optimisées pour éviter l'erreur 400)
       const roiData = calculerROI();
       const donneesAnalyse = {
         parametresGlobaux: {
           volumeMensuel: getNumericVolume(),
-          abatsParKg: getNumericAbatsParKg(),
-          peration: getNumericPeration(),
-          beneficeTotal: beneficeTotal,
-          chargesTotales: chargesTotales,
+          beneficeTotal: Math.round(beneficeTotal),
+          chargesTotales: Math.round(chargesTotales),
           margeMoyenne: (margeMoyenne * 100).toFixed(2) + '%',
           roiMensuel: roiData.mensuel.toFixed(2) + '%',
           roiAnnuel: roiData.annuel.toFixed(2) + '%',
@@ -507,23 +525,15 @@ Positionnez ce point de vente comme le modèle de référence validé pour MATA 
           prixVente: data.prixVente,
           marge: data.editable && data.prixAchat && data.prixVente ? 
             ((calculerMargeBrute(data) * 100).toFixed(1) + '%') : 'N/A',
-          volume: Math.round(data.repartition * getNumericVolume()),
-          benefice: data.editable && data.prixAchat && data.prixVente ? 
+          benefice: Math.round(data.editable && data.prixAchat && data.prixVente ? 
             calculerBenefice(calculerMargeBrute(data), data.repartition, getNumericVolume()) :
-            calculerBenefice(margeMoyenne, data.repartition, getNumericVolume())
+            calculerBenefice(margeMoyenne, data.repartition, getNumericVolume()))
         })),
         charges: {
-          chargesFixes: getNumericChargesFixes(),
-          dureeAmortissement: getNumericDureeAmortissement(),
+          total: Math.round(chargesTotales),
           salaire: getNumericSalaire(),
-          electricite: getNumericElectricite(),
-          eau: getNumericEau(),
-          internet: getNumericInternet(),
-          sacsLivraison: getNumericSacsLivraison(),
-          chargesTransport: getNumericChargesTransport(),
           loyer: getNumericLoyer(),
-          autresCharges: getNumericAutresCharges(),
-          total: chargesTotales
+          chargesTransport: getNumericChargesTransport()
         }
       };
 
@@ -561,7 +571,7 @@ Positionnez cette analyse complémentaire comme un renforcement de la crédibili
           'Authorization': `Bearer ${process.env.REACT_APP_OPENAI_API_KEY}`
         },
         body: JSON.stringify({
-          model: 'gpt-4',
+          model: modeleChatGPT,
           messages: [
             {
               role: 'user',
@@ -585,6 +595,121 @@ Positionnez cette analyse complémentaire comme un renforcement de la crédibili
       setAnalyseContextuelleText(`Erreur lors de la génération de l'analyse contextuelle: ${error.message}`);
     } finally {
       setAnalyseContextuelleLoading(false);
+    }
+  };
+
+  // Fonction pour générer l'analyse complète personnalisée
+  const genererAnalyseComplete = async () => {
+    if (!contextePersonnalise.trim()) {
+      alert('Veuillez saisir un contexte personnalisé avant de générer l\'analyse complète.');
+      return;
+    }
+
+    setAnalyseCompleteLoading(true);
+    setAnalyseCompleteVisible(true);
+    
+    try {
+      // Debug: Vérifier la clé API
+      console.log('🔍 DEBUG - Clé API depuis .env (analyse complète):', process.env.REACT_APP_OPENAI_API_KEY);
+      console.log('🔍 DEBUG - Longueur de la clé (analyse complète):', process.env.REACT_APP_OPENAI_API_KEY ? process.env.REACT_APP_OPENAI_API_KEY.length : 'undefined');
+      console.log('🔍 DEBUG - Début de la clé (analyse complète):', process.env.REACT_APP_OPENAI_API_KEY ? process.env.REACT_APP_OPENAI_API_KEY.substring(0, 20) + '...' : 'undefined');
+      
+      // Préparer toutes les données de l'application en temps réel
+      const roiData = calculerROI();
+      const fluxDCF = calculerFluxDCF();
+      const indicateursDCF = calculerIndicateursDCF();
+      const fluxDCFSimulation = calculerFluxDCFSimulation();
+      const indicateursDCFSimulation = calculerIndicateursDCFSimulation();
+      
+      // Optimisation : Réduire la taille des données pour éviter l'erreur 400
+      const donneesComplete = {
+        parametresGlobaux: {
+          volumeMensuel: getNumericVolume(),
+          beneficeTotal: Math.round(beneficeTotal),
+          chargesTotales: Math.round(chargesTotales),
+          margeMoyenne: (margeMoyenne * 100).toFixed(2) + '%',
+          roiMensuel: roiData.mensuel.toFixed(2) + '%',
+          roiAnnuel: roiData.annuel.toFixed(2) + '%',
+          capexInvestissement: getNumericCapex()
+        },
+        produits: Object.entries(produits).map(([nom, data]) => ({
+          nom,
+          repartition: (data.repartition * 100).toFixed(1) + '%',
+          prixAchat: data.prixAchat,
+          prixVente: data.prixVente,
+          marge: data.editable && data.prixAchat && data.prixVente ? 
+            ((calculerMargeBrute(data) * 100).toFixed(1) + '%') : 'N/A',
+          benefice: Math.round(data.editable && data.prixAchat && data.prixVente ? 
+            calculerBenefice(calculerMargeBrute(data), data.repartition, getNumericVolume()) :
+            calculerBenefice(margeMoyenne, data.repartition, getNumericVolume()))
+        })),
+        charges: {
+          total: Math.round(chargesTotales),
+          salaire: getNumericSalaire(),
+          loyer: getNumericLoyer(),
+          chargesTransport: getNumericChargesTransport()
+        },
+        metriquesFinancieres: {
+          ebit: Math.round(calculerEBIT()),
+          ebitda: Math.round(calculerEBITDA()),
+          fcf: Math.round(calculerFCF()),
+          enterpriseValue: Math.round(calculerEnterpriseValue()),
+          equityValue: Math.round(calculerEquityValue())
+        }
+      };
+
+      const prompt = `En tant qu'analyste financier expert spécialisé dans MATA Group SA, vous devez réaliser une ANALYSE COMPLÈTE ET PERSONNALISÉE du point de vente MATA Trading en tenant compte du contexte spécifique fourni et de toutes les données financières en temps réel.
+
+CONTEXTE MATA GROUP SA:
+Créé en août 2024, MATA Group SA est une société anonyme sénégalaise à vocation agroalimentaire, structurée autour de plusieurs entités opérationnelles spécialisées. Sa mission : construire une chaîne de valeur agroalimentaire intégrée, efficiente, digitalisée et rentable. Sa vision : devenir une "Data Driven Meat Integration Company".
+
+CONTEXTE PERSONNALISÉ FOURNI:
+${contextePersonnalise}
+
+DONNÉES FINANCIÈRES COMPLÈTES EN TEMPS RÉEL:
+${JSON.stringify(donneesComplete, null, 2)}
+
+VOTRE MISSION:
+Réalisez une analyse financière complète et personnalisée qui intègre :
+1. Le contexte spécifique que vous avez fourni
+2. Toutes les données financières actuelles (produits, charges, DCF, simulations)
+3. Les métriques de performance (ROI, EBITDA, FCF, etc.)
+4. Les scénarios de simulation (volume et DCF)
+5. Les indicateurs de valorisation
+
+Votre analyse doit être structurée, précise, et adaptée au contexte fourni. Utilisez un vocabulaire d'investissement professionnel et fournissez des recommandations concrètes basées sur les données réelles. Réponse en français business formel.`;
+
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.REACT_APP_OPENAI_API_KEY}`
+        },
+        body: JSON.stringify({
+          model: modeleChatGPT,
+          messages: [
+            {
+              role: 'user',
+              content: prompt
+            }
+          ],
+          max_tokens: 3000,
+          temperature: 0.7
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erreur API: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setAnalyseCompleteText(data.choices[0].message.content);
+      
+    } catch (error) {
+      console.error('Erreur lors de la génération de l\'analyse complète:', error);
+      setAnalyseCompleteText(`Erreur lors de la génération de l'analyse complète: ${error.message}`);
+    } finally {
+      setAnalyseCompleteLoading(false);
     }
   };
 
@@ -1453,6 +1578,31 @@ Positionnez cette analyse complémentaire comme un renforcement de la crédibili
           </div>
         </div>
 
+        {/* Sélecteur de modèle ChatGPT */}
+        <div className="bg-gradient-to-r from-orange-50 to-yellow-50 border border-orange-200 rounded-lg p-4 sm:p-6 mb-4 sm:mb-6 md:mb-8">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <h3 className="text-lg font-semibold text-orange-800 mb-2">🤖 Modèle ChatGPT</h3>
+              <p className="text-sm text-gray-600">Choisissez le modèle d'IA à utiliser pour les analyses</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <select
+                value={modeleChatGPT}
+                onChange={(e) => setModeleChatGPT(e.target.value)}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+              >
+                <option value="gpt-4">GPT-4 (Plus avancé, plus cher)</option>
+                <option value="gpt-4-turbo">GPT-4 Turbo (Équilibré)</option>
+                <option value="gpt-3.5-turbo">GPT-3.5 Turbo (Rapide, économique)</option>
+                <option value="gpt-3.5-turbo-16k">GPT-3.5 Turbo 16K (Long contexte)</option>
+              </select>
+              <div className="text-xs text-gray-500">
+                Modèle actuel: <span className="font-medium">{modeleChatGPT}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Bouton d'interprétation IA */}
         <div className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-4 sm:p-6 mb-4 sm:mb-6 md:mb-8">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -1575,6 +1725,81 @@ Positionnez cette analyse complémentaire comme un renforcement de la crédibili
               ) : (
                 <div className="whitespace-pre-wrap text-gray-700 leading-relaxed">
                   {analyseContextuelleText}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Section d'analyse complète personnalisée */}
+        <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-lg p-4 sm:p-6 mb-4 sm:mb-6 md:mb-8">
+          <div className="mb-4">
+            <h3 className="text-lg font-semibold text-emerald-800 mb-2">🔍 Analyse Complète Personnalisée</h3>
+            <p className="text-sm text-gray-600 mb-4">Générez une analyse complète intégrant votre contexte spécifique et toutes les données financières en temps réel</p>
+            
+            {/* Champ de saisie du contexte personnalisé */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                📝 Contexte personnalisé pour l'analyse
+              </label>
+              <textarea
+                value={contextePersonnalise}
+                onChange={(e) => setContextePersonnalise(e.target.value)}
+                placeholder="Décrivez votre contexte spécifique, vos objectifs, vos contraintes, vos questions particulières... Cette analyse intégrera toutes les données financières actuelles de l'application."
+                className="w-full p-3 border border-gray-300 rounded-lg text-sm resize-vertical min-h-[100px] focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                style={{ fontSize: '16px' }}
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Exemples : "Analysez la viabilité pour un investisseur en capital-risque", "Évaluez l'impact d'une expansion vers Dakar", "Comparez avec les standards du secteur agroalimentaire sénégalais"...
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex justify-end">
+            <button
+              onClick={genererAnalyseComplete}
+              disabled={analyseCompleteLoading || !contextePersonnalise.trim()}
+              className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
+                analyseCompleteLoading || !contextePersonnalise.trim()
+                  ? 'bg-gray-400 cursor-not-allowed' 
+                  : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-lg hover:shadow-xl'
+              }`}
+            >
+              {analyseCompleteLoading ? (
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  Analyse complète en cours...
+                </div>
+              ) : (
+                '🔍 Générer Analyse Complète'
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Section d'affichage de l'analyse complète */}
+        {analyseCompleteVisible && (
+          <div className="bg-white border border-emerald-200 rounded-lg p-4 sm:p-6 mb-4 sm:mb-6 md:mb-8 shadow-lg">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-emerald-800">🔍 Analyse Complète Personnalisée MATA Trading</h3>
+              <button
+                onClick={() => setAnalyseCompleteVisible(false)}
+                className="text-gray-500 hover:text-gray-700 text-xl font-bold"
+              >
+                ×
+              </button>
+            </div>
+            <div className="prose max-w-none">
+              {analyseCompleteLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="text-center">
+                    <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                    <p className="text-gray-600">Génération de l'analyse complète personnalisée en cours...</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="whitespace-pre-wrap text-gray-700 leading-relaxed">
+                  {analyseCompleteText}
                 </div>
               )}
             </div>
