@@ -679,8 +679,9 @@ Positionnez cette analyse complémentaire comme un renforcement de la crédibili
     const ebitda = calculerEBITDA();
     const nopat = calculerNOPAT();
     const fcf = calculerFCF();
-    const roiMensuel = calculerROI();
-    const roiAnnuel = roiMensuel * 12;
+    const roiData = calculerROI();
+    const roiMensuel = roiData.mensuel;
+    const roiAnnuel = roiData.annuel;
     
     const keyData = {
       // Données de base
