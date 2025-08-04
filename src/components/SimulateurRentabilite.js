@@ -12,11 +12,36 @@ const SimulateurRentabilite = () => {
   const [itemsPerPage] = useState(12);
   const [volume, setVolume] = useState('20000000');
   const [abatsParKg, setAbatsParKg] = useState('200');
-  const [peration, setPeration] = useState('0.1');
+  const [peration, setPeration] = useState('0.13');
   
   // Nouveaux états pour la simulation de volume
   const [selectedProduct, setSelectedProduct] = useState('Poulet');
   const [additionalVolume, setAdditionalVolume] = useState('0');
+  
+  // État pour le produit sélectionné pour les variations de prix
+  const [selectedProductForPricing, setSelectedProductForPricing] = useState('Tous');
+  
+  // États pour l'interprétation IA
+  const [interpretationVisible, setInterpretationVisible] = useState(false);
+  const [interpretationLoading, setInterpretationLoading] = useState(false);
+  const [interpretationText, setInterpretationText] = useState('');
+  
+  // États pour l'analyse contextuelle (seconde analyse)
+  const [analyseContextuelleVisible, setAnalyseContextuelleVisible] = useState(false);
+  const [analyseContextuelleLoading, setAnalyseContextuelleLoading] = useState(false);
+  const [analyseContextuelleText, setAnalyseContextuelleText] = useState('');
+  const [contexteSupplementaire, setContexteSupplementaire] = useState('');
+
+  // État pour garder les prix originaux pour les graphiques de sensibilité
+  const [produitsOriginaux] = useState({
+    'Boeuf': { repartition: 0.701782462, prixAchat: 3150, prixVente: 3550, editable: true, hasAbats: true },
+    'Veau': { repartition: 0.044592391, prixAchat: 3350, prixVente: 3900, editable: true, hasAbats: true },
+    'Ovin': { repartition: 0.052244053, prixAchat: 4000, prixVente: 4500, editable: true, hasAbats: false },
+    'Oeuf': { repartition: 0.0477725983, prixAchat: 2250, prixVente: 2500, editable: true, hasAbats: false },
+    'Autres': { repartition: 0.03669501, prixAchat: null, prixVente: null, editable: false, hasAbats: false },
+    'Pack': { repartition: 0.014027977, prixAchat: null, prixVente: null, editable: false, hasAbats: false },
+    'Poulet': { repartition: 0.102932124, prixAchat: 2600, prixVente: 3400, editable: true, hasAbats: false }
+  });
   
   // États pour les charges
   const [chargesFixes, setChargesFixes] = useState('5000000');
@@ -198,6 +223,96 @@ const SimulateurRentabilite = () => {
     return margeBrute * repartition * volume;
   };
 
+  // Fonction pour calculer le bénéfice total avec une variation de prix sur le bœuf
+  const calculerBeneficeAvecVariationPrix = (produitNom, typePrix, variation) => {
+    // Utiliser les données appropriées selon l'onglet actif
+    const produitsActifs = getNumericAdditionalVolume() > 0 ? adjustedProduits : produits;
+    const volumeActif = getNumericAdditionalVolume() > 0 ? adjustedVolume : getNumericVolume();
+    
+    let beneficeTotal = 0;
+    
+    Object.entries(produitsActifs).forEach(([nom, data]) => {
+      let margeBrute;
+      
+      if (data.editable && data.prixAchat && data.prixVente) {
+        // Appliquer la variation seulement au produit spécifié
+        let prixAchat = data.prixAchat;
+        let prixVente = data.prixVente;
+        
+        if (nom === produitNom) {
+          if (typePrix === 'prixAchat') {
+            prixAchat += variation;
+          } else if (typePrix === 'prixVente') {
+            prixVente += variation;
+          }
+        }
+        
+        // Calculer la marge brute avec les prix modifiés
+        if (data.hasAbats) {
+          margeBrute = ((prixVente * (1 - getNumericPeration()) + getNumericAbatsParKg()) / prixAchat) - 1;
+        } else {
+          margeBrute = (prixVente / prixAchat) - 1;
+        }
+      } else {
+        // Pour les produits non éditables, utiliser la marge moyenne
+        margeBrute = calculerMargeMoyenne();
+      }
+      
+      const benefice = calculerBenefice(margeBrute, data.repartition, volumeActif);
+      beneficeTotal += benefice;
+    });
+    
+    return beneficeTotal;
+  };
+
+  // Fonction pour calculer le bénéfice total avec une variation de prix (cohérente avec augmenterTousPrix)
+  const calculerBeneficeAvecVariationPrixCorrige = (typePrix, variation) => {
+    // Utiliser les données appropriées selon l'onglet actif
+    const produitsActifs = getNumericAdditionalVolume() > 0 ? adjustedProduits : produits;
+    const volumeActif = getNumericAdditionalVolume() > 0 ? adjustedVolume : getNumericVolume();
+    
+    let beneficeTotal = 0;
+    
+    Object.entries(produitsActifs).forEach(([nom, data]) => {
+      let margeBrute;
+      
+      if (data.editable && data.prixAchat && data.prixVente) {
+        // Appliquer la variation selon le produit sélectionné (comme augmenterTousPrix)
+        let prixAchat = data.prixAchat;
+        let prixVente = data.prixVente;
+        
+        if (selectedProductForPricing === 'Tous' || nom === selectedProductForPricing) {
+          if (typePrix === 'prixAchat') {
+            prixAchat += variation;
+          } else if (typePrix === 'prixVente') {
+            prixVente += variation;
+          }
+        }
+        
+        // Calculer la marge brute avec les prix modifiés
+        if (data.hasAbats) {
+          margeBrute = ((prixVente * (1 - getNumericPeration()) + getNumericAbatsParKg()) / prixAchat) - 1;
+        } else {
+          margeBrute = (prixVente / prixAchat) - 1;
+        }
+      } else {
+        // Pour les produits non éditables, utiliser la marge moyenne
+        margeBrute = calculerMargeMoyenne();
+      }
+      
+      const benefice = calculerBenefice(margeBrute, data.repartition, volumeActif);
+      beneficeTotal += benefice;
+    });
+    
+    return beneficeTotal;
+  };
+
+  // Fonction simple pour calculer le bénéfice avec variation de prix (pour les graphiques uniquement)
+  const calculerBeneficeAvecVariationPrixExact = (typePrix, variation) => {
+    // Utiliser la fonction existante qui fonctionne déjà
+    return calculerBeneficeAvecVariationPrixCorrige(typePrix, variation);
+  };
+
   const updatePrix = (produit, type, valeur) => {
     setProduits(prev => ({
       ...prev,
@@ -213,11 +328,264 @@ const SimulateurRentabilite = () => {
       const nouveauxProduits = { ...prev };
       Object.keys(nouveauxProduits).forEach(nom => {
         if (nouveauxProduits[nom].editable && nouveauxProduits[nom][typePrix]) {
-          nouveauxProduits[nom][typePrix] += montant;
+          // Si un produit spécifique est sélectionné, appliquer seulement à ce produit
+          if (selectedProductForPricing === 'Tous' || nom === selectedProductForPricing) {
+            nouveauxProduits[nom][typePrix] += montant;
+          }
         }
       });
       return nouveauxProduits;
     });
+  };
+
+  // Fonction pour générer l'interprétation avec ChatGPT
+  const genererInterpretation = async () => {
+    setInterpretationLoading(true);
+    setInterpretationVisible(true);
+    
+    try {
+      // Préparer les données pour l'analyse
+      const roiData = calculerROI();
+      const donneesAnalyse = {
+        parametresGlobaux: {
+          volumeMensuel: getNumericVolume(),
+          abatsParKg: getNumericAbatsParKg(),
+          peration: getNumericPeration(),
+          beneficeTotal: beneficeTotal,
+          chargesTotales: chargesTotales,
+          margeMoyenne: (margeMoyenne * 100).toFixed(2) + '%',
+          roiMensuel: roiData.mensuel.toFixed(2) + '%',
+          roiAnnuel: roiData.annuel.toFixed(2) + '%',
+          capexInvestissement: getNumericCapex()
+        },
+        produits: Object.entries(produits).map(([nom, data]) => ({
+          nom,
+          repartition: (data.repartition * 100).toFixed(1) + '%',
+          prixAchat: data.prixAchat,
+          prixVente: data.prixVente,
+          marge: data.editable && data.prixAchat && data.prixVente ? 
+            ((calculerMargeBrute(data) * 100).toFixed(1) + '%') : 'N/A',
+          volume: Math.round(data.repartition * getNumericVolume()),
+          benefice: data.editable && data.prixAchat && data.prixVente ? 
+            calculerBenefice(calculerMargeBrute(data), data.repartition, getNumericVolume()) :
+            calculerBenefice(margeMoyenne, data.repartition, getNumericVolume())
+        })),
+        charges: {
+          chargesFixes: getNumericChargesFixes(),
+          dureeAmortissement: getNumericDureeAmortissement(),
+          salaire: getNumericSalaire(),
+          electricite: getNumericElectricite(),
+          eau: getNumericEau(),
+          internet: getNumericInternet(),
+          sacsLivraison: getNumericSacsLivraison(),
+          chargesTransport: getNumericChargesTransport(),
+          loyer: getNumericLoyer(),
+          autresCharges: getNumericAutresCharges(),
+          total: chargesTotales
+        }
+      };
+
+      const prompt = `En tant qu'analyste financier expert spécialisé dans les business plans pour investisseurs, rédigez une analyse financière professionnelle d'un point de vente MATA Trading au Sénégal, prête à être intégrée dans un dossier de levée de fonds.
+
+CONTEXTE MATA GROUP SA:
+Créé en août 2024, MATA Group SA est une société anonyme sénégalaise à vocation agroalimentaire, structurée autour de plusieurs entités opérationnelles spécialisées. Sa mission : construire une chaîne de valeur agroalimentaire intégrée, efficiente, digitalisée et rentable.
+Sa vision : devenir une "Data Driven Meat Integration Company", en combinant maîtrise opérationnelle, structuration industrielle et pilotage par la donnée.
+
+Les entités du groupe :
+• MATA GROUP SA – Société Mère : Supervise les fonctions transversales, arbitre et finance les projets des entités, garantit la cohérence stratégique.
+• MATA Logistique & Conciergerie (MLC) : Logistique pour toutes les entités + plateforme de services de proximité.
+• MATA Volaille : Production avicole intégrée (9 000 sujets/mois → objectif 100 000 en 2028).
+• MATA Production : Élevage bovin, ovin et caprin (levée de fonds achevée, création en cours).
+• MATA Trading : Développement de réseau de distribution hybride (franchises, supérettes, points de vente MATA) - EN COURS DE LEVÉE DE FONDS.
+• MATA Restaurant & Traiteur : Valorisation culinaire (en projet).
+• MATA Transformation : Unité industrielle (en projet).
+
+OBJECTIF DE L'ANALYSE: Démontrer la viabilité économique d'un point de vente MATA Trading pour lever des fonds destinés à la création de cette entité. Ce modèle de point de vente, basé sur les données réelles de vos points de vente actuels, servira de référence pour le déploiement du réseau de distribution MATA Trading.
+
+DONNÉES FINANCIÈRES DU POINT DE VENTE:
+${JSON.stringify(donneesAnalyse, null, 2)}
+
+IMPORTANT: Ce modèle de point de vente est basé sur un volume mensuel de 20,000,000 FCFA et une répartition des produits alignée sur vos points de vente actuels. Adaptez vos conclusions en précisant qu'il s'agit d'un modèle basé sur vos données réelles de vente.
+
+Rédigez une analyse structurée style "due diligence" avec un ton formel et convaincant pour investisseurs, en positionnant ce point de vente comme le modèle de référence pour le réseau MATA Trading:
+
+## ANALYSE FINANCIÈRE - POINT DE VENTE MATA TRADING
+
+### 1. MODÈLE ÉCONOMIQUE BASÉ SUR LES DONNÉES RÉELLES
+Démontrez la viabilité du modèle de point de vente MATA Trading:
+- Performance financière basée sur vos données de vente actuelles
+- Ratios clés (marge, ROI, cash flow) prouvant la solidité du modèle
+- Synergies avec les entités MATA Group SA (approvisionnement, logistique)
+- Validation du mix produits et des répartitions de vos points de vente
+
+### 2. STRATÉGIE DE DÉPLOIEMENT RÉSEAU
+Analysez le potentiel d'expansion basé sur ce modèle validé:
+- Réplication du modèle éprouvé vers un réseau de distribution
+- Validation du mix produits et des marges dans des conditions réelles
+- Optimisation des processus opérationnels pour la scalabilité
+- Plan de déploiement basé sur des données concrètes
+
+### 3. PERFORMANCE ET OPTIMISATIONS DU MODÈLE
+Présentez les enseignements tirés de vos points de vente actuels:
+- Performance par segment de produits et optimisations identifiées
+- Validation des synergies avec l'écosystème MATA Group SA
+- Ajustements opérationnels et commerciaux validés
+- Métriques de succès reproductibles pour le réseau
+
+### 4. PROJECTION ET SCALABILITÉ DU MODÈLE ÉPROUVÉ
+Démontrez le potentiel d'expansion basé sur vos données réelles:
+- Multiplication du modèle validé vers un réseau de distribution
+- Avantages concurrentiels confirmés par vos points de vente actuels
+- Plan de déploiement basé sur des performances réelles
+- Création de valeur exponentielle par réplication du modèle éprouvé
+
+Positionnez ce point de vente comme le modèle de référence validé pour MATA Trading, réduisant significativement les risques d'investissement et prouvant le potentiel de scalabilité. Insistez sur l'importance de baser l'expansion sur des données réelles de vos points de vente actuels pour rassurer les investisseurs sur la solidité du business model. Utilisez un vocabulaire d'investissement (EBITDA, cash flow, ROI, scalabilité), des métriques précises, et un ton qui inspire confiance. Réponse en français business formel.`;
+
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.REACT_APP_OPENAI_API_KEY}`
+        },
+        body: JSON.stringify({
+          model: 'gpt-4',
+          messages: [
+            {
+              role: 'user',
+              content: prompt
+            }
+          ],
+          max_tokens: 2000,
+          temperature: 0.7
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erreur API: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setInterpretationText(data.choices[0].message.content);
+      
+    } catch (error) {
+      console.error('Erreur lors de la génération de l\'interprétation:', error);
+      setInterpretationText(`Erreur lors de la génération de l'interprétation: ${error.message}`);
+    } finally {
+      setInterpretationLoading(false);
+    }
+  };
+
+  // Fonction pour générer l'analyse contextuelle (seconde analyse)
+  const genererAnalyseContextuelle = async () => {
+    if (!contexteSupplementaire.trim()) {
+      alert('Veuillez saisir un contexte supplémentaire avant de générer l\'analyse.');
+      return;
+    }
+
+    setAnalyseContextuelleLoading(true);
+    setAnalyseContextuelleVisible(true);
+    
+    try {
+      // Préparer les données pour l'analyse (mêmes que l'analyse originale)
+      const roiData = calculerROI();
+      const donneesAnalyse = {
+        parametresGlobaux: {
+          volumeMensuel: getNumericVolume(),
+          abatsParKg: getNumericAbatsParKg(),
+          peration: getNumericPeration(),
+          beneficeTotal: beneficeTotal,
+          chargesTotales: chargesTotales,
+          margeMoyenne: (margeMoyenne * 100).toFixed(2) + '%',
+          roiMensuel: roiData.mensuel.toFixed(2) + '%',
+          roiAnnuel: roiData.annuel.toFixed(2) + '%',
+          capexInvestissement: getNumericCapex()
+        },
+        produits: Object.entries(produits).map(([nom, data]) => ({
+          nom,
+          repartition: (data.repartition * 100).toFixed(1) + '%',
+          prixAchat: data.prixAchat,
+          prixVente: data.prixVente,
+          marge: data.editable && data.prixAchat && data.prixVente ? 
+            ((calculerMargeBrute(data) * 100).toFixed(1) + '%') : 'N/A',
+          volume: Math.round(data.repartition * getNumericVolume()),
+          benefice: data.editable && data.prixAchat && data.prixVente ? 
+            calculerBenefice(calculerMargeBrute(data), data.repartition, getNumericVolume()) :
+            calculerBenefice(margeMoyenne, data.repartition, getNumericVolume())
+        })),
+        charges: {
+          chargesFixes: getNumericChargesFixes(),
+          dureeAmortissement: getNumericDureeAmortissement(),
+          salaire: getNumericSalaire(),
+          electricite: getNumericElectricite(),
+          eau: getNumericEau(),
+          internet: getNumericInternet(),
+          sacsLivraison: getNumericSacsLivraison(),
+          chargesTransport: getNumericChargesTransport(),
+          loyer: getNumericLoyer(),
+          autresCharges: getNumericAutresCharges(),
+          total: chargesTotales
+        }
+      };
+
+      const prompt = `En tant qu'analyste financier expert spécialisé dans MATA Group SA, vous avez précédemment rédigé cette analyse du POINT DE VENTE MATA Trading pour la levée de fonds :
+
+RAPPEL CONTEXTE MATA GROUP SA:
+Créé en août 2024, MATA Group SA est une société anonyme sénégalaise à vocation agroalimentaire, structurée autour de plusieurs entités opérationnelles spécialisées. Sa mission : construire une chaîne de valeur agroalimentaire intégrée, efficiente, digitalisée et rentable. Sa vision : devenir une "Data Driven Meat Integration Company".
+
+ANALYSE PRÉCÉDENTE DU POINT DE VENTE MATA TRADING:
+${interpretationText}
+
+DONNÉES FINANCIÈRES ACTUELLES DU POINT DE VENTE:
+${JSON.stringify(donneesAnalyse, null, 2)}
+
+IMPORTANT: Ce modèle de point de vente est basé sur un volume mensuel de 20,000,000 FCFA et une répartition des produits alignée sur vos points de vente actuels. Tenez compte de cette base de données réelles dans votre analyse.
+
+CONTEXTE SUPPLÉMENTAIRE FOURNI:
+${contexteSupplementaire}
+
+Rédigez maintenant une analyse complémentaire sur le POINT DE VENTE MATA Trading qui :
+1. Enrichit l'analyse précédente avec le nouveau contexte fourni
+2. Renforce la validation du modèle économique basé sur vos données réelles
+3. Évalue l'impact du contexte supplémentaire sur la stratégie de déploiement réseau
+4. Approfondit les implications pour l'expansion basée sur vos points de vente actuels
+5. Démontre comment le nouveau contexte confirme ou ajuste la viabilité du modèle éprouvé
+
+Format attendu : Analyse stratégique focalisée sur le POINT DE VENTE comme modèle de référence. Évitez de répéter l'analyse précédente, concentrez-vous sur comment le nouveau contexte renforce ou nuance les conclusions sur ce modèle basé sur vos données réelles.
+
+Positionnez cette analyse complémentaire comme un renforcement de la crédibilité du modèle de point de vente et de son rôle dans la validation de l'expansion réseau MATA Trading. Réponse en français business formel.`;
+
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.REACT_APP_OPENAI_API_KEY}`
+        },
+        body: JSON.stringify({
+          model: 'gpt-4',
+          messages: [
+            {
+              role: 'user',
+              content: prompt
+            }
+          ],
+          max_tokens: 2000,
+          temperature: 0.7
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erreur API: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setAnalyseContextuelleText(data.choices[0].message.content);
+      
+    } catch (error) {
+      console.error('Erreur lors de la génération de l\'analyse contextuelle:', error);
+      setAnalyseContextuelleText(`Erreur lors de la génération de l'analyse contextuelle: ${error.message}`);
+    } finally {
+      setAnalyseContextuelleLoading(false);
+    }
   };
 
   const resetPrix = () => {
@@ -232,7 +600,7 @@ const SimulateurRentabilite = () => {
     });
     setVolume('20000000');
     setAbatsParKg('200');
-    setPeration('0.1');
+    setPeration('0.13');
     setAdditionalVolume('0');
     setSelectedProduct('Poulet');
     // Reset des charges
@@ -257,6 +625,7 @@ const SimulateurRentabilite = () => {
     setTresorerie('500000');
     setTauxImposition('30');
     setDepreciationAmortissement('1250000');
+    setSelectedProductForPricing('Tous');
   };
 
   // Fonction pour forcer la simulation principale (additionalVolume = 0)
@@ -604,6 +973,20 @@ const SimulateurRentabilite = () => {
 
   const calculerNOPAT = () => {
     return calculerEBIT() * (1 - getNumericTauxImposition() / 100);
+  };
+
+  // Calcul du ROI (Return on Investment)
+  const calculerROI = () => {
+    const investissement = getNumericCapex(); // CAPEX comme investissement initial
+    const beneficeNetMensuel = calculerEBIT(); // EBIT comme proxy du bénéfice net
+    const beneficeNetAnnuel = beneficeNetMensuel * 12;
+    
+    if (investissement === 0) return { mensuel: 0, annuel: 0 };
+    
+    return {
+      mensuel: (beneficeNetMensuel / investissement) * 100,
+      annuel: (beneficeNetAnnuel / investissement) * 100
+    };
   };
 
   const calculerFCF = () => {
@@ -965,6 +1348,22 @@ const SimulateurRentabilite = () => {
         <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-gray-700">⚡ Actions Rapides</h3>
         <div className="space-y-3 sm:space-y-4">
             <div>
+              <div className="text-sm font-medium text-gray-600 mb-2">Produit cible:</div>
+              <select 
+                value={selectedProductForPricing}
+                onChange={(e) => setSelectedProductForPricing(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded text-sm"
+                style={{ fontSize: '16px' }}
+              >
+                <option value="Tous">Tous les produits</option>
+                <option value="Boeuf">Bœuf</option>
+                <option value="Veau">Veau</option>
+                <option value="Ovin">Ovin</option>
+                <option value="Poulet">Poulet</option>
+                <option value="Oeuf">Œuf</option>
+              </select>
+            </div>
+            <div>
               <div className="text-sm font-medium text-gray-600 mb-2">Prix de vente:</div>
               <div className="flex flex-wrap gap-2">
               <button onClick={() => augmenterTousPrix(50)} className="px-3 py-2 sm:px-4 sm:py-3 bg-green-500 text-white rounded text-sm hover:bg-green-600 min-h-[44px] min-w-[60px]">+50</button>
@@ -1032,6 +1431,7 @@ const SimulateurRentabilite = () => {
             {additionalVolume > 0 && (
               <div className="text-xs text-blue-600">(+{additionalVolume.toLocaleString()})</div>
             )}
+            <div className="text-xs text-orange-600 italic">Hypothèse de travail</div>
             </div>
             <div>
               <div className="text-sm text-gray-600">Bénéfice Total:</div>
@@ -1042,11 +1442,144 @@ const SimulateurRentabilite = () => {
             <div className="text-lg sm:text-xl font-bold text-blue-600">{(margeMoyenne * 100).toFixed(2)}%</div>
             </div>
             <div>
-              <div className="text-sm text-gray-600">Paramètres Bœuf/Veau:</div>
-              <div className="text-sm text-gray-700">Foie, Yell, Filet (Bœuf/Veau): {abatsParKg} | Pération: {(peration * 100).toFixed(1)}%</div>
+              <div className="text-sm text-gray-600">ROI Annuel:</div>
+              <div className={`text-lg sm:text-xl font-bold ${
+                calculerROI().annuel > 0 ? 'text-green-600' : 'text-red-600'
+              }`}>
+                {calculerROI().annuel.toFixed(1)}%
+              </div>
+              <div className="text-xs text-gray-500">Retour sur investissement</div>
             </div>
           </div>
         </div>
+
+        {/* Bouton d'interprétation IA */}
+        <div className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-4 sm:p-6 mb-4 sm:mb-6 md:mb-8">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <h3 className="text-lg font-semibold text-purple-800 mb-2">💼 Analyse Point de Vente MATA Trading</h3>
+              <p className="text-sm text-gray-600">Générez une analyse de ce modèle de point de vente basé sur vos données réelles pour votre dossier de levée de fonds</p>
+            </div>
+            <button
+              onClick={genererInterpretation}
+              disabled={interpretationLoading}
+              className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
+                interpretationLoading 
+                  ? 'bg-gray-400 cursor-not-allowed' 
+                  : 'bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-lg hover:shadow-xl'
+              }`}
+            >
+              {interpretationLoading ? (
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  Analyse en cours...
+                </div>
+              ) : (
+                '💼 Générer Analyse Point de Vente'
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Section d'interprétation */}
+        {interpretationVisible && (
+          <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6 mb-4 sm:mb-6 md:mb-8 shadow-lg">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-800">💼 Analyse Point de Vente MATA Trading - Levée de Fonds</h3>
+              <button
+                onClick={() => setInterpretationVisible(false)}
+                className="text-gray-500 hover:text-gray-700 text-xl font-bold"
+              >
+                ×
+              </button>
+            </div>
+            <div className="prose max-w-none">
+              {interpretationLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="text-center">
+                    <div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                    <p className="text-gray-600">Génération de l'analyse en cours...</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="whitespace-pre-wrap text-gray-700 leading-relaxed">
+                  {interpretationText}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Section pour ajouter du contexte supplémentaire - visible seulement si l'analyse principale est affichée */}
+        {interpretationVisible && interpretationText && !interpretationLoading && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 sm:p-6 mb-4 sm:mb-6 md:mb-8 shadow-lg">
+            <h3 className="text-lg font-semibold text-blue-800 mb-4">🎯 Analyse Contextuelle Point de Vente</h3>
+            <p className="text-blue-700 mb-4 text-sm">
+              Ajoutez du contexte stratégique supplémentaire pour approfondir l'analyse du point de vente et renforcer sa valeur comme modèle de référence.
+            </p>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-blue-700 mb-2">
+                Contexte supplémentaire (concurrence, marché, plans expansion, etc.)
+              </label>
+              <textarea
+                value={contexteSupplementaire}
+                onChange={(e) => setContexteSupplementaire(e.target.value)}
+                className="w-full p-3 border border-blue-300 rounded-lg text-base min-h-[100px] focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Ex: Données de vos points de vente actuels, comparaison avec concurrents, ajustements validés, validation des synergies MATA Group SA, insights opérationnels, métriques de performance réelles..."
+                style={{ fontSize: '16px' }}
+              />
+            </div>
+
+            <button
+              onClick={genererAnalyseContextuelle}
+              disabled={analyseContextuelleLoading || !contexteSupplementaire.trim()}
+              className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
+                analyseContextuelleLoading || !contexteSupplementaire.trim()
+                  ? 'bg-gray-400 cursor-not-allowed' 
+                  : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl'
+              }`}
+            >
+              {analyseContextuelleLoading ? (
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  Analyse point de vente en cours...
+                </div>
+              ) : (
+                '🎯 Analyser Contexte Point de Vente'
+              )}
+            </button>
+          </div>
+        )}
+
+        {/* Section d'affichage de l'analyse contextuelle */}
+        {analyseContextuelleVisible && (
+          <div className="bg-white border border-indigo-200 rounded-lg p-4 sm:p-6 mb-4 sm:mb-6 md:mb-8 shadow-lg">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-indigo-800">🎯 Analyse Contextuelle Point de Vente MATA Trading</h3>
+              <button
+                onClick={() => setAnalyseContextuelleVisible(false)}
+                className="text-gray-500 hover:text-gray-700 text-xl font-bold"
+              >
+                ×
+              </button>
+            </div>
+            <div className="prose max-w-none">
+              {analyseContextuelleLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="text-center">
+                    <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                    <p className="text-gray-600">Génération de l'analyse contextuelle du point de vente en cours...</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="whitespace-pre-wrap text-gray-700 leading-relaxed">
+                  {analyseContextuelleText}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
     </>
   );
 
@@ -1512,6 +2045,19 @@ FCF annuel: ${Math.round(calculerFCF()).toLocaleString()} FCFA`}>
               {Math.round(getNumericDepreciationAmortissement()).toLocaleString()}
             </div>
             <div className="text-xs text-gray-500">Dépréciation & Amortissement</div>
+          </div>
+          <div className="cursor-help" title={`ROI = Bénéfice Net / Investissement Initial
+ROI Mensuel: ${calculerROI().mensuel.toFixed(2)}%
+ROI Annuel: ${calculerROI().annuel.toFixed(2)}%
+Investissement (CAPEX): ${getNumericCapex().toLocaleString()} FCFA
+Bénéfice Net Mensuel: ${Math.round(calculerEBIT()).toLocaleString()} FCFA`}>
+            <div className="text-sm text-gray-600">ROI (annuel):</div>
+            <div className={`text-lg sm:text-xl font-bold ${
+              calculerROI().annuel > 0 ? 'text-green-600' : 'text-red-600'
+            }`}>
+              {calculerROI().annuel.toFixed(1)}%
+            </div>
+            <div className="text-xs text-gray-500">Retour sur investissement</div>
           </div>
           <div className="cursor-help" title={`Valeur Terminale = FCF × (1 + g) / (WACC - g)
 FCF: ${Math.round(calculerFCF()).toLocaleString()} FCFA
@@ -2145,17 +2691,17 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
             <div className="bg-white p-3 rounded border">
               <div className="font-medium text-gray-800">CA (Chiffre d'Affaires) Mensuel</div>
               <div className="text-lg font-bold text-blue-600">20,000,000</div>
-              <div className="text-sm text-gray-600">Volume de vente mensuel total de tous les produits</div>
+              <div className="text-sm text-gray-600">Hypothèse de volume de vente mensuel total (modifiable dans les paramètres)</div>
                   </div>
             <div className="bg-white p-3 rounded border">
               <div className="font-medium text-gray-800">CA Annuel</div>
               <div className="text-lg font-bold text-blue-600">240,000,000</div>
-              <div className="text-sm text-gray-600">20,000,000 × 12 mois</div>
+              <div className="text-sm text-gray-600">Basé sur l'hypothèse : 20,000,000 × 12 mois</div>
                 </div>
             <div className="bg-white p-3 rounded border">
               <div className="font-medium text-gray-800">Bénéfice Mensuel Approximatif</div>
               <div className="text-lg font-bold text-green-600">~2,000,000</div>
-              <div className="text-sm text-gray-600">Environ 10% du CA mensuel</div>
+              <div className="text-sm text-gray-600">Basé sur l'hypothèse CA : environ 10% du CA mensuel</div>
               </div>
             </div>
           </div>
@@ -2266,6 +2812,23 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
               <div className="text-sm text-gray-600">
                 Flux de trésorerie disponible. Il représente les liquidités générées par l'activité après 
                 déduction des investissements nécessaires : FCF = NOPAT + D&A - CAPEX - ΔBFR.
+              </div>
+            </div>
+            <div className="bg-white p-4 rounded border">
+              <div className="font-medium text-gray-800 mb-2">📊 ROI (Return on Investment)</div>
+              <div className="text-sm text-gray-600">
+                <strong>Retour sur Investissement :</strong> Mesure la rentabilité d'un investissement en comparant 
+                le bénéfice généré à l'investissement initial.<br/><br/>
+                <strong>Formule :</strong> ROI = (Bénéfice Net / Investissement Initial) × 100<br/><br/>
+                <strong>Dans notre modèle :</strong><br/>
+                • Bénéfice Net = EBIT (Bénéfice Total - Charges)<br/>
+                • Investissement Initial = CAPEX<br/>
+                • ROI Mensuel = (EBIT mensuel / CAPEX) × 100<br/>
+                • ROI Annuel = (EBIT annuel / CAPEX) × 100<br/><br/>
+                <strong>Interprétation :</strong><br/>
+                • ROI &gt; 0% : Investissement rentable<br/>
+                • ROI élevé : Excellente rentabilité (attractif pour les investisseurs)<br/>
+                • Un ROI annuel de 24% signifie que l'investissement génère 24% de bénéfice par an
               </div>
             </div>
           </div>
@@ -2654,6 +3217,199 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
               <Bar dataKey="marge" fill="#2ecc71" />
             </BarChart>
           </ResponsiveContainer>
+        </div>
+
+        {/* Graphiques de sensibilité */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 md:gap-8 mb-4 sm:mb-6 md:mb-8">
+          {/* Sensibilité prix de vente */}
+          <div className="bg-white p-3 sm:p-4 md:p-6 rounded-lg shadow-md border">
+            <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-gray-800">
+              📈 Sensibilité - Prix de Vente {selectedProductForPricing === 'Tous' ? '(Tous)' : selectedProductForPricing}
+            </h3>
+            <ResponsiveContainer width="100%" height={250} className="sm:h-[300px]">
+              <LineChart data={(() => {
+                const data = [];
+                
+                // DEBUG: Calculer le bénéfice de base avec les prix ORIGINAUX
+                let baseBeneficeOriginal = 0;
+                Object.entries(produitsOriginaux).map(([nom, data]) => {
+                  let margeBrute;
+                  if (data.editable && data.prixAchat && data.prixVente) {
+                    margeBrute = calculerMargeBrute(data);
+                  } else {
+                    margeBrute = margeMoyenne;
+                  }
+                  const benefice = calculerBenefice(margeBrute, data.repartition, getNumericVolume());
+                  baseBeneficeOriginal += benefice;
+                  return { nom, ...data, margeBrute, benefice };
+                });
+                
+
+                
+                data.push({ variation: 'Base', benefice: baseBeneficeOriginal });
+                
+                // Simuler chaque variation comme si on faisait un vrai bump
+                [50, 100, 150, 200].forEach(variation => {
+                  // Simuler le bump: partir des prix originaux et appliquer la variation
+                  const tempProduits = JSON.parse(JSON.stringify(produitsOriginaux));
+                  Object.keys(tempProduits).forEach(nom => {
+                    if (tempProduits[nom].editable && tempProduits[nom].prixVente) {
+                      if (selectedProductForPricing === 'Tous' || nom === selectedProductForPricing) {
+                        tempProduits[nom].prixVente = tempProduits[nom].prixVente + variation;
+                      }
+                    }
+                  });
+                  
+                  // Calculer la nouvelle margeMoyenne après bump (comme le ferait l'UI)
+                  const produitsEditables = Object.entries(tempProduits).filter(([nom, data]) => 
+                    data.editable && data.prixAchat && data.prixVente
+                  );
+                  const marges = produitsEditables.map(([nom, data]) => {
+                    if (data.hasAbats) {
+                      return ((data.prixVente * (1 - getNumericPeration()) + getNumericAbatsParKg()) / data.prixAchat) - 1;
+                    } else {
+                      return (data.prixVente / data.prixAchat) - 1;
+                    }
+                  });
+                  const margeMoyenneApresVump = marges.length > 0 ? marges.reduce((sum, marge) => sum + marge, 0) / marges.length : 0;
+                  
+                  // Calculer le bénéfice avec les prix modifiés
+                  let beneficeTotal = 0;
+                  Object.entries(tempProduits).map(([nom, data]) => {
+                    let margeBrute;
+                    if (data.editable && data.prixAchat && data.prixVente) {
+                      margeBrute = calculerMargeBrute(data);
+                    } else {
+                      // Utiliser la nouvelle margeMoyenne calculée après bump
+                      margeBrute = margeMoyenneApresVump;
+                    }
+                    
+                    const benefice = calculerBenefice(margeBrute, data.repartition, getNumericVolume());
+                    beneficeTotal += benefice;
+                    
+                    return { nom, ...data, margeBrute, benefice };
+                  });
+                  
+                  data.push({ variation: `+${variation}`, benefice: beneficeTotal });
+                });
+                
+                return data;
+              })()}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="variation" tick={{ fontSize: 12 }} />
+                <YAxis tickFormatter={(value) => `${(value / 1000000).toFixed(1)}M`} tick={{ fontSize: 12 }} />
+                <Tooltip 
+                  formatter={(value) => [value.toLocaleString() + ' FCFA', 'Bénéfice Total']}
+                  labelFormatter={(label) => `Variation: ${label}`}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="benefice" 
+                  stroke="#e74c3c" 
+                  strokeWidth={3}
+                  dot={{ fill: '#e74c3c', strokeWidth: 2, r: 4 }}
+                  activeDot={{ r: 6 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+            <div className="mt-2 text-xs text-gray-600 text-center">
+              Impact sur le bénéfice total en modifiant le prix de vente {selectedProductForPricing === 'Tous' ? 'de tous les produits' : `du ${selectedProductForPricing.toLowerCase()}`}
+            </div>
+          </div>
+
+          {/* Sensibilité prix d'achat */}
+          <div className="bg-white p-3 sm:p-4 md:p-6 rounded-lg shadow-md border">
+            <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-gray-800">
+              📉 Sensibilité - Prix d'Achat {selectedProductForPricing === 'Tous' ? '(Tous)' : selectedProductForPricing}
+            </h3>
+            <ResponsiveContainer width="100%" height={250} className="sm:h-[300px]">
+              <LineChart data={(() => {
+                const data = [];
+                
+                // DEBUG: Calculer le bénéfice de base avec les prix ORIGINAUX
+                let baseBeneficeOriginal = 0;
+                Object.entries(produitsOriginaux).map(([nom, data]) => {
+                  let margeBrute;
+                  if (data.editable && data.prixAchat && data.prixVente) {
+                    margeBrute = calculerMargeBrute(data);
+                  } else {
+                    margeBrute = margeMoyenne;
+                  }
+                  const benefice = calculerBenefice(margeBrute, data.repartition, getNumericVolume());
+                  baseBeneficeOriginal += benefice;
+                  return { nom, ...data, margeBrute, benefice };
+                });
+                
+                data.push({ variation: 'Base', benefice: baseBeneficeOriginal });
+                
+                // Simuler chaque variation comme si on faisait un vrai bump
+                [-50, -100, -150, -200].forEach(variation => {
+                  // Simuler le bump: partir des prix originaux et appliquer la variation
+                  const tempProduits = JSON.parse(JSON.stringify(produitsOriginaux));
+                  Object.keys(tempProduits).forEach(nom => {
+                    if (tempProduits[nom].editable && tempProduits[nom].prixAchat) {
+                      if (selectedProductForPricing === 'Tous' || nom === selectedProductForPricing) {
+                        tempProduits[nom].prixAchat = tempProduits[nom].prixAchat + variation;
+                      }
+                    }
+                  });
+                  
+                  // Calculer la nouvelle margeMoyenne après bump (comme le ferait l'UI)
+                  const produitsEditables = Object.entries(tempProduits).filter(([nom, data]) => 
+                    data.editable && data.prixAchat && data.prixVente
+                  );
+                  const marges = produitsEditables.map(([nom, data]) => {
+                    if (data.hasAbats) {
+                      return ((data.prixVente * (1 - getNumericPeration()) + getNumericAbatsParKg()) / data.prixAchat) - 1;
+                    } else {
+                      return (data.prixVente / data.prixAchat) - 1;
+                    }
+                  });
+                  const margeMoyenneApresVump = marges.length > 0 ? marges.reduce((sum, marge) => sum + marge, 0) / marges.length : 0;
+                  
+                  // Calculer le bénéfice avec les prix modifiés
+                  let beneficeTotal = 0;
+                  Object.entries(tempProduits).map(([nom, data]) => {
+                    let margeBrute;
+                    if (data.editable && data.prixAchat && data.prixVente) {
+                      margeBrute = calculerMargeBrute(data);
+                    } else {
+                      // Utiliser la nouvelle margeMoyenne calculée après bump
+                      margeBrute = margeMoyenneApresVump;
+                    }
+                    
+                    const benefice = calculerBenefice(margeBrute, data.repartition, getNumericVolume());
+                    beneficeTotal += benefice;
+                    
+                    return { nom, ...data, margeBrute, benefice };
+                  });
+                  
+                  data.push({ variation: `${variation}`, benefice: beneficeTotal });
+                });
+                
+                return data;
+              })()}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="variation" tick={{ fontSize: 12 }} />
+                <YAxis tickFormatter={(value) => `${(value / 1000000).toFixed(1)}M`} tick={{ fontSize: 12 }} />
+                <Tooltip 
+                  formatter={(value) => [value.toLocaleString() + ' FCFA', 'Bénéfice Total']}
+                  labelFormatter={(label) => `Variation: ${label}`}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="benefice" 
+                  stroke="#3498db" 
+                  strokeWidth={3}
+                  dot={{ fill: '#3498db', strokeWidth: 2, r: 4 }}
+                  activeDot={{ r: 6 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+            <div className="mt-2 text-xs text-gray-600 text-center">
+              Impact sur le bénéfice total en modifiant le prix d'achat {selectedProductForPricing === 'Tous' ? 'de tous les produits' : `du ${selectedProductForPricing.toLowerCase()}`}
+            </div>
+          </div>
         </div>
 
         {/* Tableau détaillé - Version mobile optimisée */}
