@@ -388,8 +388,8 @@ const SimulateurRentabilite = () => {
           beneficeTotal: Math.round(beneficeTotal),
           chargesTotales: Math.round(chargesTotales),
           margeMoyenne: (margeMoyenne * 100).toFixed(2) + '%',
-          roiMensuel: roiData.mensuel.toFixed(2) + '%',
-          roiAnnuel: roiData.annuel.toFixed(2) + '%',
+          roiMensuel: (roiData.mensuel * 100).toFixed(2) + '%',
+          roiAnnuel: (roiData.annuel * 100).toFixed(2) + '%',
           capexInvestissement: getNumericCapex()
         },
         produits: Object.entries(produits).map(([nom, data]) => ({
@@ -554,8 +554,8 @@ Positionnez ce point de vente comme le modèle de référence validé pour MATA 
           beneficeTotal: Math.round(beneficeTotal),
           chargesTotales: Math.round(chargesTotales),
           margeMoyenne: (margeMoyenne * 100).toFixed(2) + '%',
-          roiMensuel: roiData.mensuel.toFixed(2) + '%',
-          roiAnnuel: roiData.annuel.toFixed(2) + '%',
+          roiMensuel: (roiData.mensuel * 100).toFixed(2) + '%',
+          roiAnnuel: (roiData.annuel * 100).toFixed(2) + '%',
           capexInvestissement: getNumericCapex()
         },
         produits: Object.entries(produits).map(([nom, data]) => ({
@@ -780,8 +780,8 @@ Positionnez cette analyse complémentaire comme un renforcement de la crédibili
           beneficeTotal: Math.round(beneficeTotal),
           chargesTotales: Math.round(chargesTotales),
           margeMoyenne: (margeMoyenne * 100).toFixed(2) + '%',
-          roiMensuel: roiData.mensuel.toFixed(2) + '%',
-          roiAnnuel: roiData.annuel.toFixed(2) + '%',
+          roiMensuel: (roiData.mensuel * 100).toFixed(2) + '%',
+          roiAnnuel: (roiData.annuel * 100).toFixed(2) + '%',
           capexInvestissement: getNumericCapex()
         },
         produits: Object.entries(produits).map(([nom, data]) => ({
@@ -1261,8 +1261,8 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
     if (investissement === 0) return { mensuel: 0, annuel: 0 };
     
     return {
-      mensuel: (beneficeNetMensuel / investissement) * 100,
-      annuel: (beneficeNetAnnuel / investissement) * 100
+      mensuel: (beneficeNetMensuel / investissement), // Ratio sans multiplication par 100
+      annuel: (beneficeNetAnnuel / investissement)   // Ratio sans multiplication par 100
     };
   };
 
@@ -1800,7 +1800,7 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
               <div className={`text-lg sm:text-xl font-bold ${
                 calculerROI().annuel > 0 ? 'text-green-600' : 'text-red-600'
               }`}>
-                {calculerROI().annuel.toFixed(1)}%
+                {(calculerROI().annuel * 100).toFixed(1)}%
               </div>
               <div className="text-xs text-gray-500">Retour sur investissement</div>
             </div>
@@ -2799,15 +2799,15 @@ FCF annuel: ${Math.round(calculerFCF()).toLocaleString()} FCFA`}>
             <div className="text-xs text-gray-500">Dépréciation & Amortissement</div>
           </div>
           <div className="cursor-help" title={`ROI = Bénéfice Net / Investissement Initial
-ROI Mensuel: ${calculerROI().mensuel.toFixed(2)}%
-ROI Annuel: ${calculerROI().annuel.toFixed(2)}%
+ROI Mensuel: ${(calculerROI().mensuel * 100).toFixed(2)}%
+ROI Annuel: ${(calculerROI().annuel * 100).toFixed(2)}%
 Investissement (CAPEX): ${getNumericCapex().toLocaleString()} FCFA
 Bénéfice Net Mensuel: ${Math.round(calculerEBIT()).toLocaleString()} FCFA`}>
             <div className="text-sm text-gray-600">ROI (annuel):</div>
             <div className={`text-lg sm:text-xl font-bold ${
               calculerROI().annuel > 0 ? 'text-green-600' : 'text-red-600'
             }`}>
-              {calculerROI().annuel.toFixed(1)}%
+              {(calculerROI().annuel * 100).toFixed(1)}%
             </div>
             <div className="text-xs text-gray-500">Retour sur investissement</div>
           </div>
