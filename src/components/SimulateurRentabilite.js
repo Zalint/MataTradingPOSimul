@@ -4,6 +4,28 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import FormulesHypotheses from './FormulesHypotheses';
 
+// Fonctions utilitaires pour la gestion des cookies
+const setCookie = (name, value, days = 30) => {
+  const expires = new Date();
+  expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
+  document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/`;
+};
+
+const getCookie = (name) => {
+  const nameEQ = name + "=";
+  const ca = document.cookie.split(';');
+  for (let i = 0; i < ca.length; i++) {
+    let c = ca[i];
+    while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+    if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
+  }
+  return null;
+};
+
+const deleteCookie = (name) => {
+  document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+};
+
 const SimulateurRentabilite = () => {
   // Debug: Vérifier les variables d'environnement au démarrage
   console.log('🚀 DEBUG - Variables d\'environnement au démarrage:');
@@ -11,10 +33,17 @@ const SimulateurRentabilite = () => {
   console.log('🔑 Longueur de la clé:', process.env.REACT_APP_OPENAI_API_KEY ? process.env.REACT_APP_OPENAI_API_KEY.length : 'undefined');
   console.log('🔑 Toutes les variables env:', process.env);
   
-  // États d'authentification
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  // États d'authentification avec persistence des cookies
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    const savedAuth = getCookie('mata_authenticated');
+    return savedAuth === 'true';
+  });
+  const [username, setUsername] = useState(() => {
+    return getCookie('mata_username') || '';
+  });
+  const [password, setPassword] = useState(() => {
+    return getCookie('mata_password') || '';
+  });
   const [loginError, setLoginError] = useState('');
 
   // Tous les autres hooks doivent être déclarés avant toute condition
@@ -59,6 +88,105 @@ const SimulateurRentabilite = () => {
   
   // État pour contrôler la visibilité globale des analyses IA
   const [aiAnalysisVisible, setAiAnalysisVisible] = useState(false);
+  
+  // État pour l'explication de la marge
+  const [margeExplicationVisible, setMargeExplicationVisible] = useState(false);
+
+  // Fonction pour générer l'explication détaillée de la marge
+  const genererExplicationMarge = () => {
+    const produitsActuels = getNumericAdditionalVolume() > 0 ? getAdjustedRepartitions() : produits;
+    const volumeActuel = getNumericAdditionalVolume() > 0 ? getAdjustedVolume() : getNumericVolume();
+    const estSimulation = getNumericAdditionalVolume() > 0;
+    
+    let margePonderee = 0;
+    const detailsProduits = [];
+    
+    // Calculer d'abord la marge moyenne des produits éditables
+    let margeMoyenneEditables = 0;
+    let nombreProduitsEditables = 0;
+    
+    Object.entries(produitsActuels).forEach(([nom, data]) => {
+      if (data.editable && data.prixAchat && data.prixVente) {
+        let marge;
+        if (data.hasAbats) {
+          const prixVenteAjuste = data.prixVente * (1 - getNumericPeration());
+          const abats = getNumericAbatsParKg();
+          const total = prixVenteAjuste + abats;
+          marge = (total / data.prixAchat) - 1;
+        } else {
+          marge = (data.prixVente / data.prixAchat) - 1;
+        }
+        margeMoyenneEditables += marge;
+        nombreProduitsEditables++;
+      }
+    });
+    
+    margeMoyenneEditables = nombreProduitsEditables > 0 ? margeMoyenneEditables / nombreProduitsEditables : 0;
+
+    // Ensuite traiter TOUS les produits
+    Object.entries(produitsActuels).forEach(([nom, data]) => {
+      let marge;
+      let calculDetail = '';
+      
+      if (data.editable && data.prixAchat && data.prixVente) {
+        if (data.hasAbats) {
+          const prixVenteAjuste = data.prixVente * (1 - getNumericPeration());
+          const abats = getNumericAbatsParKg();
+          const total = prixVenteAjuste + abats;
+          marge = (total / data.prixAchat) - 1;
+          calculDetail = `((${data.prixVente} × ${(1-getNumericPeration()).toFixed(3)} + ${abats}) / ${data.prixAchat}) - 1 = ${(marge * 100).toFixed(2)}%`;
+        } else {
+          marge = (data.prixVente / data.prixAchat) - 1;
+          calculDetail = `(${data.prixVente} / ${data.prixAchat}) - 1 = ${(marge * 100).toFixed(2)}%`;
+        }
+      } else {
+        // Pour les produits non éditables, utiliser la marge moyenne des éditables
+        marge = margeMoyenneEditables;
+        calculDetail = `Marge moyenne des produits éditables = ${(marge * 100).toFixed(2)}%`;
+      }
+      
+      const poids = data.repartition;
+      const contribution = marge * poids;
+      margePonderee += contribution;
+      
+      const volumeProduit = poids * volumeActuel;
+      
+      detailsProduits.push({
+        nom,
+        repartition: poids,
+        repartitionPourcentage: (poids * 100).toFixed(2),
+        marge: marge,
+        margePourcentage: (marge * 100).toFixed(2),
+        contribution: contribution,
+        contributionPourcentage: (contribution * 100).toFixed(2),
+        calculDetail,
+        volumeProduit: Math.round(volumeProduit),
+        hasAbats: data.hasAbats,
+        prixAchat: data.prixAchat,
+        prixVente: data.prixVente,
+        estEditable: data.editable && data.prixAchat && data.prixVente
+      });
+    });
+
+    const margeFinale = margePonderee; // Pas de division car les répartitions font 100%
+
+    return {
+      estSimulation,
+      volumeTotal: volumeActuel,
+      volumeOriginal: getNumericVolume(),
+      volumeAjoute: getNumericAdditionalVolume(),
+      produitAjoute: selectedProduct,
+      margeFinale,
+      margeFinalePourcentage: (margeFinale * 100).toFixed(2),
+      detailsProduits,
+      sommePonderee: margePonderee,
+      parametres: {
+        peration: getNumericPeration(),
+        perationPourcentage: (getNumericPeration() * 100).toFixed(1),
+        abatsParKg: getNumericAbatsParKg()
+      }
+    };
+  };
 
   // État pour garder les prix originaux pour les graphiques de sensibilité
   const [produitsOriginaux] = useState({
@@ -224,17 +352,61 @@ const SimulateurRentabilite = () => {
   };
 
   const calculerMargeMoyenne = () => {
-    const produitsEditables = Object.entries(produits).filter(([nom, data]) => 
-      data.editable && data.prixAchat && data.prixVente
-    );
-    const marges = produitsEditables.map(([nom, data]) => {
-      if (data.hasAbats) {
-        return ((data.prixVente * (1 - getNumericPeration()) + getNumericAbatsParKg()) / data.prixAchat) - 1;
-      } else {
-        return (data.prixVente / data.prixAchat) - 1;
+    // Utiliser les répartitions appropriées selon le contexte (simulation ou principal)
+    const produitsActuels = getNumericAdditionalVolume() > 0 ? getAdjustedRepartitions() : produits;
+    
+    console.log('🔍 CALCUL MARGE MOYENNE - Début');
+    console.log('📊 Produits actuels:', Object.keys(produitsActuels));
+    console.log('📊 Volume supplémentaire:', getNumericAdditionalVolume());
+    
+    let margePonderee = 0;
+    
+    // Calculer d'abord la marge moyenne des produits éditables
+    let margeMoyenneEditables = 0;
+    let nombreProduitsEditables = 0;
+    
+    Object.entries(produitsActuels).forEach(([nom, data]) => {
+      if (data.editable && data.prixAchat && data.prixVente) {
+        let marge;
+        if (data.hasAbats) {
+          marge = ((data.prixVente * (1 - getNumericPeration()) + getNumericAbatsParKg()) / data.prixAchat) - 1;
+        } else {
+          marge = (data.prixVente / data.prixAchat) - 1;
+        }
+        console.log(`📈 ${nom}: ${data.prixAchat} → ${data.prixVente} = ${(marge * 100).toFixed(2)}%`);
+        margeMoyenneEditables += marge;
+        nombreProduitsEditables++;
       }
     });
-    return marges.length > 0 ? marges.reduce((sum, marge) => sum + marge, 0) / marges.length : 0;
+    
+    margeMoyenneEditables = nombreProduitsEditables > 0 ? margeMoyenneEditables / nombreProduitsEditables : 0;
+    console.log(`📊 Marge moyenne éditables: ${(margeMoyenneEditables * 100).toFixed(2)}%`);
+
+    // Ensuite calculer la moyenne pondérée de TOUS les produits
+    Object.entries(produitsActuels).forEach(([nom, data]) => {
+      let marge;
+      
+      if (data.editable && data.prixAchat && data.prixVente) {
+        if (data.hasAbats) {
+          marge = ((data.prixVente * (1 - getNumericPeration()) + getNumericAbatsParKg()) / data.prixAchat) - 1;
+        } else {
+          marge = (data.prixVente / data.prixAchat) - 1;
+        }
+      } else {
+        // Pour les produits non éditables, utiliser la marge moyenne des éditables
+        marge = margeMoyenneEditables;
+      }
+      
+      // Pondérer par la répartition du produit
+      const contribution = marge * data.repartition;
+      margePonderee += contribution;
+      console.log(`📊 ${nom}: ${(marge * 100).toFixed(2)}% × ${(data.repartition * 100).toFixed(2)}% = ${(contribution * 100).toFixed(3)}%`);
+    });
+
+    console.log(`🎯 RÉSULTAT FINAL: ${(margePonderee * 100).toFixed(2)}%`);
+    console.log('🔍 CALCUL MARGE MOYENNE - Fin');
+    
+    return margePonderee; // Pas de division par poidsTotal car les répartitions font déjà 100%
   };
 
   const calculerMargeBrute = (produitData) => {
@@ -352,16 +524,30 @@ const SimulateurRentabilite = () => {
   };
 
   const augmenterTousPrix = (montant, typePrix = 'prixVente') => {
+    console.log('🚀 BUMP MANUEL - Début');
+    console.log(`📈 Montant: ${montant}, Type: ${typePrix}, Produit: ${selectedProductForPricing}`);
+    
     setProduits(prev => {
       const nouveauxProduits = { ...prev };
+      console.log('📊 Prix AVANT bump:');
+      Object.keys(nouveauxProduits).forEach(nom => {
+        if (nouveauxProduits[nom].editable && nouveauxProduits[nom][typePrix]) {
+          console.log(`   ${nom}: ${nouveauxProduits[nom][typePrix]}`);
+        }
+      });
+      
       Object.keys(nouveauxProduits).forEach(nom => {
         if (nouveauxProduits[nom].editable && nouveauxProduits[nom][typePrix]) {
           // Si un produit spécifique est sélectionné, appliquer seulement à ce produit
           if (selectedProductForPricing === 'Tous' || nom === selectedProductForPricing) {
+            const ancienPrix = nouveauxProduits[nom][typePrix];
             nouveauxProduits[nom][typePrix] += montant;
+            console.log(`✅ ${nom}: ${ancienPrix} → ${nouveauxProduits[nom][typePrix]} (+${montant})`);
           }
         }
       });
+      
+      console.log('🚀 BUMP MANUEL - Fin');
       return nouveauxProduits;
     });
   };
@@ -1189,13 +1375,33 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
   const chargesTotales = amortissementChargesFixes + chargesMensuelles;
   
   // Calcul avec les données originales (pour l'affichage principal et DCF simple)
+  // CORRECTION: Calculer la marge moyenne en temps réel pour les produits non-éditables
+  let margeMoyenneEditablesActuelle = 0;
+  let nombreProduitsEditables = 0;
+  
+  Object.entries(produits).forEach(([nom, data]) => {
+    if (data.editable && data.prixAchat && data.prixVente) {
+      let marge;
+      if (data.hasAbats) {
+        marge = ((data.prixVente * (1 - getNumericPeration()) + getNumericAbatsParKg()) / data.prixAchat) - 1;
+      } else {
+        marge = (data.prixVente / data.prixAchat) - 1;
+      }
+      margeMoyenneEditablesActuelle += marge;
+      nombreProduitsEditables++;
+    }
+  });
+  
+  margeMoyenneEditablesActuelle = nombreProduitsEditables > 0 ? margeMoyenneEditablesActuelle / nombreProduitsEditables : 0;
+  console.log(`🔧 CORRECTION: Marge moyenne actuelle ${(margeMoyenneEditablesActuelle * 100).toFixed(2)}% (vs ancienne ${(margeMoyenne * 100).toFixed(2)}%)`);
+  
   let beneficeTotal = 0;
   const produitsAvecCalculs = Object.entries(produits).map(([nom, data]) => {
     let margeBrute;
     if (data.editable && data.prixAchat && data.prixVente) {
       margeBrute = calculerMargeBrute(data);
     } else {
-      margeBrute = margeMoyenne;
+      margeBrute = margeMoyenneEditablesActuelle; // CORRECTION: Utiliser la marge recalculée !
     }
     
     const benefice = calculerBenefice(margeBrute, data.repartition, getNumericVolume());
@@ -1205,13 +1411,32 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
   });
 
   // Calcul avec les données de simulation (pour l'affichage de simulation)
+  // CORRECTION: Calculer aussi la marge moyenne pour la simulation
+  let margeMoyenneEditablesSimulation = 0;
+  let nombreProduitsEditablesSimulation = 0;
+  
+  Object.entries(adjustedProduits).forEach(([nom, data]) => {
+    if (data.editable && data.prixAchat && data.prixVente) {
+      let marge;
+      if (data.hasAbats) {
+        marge = ((data.prixVente * (1 - getNumericPeration()) + getNumericAbatsParKg()) / data.prixAchat) - 1;
+      } else {
+        marge = (data.prixVente / data.prixAchat) - 1;
+      }
+      margeMoyenneEditablesSimulation += marge;
+      nombreProduitsEditablesSimulation++;
+    }
+  });
+  
+  margeMoyenneEditablesSimulation = nombreProduitsEditablesSimulation > 0 ? margeMoyenneEditablesSimulation / nombreProduitsEditablesSimulation : 0;
+  
   let beneficeTotalSimulation = 0;
   const produitsAvecCalculsSimulation = Object.entries(adjustedProduits).map(([nom, data]) => {
     let margeBrute;
     if (data.editable && data.prixAchat && data.prixVente) {
       margeBrute = calculerMargeBrute(data);
     } else {
-      margeBrute = margeMoyenne;
+      margeBrute = margeMoyenneEditablesSimulation; // CORRECTION: Utiliser la marge recalculée pour simulation !
     }
     
     const benefice = calculerBenefice(margeBrute, data.repartition, adjustedVolume);
@@ -1236,7 +1461,9 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
 
   // Fonction helper pour obtenir le bénéfice total approprié selon l'onglet
   const getBeneficeTotalActif = () => {
-    return getNumericAdditionalVolume() > 0 ? beneficeTotalSimulation : beneficeTotal;
+    const result = getNumericAdditionalVolume() > 0 ? beneficeTotalSimulation : beneficeTotal;
+    console.log(`💰 BÉNÉFICE TOTAL ACTUEL (Interface): ${result.toLocaleString()} FCFA`);
+    return result;
   };
 
   // Calculs financiers avancés
@@ -1573,9 +1800,31 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
     if (username === 'Mata' && password === 'Matix@2025') {
       setIsAuthenticated(true);
       setLoginError('');
+      
+      // Sauvegarder les identifiants dans les cookies (1 jour)
+      setCookie('mata_authenticated', 'true', 1);
+      setCookie('mata_username', username, 1);
+      setCookie('mata_password', password, 1);
+      
+      console.log('🍪 Identifiants sauvegardés dans les cookies pour 1 jour');
     } else {
       setLoginError('Identifiants incorrects. Veuillez réessayer.');
     }
+  };
+
+  // Fonction de déconnexion
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    setUsername('');
+    setPassword('');
+    setLoginError('');
+    
+    // Effacer les cookies
+    deleteCookie('mata_authenticated');
+    deleteCookie('mata_username');
+    deleteCookie('mata_password');
+    
+    console.log('🍪 Cookies d\'authentification effacés');
   };
 
   // Écran de connexion
@@ -1792,7 +2041,16 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
             <div className="text-lg sm:text-xl font-bold text-green-600">{Math.round(getBeneficeTotalActif()).toLocaleString()}</div>
             </div>
             <div>
-              <div className="text-sm text-gray-600">Marge Moyenne:</div>
+              <div className="text-sm text-gray-600 flex items-center gap-2">
+                Marge Moyenne:
+                <button
+                  onClick={() => setMargeExplicationVisible(!margeExplicationVisible)}
+                  className="w-5 h-5 bg-blue-500 text-white rounded-full text-xs font-bold hover:bg-blue-600 transition-colors flex items-center justify-center"
+                  title="Explication du calcul de la marge moyenne"
+                >
+                  i
+                </button>
+              </div>
             <div className="text-lg sm:text-xl font-bold text-blue-600">{(margeMoyenne * 100).toFixed(2)}%</div>
             </div>
             <div>
@@ -1806,6 +2064,144 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
             </div>
           </div>
         </div>
+
+        {/* Explication détaillée de la marge moyenne */}
+        {margeExplicationVisible && (
+          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4 sm:p-6 mb-4 sm:mb-6 md:mb-8 shadow-lg">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-blue-800 flex items-center gap-2">
+                🧮 Calcul Détaillé de la Marge Moyenne Pondérée
+                <span className="text-sm font-normal text-blue-600">
+                  ({(() => {
+                    const explication = genererExplicationMarge();
+                    return explication.estSimulation ? 'Mode Simulation' : 'Mode Principal';
+                  })()})
+                </span>
+              </h3>
+              <button
+                onClick={() => setMargeExplicationVisible(false)}
+                className="text-blue-500 hover:text-blue-700 text-xl font-bold"
+              >
+                ×
+              </button>
+            </div>
+            
+            {(() => {
+              const explication = genererExplicationMarge();
+              
+              return (
+                <div className="space-y-6">
+                  {/* Contexte */}
+                  <div className="bg-white p-4 rounded-lg border border-blue-200">
+                    <h4 className="font-semibold text-blue-800 mb-3">📊 Contexte</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                      <div>
+                        <span className="text-gray-600">Volume de base:</span>
+                        <div className="font-mono text-lg text-blue-700">{explication.volumeOriginal.toLocaleString()} FCFA</div>
+                      </div>
+                      {explication.estSimulation && (
+                        <>
+                          <div>
+                            <span className="text-gray-600">Volume ajouté ({explication.produitAjoute}):</span>
+                            <div className="font-mono text-lg text-green-600">+{explication.volumeAjoute.toLocaleString()} FCFA</div>
+                          </div>
+                          <div>
+                            <span className="text-gray-600">Volume total:</span>
+                            <div className="font-mono text-lg text-purple-600">{explication.volumeTotal.toLocaleString()} FCFA</div>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                    
+                    <div className="mt-4 p-3 bg-blue-50 rounded">
+                      <h5 className="font-medium text-blue-800 mb-2">⚙️ Paramètres</h5>
+                      <div className="text-sm space-y-1">
+                        <div>• Pération (Bœuf/Veau): <span className="font-mono">{explication.parametres.perationPourcentage}%</span></div>
+                        <div>• Abats par Kg: <span className="font-mono">{explication.parametres.abatsParKg} FCFA</span></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Détail par produit */}
+                  <div className="bg-white p-4 rounded-lg border border-blue-200">
+                    <h4 className="font-semibold text-blue-800 mb-3">🥩 Calcul par Produit</h4>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs sm:text-sm">
+                        <thead>
+                          <tr className="border-b-2 border-blue-200 bg-blue-50">
+                            <th className="text-left py-2 px-2 font-semibold text-blue-800">Produit</th>
+                            <th className="text-right py-2 px-2 font-semibold text-blue-800">Volume</th>
+                            <th className="text-right py-2 px-2 font-semibold text-blue-800">Part %</th>
+                            <th className="text-left py-2 px-2 font-semibold text-blue-800">Calcul Marge</th>
+                            <th className="text-right py-2 px-2 font-semibold text-blue-800">Marge</th>
+                            <th className="text-right py-2 px-2 font-semibold text-blue-800">Contribution</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {explication.detailsProduits.map((produit, index) => (
+                            <tr key={index} className={`border-b border-blue-100 ${index % 2 === 0 ? 'bg-blue-25' : 'bg-white'} ${!produit.estEditable ? 'bg-yellow-50' : ''}`}>
+                              <td className="py-2 px-2 font-medium text-gray-800">
+                                {produit.nom}
+                                {produit.hasAbats && <span className="text-orange-500 text-xs ml-1">*</span>}
+                                {!produit.estEditable && <span className="text-gray-500 text-xs ml-1">†</span>}
+                              </td>
+                              <td className="text-right py-2 px-2 font-mono text-gray-700">{produit.volumeProduit.toLocaleString()}</td>
+                              <td className="text-right py-2 px-2 font-mono text-blue-600">{produit.repartitionPourcentage}%</td>
+                              <td className="py-2 px-2 font-mono text-xs text-gray-600">{produit.calculDetail}</td>
+                              <td className="text-right py-2 px-2 font-mono font-semibold text-green-600">{produit.margePourcentage}%</td>
+                              <td className="text-right py-2 px-2 font-mono font-semibold text-purple-600">{produit.contributionPourcentage}%</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="text-xs mt-2 space-y-1">
+                      <div className="text-orange-600">* Produits avec abats (Foie, Yell, Filet)</div>
+                      <div className="text-gray-500">† Produits non-éditables (marge = moyenne des produits éditables)</div>
+                    </div>
+                  </div>
+
+                  {/* Formule finale */}
+                  <div className="bg-gradient-to-r from-purple-50 to-blue-50 p-4 rounded-lg border border-purple-200">
+                    <h4 className="font-semibold text-purple-800 mb-3">🎯 Calcul Final</h4>
+                    <div className="space-y-3">
+                      <div className="text-sm">
+                        <div className="font-medium text-purple-700 mb-2">Formule: Marge Moyenne = Σ(Marge × Répartition)</div>
+                        <div className="text-xs text-purple-600 mb-2">Les répartitions totalisent 100%, donc pas de division supplémentaire</div>
+                        <div className="font-mono text-sm bg-white p-3 rounded border">
+                          <div>Somme pondérée = {explication.detailsProduits.map(p => `${p.margePourcentage}% × ${p.repartitionPourcentage}%`).join(' + ')}</div>
+                          <div className="mt-2 text-purple-600">= {explication.detailsProduits.map(p => p.contributionPourcentage + '%').join(' + ')}</div>
+                          <div className="mt-2 text-green-600 font-semibold">= {(explication.sommePonderee * 100).toFixed(2)}%</div>
+                        </div>
+                      </div>
+                      <div className="bg-white p-4 rounded border-2 border-purple-300">
+                        <div className="text-center">
+                          <div className="text-sm text-purple-600 mb-1">Marge Moyenne Pondérée</div>
+                          <div className="text-2xl font-bold text-purple-700">{explication.margeFinalePourcentage}%</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Légende */}
+                  <div className="bg-gray-50 p-4 rounded-lg border">
+                    <h4 className="font-semibold text-gray-800 mb-2">💡 Pourquoi cette méthode ?</h4>
+                    <div className="text-sm text-gray-700 space-y-1">
+                      <div>• <strong>Pondération par volume :</strong> Les produits avec plus de volume ont plus d'impact sur la marge globale</div>
+                      <div>• <strong>Calcul dynamique :</strong> La marge s'ajuste automatiquement quand vous changez les volumes</div>
+                      <div>• <strong>Réalisme :</strong> Reflète l'impact réel de chaque produit sur la rentabilité totale</div>
+                      <div>• <strong>Tous les produits inclus :</strong> Même les produits non-éditables (Autres, Pack) contribuent au calcul avec la marge moyenne</div>
+                      <div>• <strong>Somme = 100% :</strong> Toutes les répartitions sont incluses, pas de division supplémentaire</div>
+                      {explication.estSimulation && (
+                        <div className="text-purple-600">• <strong>Mode simulation :</strong> Montre l'impact des nouvelles répartitions de volume</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        )}
 
         {/* Sélecteur de modèle ChatGPT */}
         <div className="bg-gradient-to-r from-orange-50 to-yellow-50 border border-orange-200 rounded-lg p-4 sm:p-6 mb-4 sm:mb-6 md:mb-8">
@@ -3802,6 +4198,20 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
           🧮 Simulateur Interactif - Analyse de Rentabilité Avancée
         </h1>
 
+        {/* Header avec bouton de déconnexion */}
+        <div className="flex justify-between items-center mb-4">
+          <div className="text-sm text-gray-600">
+            Bienvenue, <span className="font-semibold text-blue-600">{username}</span>
+          </div>
+          <button
+            onClick={handleLogout}
+            className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm font-medium transition-colors flex items-center space-x-1"
+          >
+            <span>🚪</span>
+            <span>Déconnexion</span>
+          </button>
+        </div>
+
                  {/* Onglets */}
          <div className="flex border-b border-gray-200 mb-6">
            <button
@@ -3978,9 +4388,9 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
               <LineChart data={(() => {
                 const data = [];
                 
-                // DEBUG: Calculer le bénéfice de base avec les prix ORIGINAUX
+                // DEBUG: Calculer le bénéfice de base avec les prix ACTUELS (pas originaux)
                 let baseBeneficeOriginal = 0;
-                Object.entries(produitsOriginaux).map(([nom, data]) => {
+                Object.entries(produits).map(([nom, data]) => {
                   let margeBrute;
                   if (data.editable && data.prixAchat && data.prixVente) {
                     margeBrute = calculerMargeBrute(data);
@@ -3998,38 +4408,81 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
                 
                 // Simuler chaque variation comme si on faisait un vrai bump
                 [50, 100, 150, 200].forEach(variation => {
-                  // Simuler le bump: partir des prix originaux et appliquer la variation
-                  const tempProduits = JSON.parse(JSON.stringify(produitsOriginaux));
+                  console.log(`🎯 GRAPHIQUE SENSIBILITÉ - Variation +${variation}`);
+                  console.log(`📊 Produit cible: ${selectedProductForPricing}`);
+                  
+                  // Simuler le bump: partir des prix ACTUELS et appliquer la variation
+                  const tempProduits = JSON.parse(JSON.stringify(produits));
+                  console.log('📊 Prix AVANT variation (graphique):');
+                  Object.keys(tempProduits).forEach(nom => {
+                    if (tempProduits[nom].editable && tempProduits[nom].prixVente) {
+                      console.log(`   ${nom}: ${tempProduits[nom].prixVente}`);
+                    }
+                  });
+                  
                   Object.keys(tempProduits).forEach(nom => {
                     if (tempProduits[nom].editable && tempProduits[nom].prixVente) {
                       if (selectedProductForPricing === 'Tous' || nom === selectedProductForPricing) {
+                        const ancienPrix = tempProduits[nom].prixVente;
                         tempProduits[nom].prixVente = tempProduits[nom].prixVente + variation;
+                        console.log(`✅ ${nom}: ${ancienPrix} → ${tempProduits[nom].prixVente} (+${variation})`);
                       }
                     }
                   });
                   
-                  // Calculer la nouvelle margeMoyenne après bump (comme le ferait l'UI)
-                  const produitsEditables = Object.entries(tempProduits).filter(([nom, data]) => 
-                    data.editable && data.prixAchat && data.prixVente
-                  );
-                  const marges = produitsEditables.map(([nom, data]) => {
-                    if (data.hasAbats) {
-                      return ((data.prixVente * (1 - getNumericPeration()) + getNumericAbatsParKg()) / data.prixAchat) - 1;
-                    } else {
-                      return (data.prixVente / data.prixAchat) - 1;
+                  // Calculer la moyenne pondérée exactement comme calculerMargeMoyenne()
+                  let margePonderee = 0;
+                  
+                  // Étape 1: Calculer la marge moyenne des produits éditables
+                  let margeMoyenneEditables = 0;
+                  let nombreProduitsEditables = 0;
+                  
+                  Object.entries(tempProduits).forEach(([nom, data]) => {
+                    if (data.editable && data.prixAchat && data.prixVente) {
+                      let marge;
+                      if (data.hasAbats) {
+                        marge = ((data.prixVente * (1 - getNumericPeration()) + getNumericAbatsParKg()) / data.prixAchat) - 1;
+                      } else {
+                        marge = (data.prixVente / data.prixAchat) - 1;
+                      }
+                      margeMoyenneEditables += marge;
+                      nombreProduitsEditables++;
                     }
                   });
-                  const margeMoyenneApresVump = marges.length > 0 ? marges.reduce((sum, marge) => sum + marge, 0) / marges.length : 0;
                   
-                  // Calculer le bénéfice avec les prix modifiés
+                  margeMoyenneEditables = nombreProduitsEditables > 0 ? margeMoyenneEditables / nombreProduitsEditables : 0;
+
+                  // Étape 2: Calculer la moyenne pondérée de TOUS les produits
+                  Object.entries(tempProduits).forEach(([nom, data]) => {
+                    let marge;
+                    
+                    if (data.editable && data.prixAchat && data.prixVente) {
+                      if (data.hasAbats) {
+                        marge = ((data.prixVente * (1 - getNumericPeration()) + getNumericAbatsParKg()) / data.prixAchat) - 1;
+                      } else {
+                        marge = (data.prixVente / data.prixAchat) - 1;
+                      }
+                    } else {
+                      // Pour les produits non éditables, utiliser la marge moyenne des éditables
+                      marge = margeMoyenneEditables;
+                    }
+                    
+                    // Pondérer par la répartition du produit
+                    margePonderee += marge * data.repartition;
+                  });
+                  
+                  // Le résultat final EST la moyenne pondérée (pas de division supplémentaire)
+                  const margeMoyenneApresVump = margePonderee;
+                  
+                  // Calculer le bénéfice avec la moyenne pondérée correcte
                   let beneficeTotal = 0;
                   Object.entries(tempProduits).map(([nom, data]) => {
                     let margeBrute;
                     if (data.editable && data.prixAchat && data.prixVente) {
                       margeBrute = calculerMargeBrute(data);
                     } else {
-                      // Utiliser la nouvelle margeMoyenne calculée après bump
-                      margeBrute = margeMoyenneApresVump;
+                      // Utiliser la marge moyenne des éditables pour les non-éditables
+                      margeBrute = margeMoyenneEditables;
                     }
                     
                     const benefice = calculerBenefice(margeBrute, data.repartition, getNumericVolume());
@@ -4037,6 +4490,9 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
                     
                     return { nom, ...data, margeBrute, benefice };
                   });
+                  
+                  console.log(`💰 BÉNÉFICE GRAPHIQUE (+${variation}): ${beneficeTotal.toLocaleString()} FCFA`);
+                  console.log(`🎯 GRAPHIQUE SENSIBILITÉ - Variation +${variation} - FIN`);
                   
                   data.push({ variation: `+${variation}`, benefice: beneficeTotal });
                 });
@@ -4074,9 +4530,9 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
               <LineChart data={(() => {
                 const data = [];
                 
-                // DEBUG: Calculer le bénéfice de base avec les prix ORIGINAUX
+                // DEBUG: Calculer le bénéfice de base avec les prix ACTUELS (pas originaux)
                 let baseBeneficeOriginal = 0;
-                Object.entries(produitsOriginaux).map(([nom, data]) => {
+                Object.entries(produits).map(([nom, data]) => {
                   let margeBrute;
                   if (data.editable && data.prixAchat && data.prixVente) {
                     margeBrute = calculerMargeBrute(data);
@@ -4092,8 +4548,8 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
                 
                 // Simuler chaque variation comme si on faisait un vrai bump
                 [-50, -100, -150, -200].forEach(variation => {
-                  // Simuler le bump: partir des prix originaux et appliquer la variation
-                  const tempProduits = JSON.parse(JSON.stringify(produitsOriginaux));
+                  // Simuler le bump: partir des prix ACTUELS et appliquer la variation
+                  const tempProduits = JSON.parse(JSON.stringify(produits));
                   Object.keys(tempProduits).forEach(nom => {
                     if (tempProduits[nom].editable && tempProduits[nom].prixAchat) {
                       if (selectedProductForPricing === 'Tous' || nom === selectedProductForPricing) {
@@ -4102,28 +4558,59 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
                     }
                   });
                   
-                  // Calculer la nouvelle margeMoyenne après bump (comme le ferait l'UI)
-                  const produitsEditables = Object.entries(tempProduits).filter(([nom, data]) => 
-                    data.editable && data.prixAchat && data.prixVente
-                  );
-                  const marges = produitsEditables.map(([nom, data]) => {
-                    if (data.hasAbats) {
-                      return ((data.prixVente * (1 - getNumericPeration()) + getNumericAbatsParKg()) / data.prixAchat) - 1;
-                    } else {
-                      return (data.prixVente / data.prixAchat) - 1;
+                  // Calculer la moyenne pondérée exactement comme calculerMargeMoyenne()
+                  let margePonderee = 0;
+                  
+                  // Étape 1: Calculer la marge moyenne des produits éditables
+                  let margeMoyenneEditables = 0;
+                  let nombreProduitsEditables = 0;
+                  
+                  Object.entries(tempProduits).forEach(([nom, data]) => {
+                    if (data.editable && data.prixAchat && data.prixVente) {
+                      let marge;
+                      if (data.hasAbats) {
+                        marge = ((data.prixVente * (1 - getNumericPeration()) + getNumericAbatsParKg()) / data.prixAchat) - 1;
+                      } else {
+                        marge = (data.prixVente / data.prixAchat) - 1;
+                      }
+                      margeMoyenneEditables += marge;
+                      nombreProduitsEditables++;
                     }
                   });
-                  const margeMoyenneApresVump = marges.length > 0 ? marges.reduce((sum, marge) => sum + marge, 0) / marges.length : 0;
                   
-                  // Calculer le bénéfice avec les prix modifiés
+                  margeMoyenneEditables = nombreProduitsEditables > 0 ? margeMoyenneEditables / nombreProduitsEditables : 0;
+
+                  // Étape 2: Calculer la moyenne pondérée de TOUS les produits
+                  Object.entries(tempProduits).forEach(([nom, data]) => {
+                    let marge;
+                    
+                    if (data.editable && data.prixAchat && data.prixVente) {
+                      if (data.hasAbats) {
+                        marge = ((data.prixVente * (1 - getNumericPeration()) + getNumericAbatsParKg()) / data.prixAchat) - 1;
+                      } else {
+                        marge = (data.prixVente / data.prixAchat) - 1;
+                      }
+                    } else {
+                      // Pour les produits non éditables, utiliser la marge moyenne des éditables
+                      marge = margeMoyenneEditables;
+                    }
+                    
+                    // Pondérer par la répartition du produit
+                    margePonderee += marge * data.repartition;
+                  });
+                  
+                  // Le résultat final EST la moyenne pondérée (pas de division supplémentaire)
+                  const margeMoyenneApresVump = margePonderee;
+                  
+                  // Calculer le bénéfice avec la moyenne pondérée correcte
                   let beneficeTotal = 0;
                   Object.entries(tempProduits).map(([nom, data]) => {
                     let margeBrute;
                     if (data.editable && data.prixAchat && data.prixVente) {
                       margeBrute = calculerMargeBrute(data);
                     } else {
-                      // Utiliser la nouvelle margeMoyenne calculée après bump
-                      margeBrute = margeMoyenneApresVump;
+                      // Utiliser la marge moyenne des éditables pour les non-éditables
+                      margeBrute = margeMoyenneEditables;
                     }
                     
                     const benefice = calculerBenefice(margeBrute, data.repartition, getNumericVolume());
