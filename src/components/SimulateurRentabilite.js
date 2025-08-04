@@ -11,6 +11,13 @@ const SimulateurRentabilite = () => {
   console.log('🔑 Longueur de la clé:', process.env.REACT_APP_OPENAI_API_KEY ? process.env.REACT_APP_OPENAI_API_KEY.length : 'undefined');
   console.log('🔑 Toutes les variables env:', process.env);
   
+  // États d'authentification
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+
+  // Tous les autres hooks doivent être déclarés avant toute condition
   const mainContainerRef = useRef(null);
   const [activeTab, setActiveTab] = useState('main'); // 'main', 'volume', 'charges', 'dcf', 'dcfSimulation' ou 'faq'
   const [pageFluxDCF, setPageFluxDCF] = useState(1);
@@ -46,6 +53,12 @@ const SimulateurRentabilite = () => {
   
   // État pour le modèle ChatGPT sélectionné
   const [modeleChatGPT, setModeleChatGPT] = useState('gpt-4o-mini');
+  
+  // État pour afficher les données clés
+  const [keyDataVisible, setKeyDataVisible] = useState(false);
+  
+  // État pour contrôler la visibilité globale des analyses IA
+  const [aiAnalysisVisible, setAiAnalysisVisible] = useState(false);
 
   // État pour garder les prix originaux pour les graphiques de sensibilité
   const [produitsOriginaux] = useState({
@@ -366,13 +379,14 @@ const SimulateurRentabilite = () => {
       
       // Préparer les données pour l'analyse
       const roiData = calculerROI();
+      // Données complètes incluant DCF et métriques financières
       const donneesAnalyse = {
         parametresGlobaux: {
           volumeMensuel: getNumericVolume(),
           abatsParKg: getNumericAbatsParKg(),
           peration: getNumericPeration(),
-          beneficeTotal: beneficeTotal,
-          chargesTotales: chargesTotales,
+          beneficeTotal: Math.round(beneficeTotal),
+          chargesTotales: Math.round(chargesTotales),
           margeMoyenne: (margeMoyenne * 100).toFixed(2) + '%',
           roiMensuel: roiData.mensuel.toFixed(2) + '%',
           roiAnnuel: roiData.annuel.toFixed(2) + '%',
@@ -386,9 +400,9 @@ const SimulateurRentabilite = () => {
           marge: data.editable && data.prixAchat && data.prixVente ? 
             ((calculerMargeBrute(data) * 100).toFixed(1) + '%') : 'N/A',
           volume: Math.round(data.repartition * getNumericVolume()),
-          benefice: data.editable && data.prixAchat && data.prixVente ? 
+          benefice: Math.round(data.editable && data.prixAchat && data.prixVente ? 
             calculerBenefice(calculerMargeBrute(data), data.repartition, getNumericVolume()) :
-            calculerBenefice(margeMoyenne, data.repartition, getNumericVolume())
+            calculerBenefice(margeMoyenne, data.repartition, getNumericVolume()))
         })),
         charges: {
           chargesFixes: getNumericChargesFixes(),
@@ -401,7 +415,31 @@ const SimulateurRentabilite = () => {
           chargesTransport: getNumericChargesTransport(),
           loyer: getNumericLoyer(),
           autresCharges: getNumericAutresCharges(),
-          total: chargesTotales
+          total: Math.round(chargesTotales)
+        },
+        metriquesFinancieres: {
+          ebit: Math.round(calculerEBIT()),
+          ebitda: Math.round(calculerEBITDA()),
+          nopat: Math.round(calculerNOPAT()),
+          fcf: Math.round(calculerFCF()),
+          valeurTerminale: Math.round(calculerValeurTerminale()),
+          enterpriseValue: Math.round(calculerEnterpriseValue()),
+          equityValue: Math.round(calculerEquityValue())
+        },
+        analyseDCF: {
+          parametres: {
+            tauxActualisation: getNumericTauxActualisationAnnuel(),
+            dureeAnalyse: getNumericDureeAnalyse(),
+            capex: getNumericCapex(),
+            bfr: getNumericBfr(),
+            wacc: getNumericWacc(),
+            croissanceTerminale: getNumericCroissanceTerminale(),
+            dette: getNumericDette(),
+            tresorerie: getNumericTresorerie(),
+            tauxImposition: getNumericTauxImposition(),
+            depreciationAmortissement: getNumericDepreciationAmortissement()
+          },
+          indicateurs: calculerIndicateursDCF()
         }
       };
 
@@ -506,11 +544,13 @@ Positionnez ce point de vente comme le modèle de référence validé pour MATA 
     setAnalyseContextuelleVisible(true);
     
     try {
-      // Préparer les données pour l'analyse (optimisées pour éviter l'erreur 400)
+      // Préparer les données complètes pour l'analyse contextuelle
       const roiData = calculerROI();
       const donneesAnalyse = {
         parametresGlobaux: {
           volumeMensuel: getNumericVolume(),
+          abatsParKg: getNumericAbatsParKg(),
+          peration: getNumericPeration(),
           beneficeTotal: Math.round(beneficeTotal),
           chargesTotales: Math.round(chargesTotales),
           margeMoyenne: (margeMoyenne * 100).toFixed(2) + '%',
@@ -525,15 +565,47 @@ Positionnez ce point de vente comme le modèle de référence validé pour MATA 
           prixVente: data.prixVente,
           marge: data.editable && data.prixAchat && data.prixVente ? 
             ((calculerMargeBrute(data) * 100).toFixed(1) + '%') : 'N/A',
+          volume: Math.round(data.repartition * getNumericVolume()),
           benefice: Math.round(data.editable && data.prixAchat && data.prixVente ? 
             calculerBenefice(calculerMargeBrute(data), data.repartition, getNumericVolume()) :
             calculerBenefice(margeMoyenne, data.repartition, getNumericVolume()))
         })),
         charges: {
-          total: Math.round(chargesTotales),
+          chargesFixes: getNumericChargesFixes(),
+          dureeAmortissement: getNumericDureeAmortissement(),
           salaire: getNumericSalaire(),
+          electricite: getNumericElectricite(),
+          eau: getNumericEau(),
+          internet: getNumericInternet(),
+          sacsLivraison: getNumericSacsLivraison(),
+          chargesTransport: getNumericChargesTransport(),
           loyer: getNumericLoyer(),
-          chargesTransport: getNumericChargesTransport()
+          autresCharges: getNumericAutresCharges(),
+          total: Math.round(chargesTotales)
+        },
+        metriquesFinancieres: {
+          ebit: Math.round(calculerEBIT()),
+          ebitda: Math.round(calculerEBITDA()),
+          nopat: Math.round(calculerNOPAT()),
+          fcf: Math.round(calculerFCF()),
+          valeurTerminale: Math.round(calculerValeurTerminale()),
+          enterpriseValue: Math.round(calculerEnterpriseValue()),
+          equityValue: Math.round(calculerEquityValue())
+        },
+        analyseDCF: {
+          parametres: {
+            tauxActualisation: getNumericTauxActualisationAnnuel(),
+            dureeAnalyse: getNumericDureeAnalyse(),
+            capex: getNumericCapex(),
+            bfr: getNumericBfr(),
+            wacc: getNumericWacc(),
+            croissanceTerminale: getNumericCroissanceTerminale(),
+            dette: getNumericDette(),
+            tresorerie: getNumericTresorerie(),
+            tauxImposition: getNumericTauxImposition(),
+            depreciationAmortissement: getNumericDepreciationAmortissement()
+          },
+          indicateurs: calculerIndicateursDCF()
         }
       };
 
@@ -599,6 +671,85 @@ Positionnez cette analyse complémentaire comme un renforcement de la crédibili
   };
 
   // Fonction pour générer l'analyse complète personnalisée
+  // Fonction pour générer les données clés utilisées dans les analyses
+  const genererKeyData = () => {
+    const margeMoyenne = calculerMargeMoyenne();
+    const beneficeTotal = getBeneficeTotalActif();
+    const ebit = calculerEBIT();
+    const ebitda = calculerEBITDA();
+    const nopat = calculerNOPAT();
+    const fcf = calculerFCF();
+    const roiMensuel = calculerROI();
+    const roiAnnuel = roiMensuel * 12;
+    
+    const keyData = {
+      // Données de base
+      volumePointVente: getNumericVolume(),
+      volumeSupplementaire: getNumericAdditionalVolume(),
+      volumeTotal: getAdjustedVolume(),
+      
+      // Répartition des produits
+      repartitionProduits: getAdjustedRepartitions(),
+      
+      // Prix et marges
+      produits: Object.keys(produits).map(nom => ({
+        nom,
+        repartition: produits[nom].repartition,
+        prixAchat: produits[nom].prixAchat,
+        prixVente: produits[nom].prixVente,
+        margeBrute: calculerMargeBrute(produits[nom]),
+        benefice: calculerBenefice(calculerMargeBrute(produits[nom]), produits[nom].repartition, getAdjustedVolume())
+      })),
+      
+      // Métriques financières
+      margeMoyenne: margeMoyenne,
+      beneficeTotal: beneficeTotal,
+      ebit: ebit,
+      ebitda: ebitda,
+      nopat: nopat,
+      fcf: fcf,
+      roiMensuel: roiMensuel,
+      roiAnnuel: roiAnnuel,
+      
+      // Charges
+      charges: {
+        fixes: getNumericChargesFixes(),
+        salaire: getNumericSalaire(),
+        electricite: getNumericElectricite(),
+        eau: getNumericEau(),
+        internet: getNumericInternet(),
+        sacsLivraison: getNumericSacsLivraison(),
+        chargesTransport: getNumericChargesTransport(),
+        loyer: getNumericLoyer(),
+        autresCharges: getNumericAutresCharges(),
+        total: getNumericChargesFixes() + getNumericSalaire() + getNumericElectricite() + 
+               getNumericEau() + getNumericInternet() + getNumericSacsLivraison() + 
+               getNumericChargesTransport() + getNumericLoyer() + getNumericAutresCharges()
+      },
+      
+      // Paramètres DCF
+      dcf: {
+        tauxActualisation: getNumericTauxActualisationAnnuel(),
+        dureeAnalyse: getNumericDureeAnalyse(),
+        capex: getNumericCapex(),
+        bfr: getNumericBfr(),
+        wacc: getNumericWacc(),
+        croissanceTerminale: getNumericCroissanceTerminale(),
+        dette: getNumericDette(),
+        tresorerie: getNumericTresorerie(),
+        tauxImposition: getNumericTauxImposition(),
+        depreciationAmortissement: getNumericDepreciationAmortissement()
+      },
+      
+      // Paramètres spécifiques
+      abatsParKg: getNumericAbatsParKg(),
+      peration: getNumericPeration(),
+      dureeAmortissement: getNumericDureeAmortissement()
+    };
+    
+    return keyData;
+  };
+
   const genererAnalyseComplete = async () => {
     if (!contextePersonnalise.trim()) {
       alert('Veuillez saisir un contexte personnalisé avant de générer l\'analyse complète.');
@@ -1415,6 +1566,83 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
   
   const indicateursDCFSimulation = calculerIndicateursDCFSimulation();
 
+  // Fonction de connexion
+  const handleLogin = (e) => {
+    e.preventDefault();
+    if (username === 'Mata' && password === 'Matix@2025') {
+      setIsAuthenticated(true);
+      setLoginError('');
+    } else {
+      setLoginError('Identifiants incorrects. Veuillez réessayer.');
+    }
+  };
+
+  // Écran de connexion
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
+          <div className="text-center mb-8">
+            <div className="w-20 h-20 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <span className="text-white text-2xl font-bold">M</span>
+            </div>
+            <h1 className="text-2xl font-bold text-gray-800 mb-2">MATA Trading</h1>
+            <p className="text-gray-600">Simulateur de Rentabilité</p>
+          </div>
+          
+          <form onSubmit={handleLogin} className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Nom d'utilisateur
+              </label>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                placeholder="Entrez votre nom d'utilisateur"
+                required
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Mot de passe
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                placeholder="Entrez votre mot de passe"
+                required
+              />
+            </div>
+            
+            {loginError && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                <p className="text-red-600 text-sm">{loginError}</p>
+              </div>
+            )}
+            
+            <button
+              type="submit"
+              className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 px-4 rounded-lg font-medium hover:from-blue-700 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl"
+            >
+              Se connecter
+            </button>
+          </form>
+          
+          <div className="mt-6 text-center">
+            <p className="text-xs text-gray-500">
+              Accès réservé aux utilisateurs autorisés
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const renderMainContent = () => (
     <>
         {/* Paramètres globaux */}
@@ -1606,44 +1834,85 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
         </div>
 
         {/* Bouton d'interprétation IA */}
-        <div className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-4 sm:p-6 mb-4 sm:mb-6 md:mb-8">
+        {/* Bouton toggle pour les analyses IA */}
+        <div className="bg-gradient-to-r from-orange-50 to-red-50 border border-orange-200 rounded-lg p-4 sm:p-6 mb-4 sm:mb-6 md:mb-8">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
-              <h3 className="text-lg font-semibold text-purple-800 mb-2">💼 Analyse Point de Vente MATA Trading</h3>
-              <p className="text-sm text-gray-600">Générez une analyse de ce modèle de point de vente basé sur vos données réelles pour votre dossier de levée de fonds</p>
+              <h3 className="text-lg font-semibold text-orange-800 mb-2">🤖 Analyses IA</h3>
+              <p className="text-sm text-gray-600">Activez les analyses intelligentes pour obtenir des insights détaillés sur votre modèle de point de vente</p>
             </div>
             <button
-              onClick={genererInterpretation}
-              disabled={interpretationLoading}
-              className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
-                interpretationLoading 
-                  ? 'bg-gray-400 cursor-not-allowed' 
-                  : 'bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-lg hover:shadow-xl'
-              }`}
+              onClick={() => setAiAnalysisVisible(!aiAnalysisVisible)}
+              className="px-6 py-3 rounded-lg font-medium transition-all duration-200 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white shadow-lg hover:shadow-xl"
             >
-              {interpretationLoading ? (
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  Analyse en cours...
-                </div>
-              ) : (
-                '💼 Générer Analyse Point de Vente'
-              )}
+              {aiAnalysisVisible ? '🔒 Masquer Analyses IA' : '🤖 Afficher Analyses IA'}
             </button>
           </div>
         </div>
 
+        {/* Section des analyses IA - visible seulement si aiAnalysisVisible est true */}
+        {aiAnalysisVisible && (
+          <>
+            <div className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-4 sm:p-6 mb-4 sm:mb-6 md:mb-8">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-purple-800 mb-2">💼 Analyse Point de Vente MATA Trading</h3>
+                  <p className="text-sm text-gray-600">Générez une analyse de ce modèle de point de vente basé sur vos données réelles pour votre dossier de levée de fonds</p>
+                </div>
+                <button
+                  onClick={genererInterpretation}
+                  disabled={interpretationLoading}
+                  className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
+                    interpretationLoading 
+                      ? 'bg-gray-400 cursor-not-allowed' 
+                      : 'bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-lg hover:shadow-xl'
+                  }`}
+                >
+                  {interpretationLoading ? (
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      Analyse en cours...
+                    </div>
+                  ) : (
+                    '💼 Générer Analyse Point de Vente'
+                  )}
+                </button>
+                
+                {/* Bouton pour voir les données clés */}
+                <button
+                  onClick={() => setKeyDataVisible(!keyDataVisible)}
+                  className="mt-3 w-full px-6 py-3 rounded-lg font-medium transition-all duration-200 bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white shadow-lg hover:shadow-xl"
+                >
+                  {keyDataVisible ? '🔒 Masquer Key Data' : '🔑 Voir Key Data'}
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+
         {/* Section d'interprétation */}
-        {interpretationVisible && (
+        {aiAnalysisVisible && interpretationVisible && (
           <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6 mb-4 sm:mb-6 md:mb-8 shadow-lg">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-800">💼 Analyse Point de Vente MATA Trading - Levée de Fonds</h3>
-              <button
-                onClick={() => setInterpretationVisible(false)}
-                className="text-gray-500 hover:text-gray-700 text-xl font-bold"
-              >
-                ×
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(interpretationText);
+                    alert('Analyse copiée dans le presse-papiers !');
+                  }}
+                  className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                  title="Copier l'analyse"
+                >
+                  📋 Copier
+                </button>
+                <button
+                  onClick={() => setInterpretationVisible(false)}
+                  className="text-gray-500 hover:text-gray-700 text-xl font-bold"
+                >
+                  ×
+                </button>
+              </div>
             </div>
             <div className="prose max-w-none">
               {interpretationLoading ? (
@@ -1658,6 +1927,235 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
                   {interpretationText}
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Section d'affichage des données clés */}
+        {aiAnalysisVisible && keyDataVisible && (
+          <div className="bg-white border border-green-200 rounded-lg p-4 sm:p-6 mb-4 sm:mb-6 md:mb-8 shadow-lg">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-green-800">🔑 Données Clés Utilisées dans les Analyses</h3>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    const keyData = genererKeyData();
+                    const keyDataText = JSON.stringify(keyData, null, 2);
+                    navigator.clipboard.writeText(keyDataText);
+                    alert('Données clés copiées dans le presse-papiers !');
+                  }}
+                  className="px-3 py-1 text-sm bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
+                  title="Copier les données clés"
+                >
+                  📋 Copier
+                </button>
+                <button
+                  onClick={() => setKeyDataVisible(false)}
+                  className="text-gray-500 hover:text-gray-700 text-xl font-bold"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+            <div className="space-y-6">
+              {(() => {
+                const keyData = genererKeyData();
+                return (
+                  <>
+                    {/* Données de base */}
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <h4 className="font-semibold text-gray-800 mb-3">📊 Données de Base</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                          <span className="text-sm text-gray-600">Volume Point de Vente:</span>
+                          <div className="font-mono text-lg">{keyData.volumePointVente.toLocaleString()} FCFA</div>
+                        </div>
+                        <div>
+                          <span className="text-sm text-gray-600">Volume Supplémentaire:</span>
+                          <div className="font-mono text-lg">{keyData.volumeSupplementaire.toLocaleString()} FCFA</div>
+                        </div>
+                        <div>
+                          <span className="text-sm text-gray-600">Volume Total:</span>
+                          <div className="font-mono text-lg">{keyData.volumeTotal.toLocaleString()} FCFA</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Produits et marges */}
+                    <div className="bg-blue-50 p-4 rounded-lg">
+                      <h4 className="font-semibold text-blue-800 mb-3">🥩 Produits et Marges</h4>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-blue-200">
+                              <th className="text-left py-2">Produit</th>
+                              <th className="text-right py-2">Répartition</th>
+                              <th className="text-right py-2">Prix Achat</th>
+                              <th className="text-right py-2">Prix Vente</th>
+                              <th className="text-right py-2">Marge Brute</th>
+                              <th className="text-right py-2">Bénéfice</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {keyData.produits.map((produit, index) => (
+                              <tr key={index} className="border-b border-blue-100">
+                                <td className="py-2 font-medium">{produit.nom}</td>
+                                <td className="text-right py-2">{(produit.repartition * 100).toFixed(2)}%</td>
+                                <td className="text-right py-2 font-mono">{produit.prixAchat?.toLocaleString() || '-'}</td>
+                                <td className="text-right py-2 font-mono">{produit.prixVente?.toLocaleString() || '-'}</td>
+                                <td className="text-right py-2 font-mono">{produit.margeBrute?.toFixed(2)}%</td>
+                                <td className="text-right py-2 font-mono">{produit.benefice?.toLocaleString()}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      <div className="mt-3 p-3 bg-blue-100 rounded">
+                        <div className="font-semibold text-blue-800">Marge Moyenne: {(keyData.margeMoyenne * 100).toFixed(2)}%</div>
+                      </div>
+                    </div>
+
+                    {/* Métriques financières */}
+                    <div className="bg-purple-50 p-4 rounded-lg">
+                      <h4 className="font-semibold text-purple-800 mb-3">💰 Métriques Financières</h4>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div>
+                          <span className="text-sm text-gray-600">Bénéfice Total:</span>
+                          <div className="font-mono text-lg">{keyData.beneficeTotal.toLocaleString()} FCFA</div>
+                        </div>
+                        <div>
+                          <span className="text-sm text-gray-600">EBIT:</span>
+                          <div className="font-mono text-lg">{keyData.ebit.toLocaleString()} FCFA</div>
+                        </div>
+                        <div>
+                          <span className="text-sm text-gray-600">EBITDA:</span>
+                          <div className="font-mono text-lg">{keyData.ebitda.toLocaleString()} FCFA</div>
+                        </div>
+                        <div>
+                          <span className="text-sm text-gray-600">NOPAT:</span>
+                          <div className="font-mono text-lg">{keyData.nopat.toLocaleString()} FCFA</div>
+                        </div>
+                        <div>
+                          <span className="text-sm text-gray-600">FCF:</span>
+                          <div className="font-mono text-lg">{keyData.fcf.toLocaleString()} FCFA</div>
+                        </div>
+                        <div>
+                          <span className="text-sm text-gray-600">ROI Mensuel:</span>
+                          <div className="font-mono text-lg">{(keyData.roiMensuel * 100).toFixed(2)}%</div>
+                        </div>
+                        <div>
+                          <span className="text-sm text-gray-600">ROI Annuel:</span>
+                          <div className="font-mono text-lg">{(keyData.roiAnnuel * 100).toFixed(2)}%</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Charges */}
+                    <div className="bg-orange-50 p-4 rounded-lg">
+                      <h4 className="font-semibold text-orange-800 mb-3">💸 Charges</h4>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        <div>
+                          <span className="text-sm text-gray-600">Charges Fixes:</span>
+                          <div className="font-mono text-lg">{keyData.charges.fixes.toLocaleString()} FCFA</div>
+                        </div>
+                        <div>
+                          <span className="text-sm text-gray-600">Salaire:</span>
+                          <div className="font-mono text-lg">{keyData.charges.salaire.toLocaleString()} FCFA</div>
+                        </div>
+                        <div>
+                          <span className="text-sm text-gray-600">Électricité:</span>
+                          <div className="font-mono text-lg">{keyData.charges.electricite.toLocaleString()} FCFA</div>
+                        </div>
+                        <div>
+                          <span className="text-sm text-gray-600">Eau:</span>
+                          <div className="font-mono text-lg">{keyData.charges.eau.toLocaleString()} FCFA</div>
+                        </div>
+                        <div>
+                          <span className="text-sm text-gray-600">Internet:</span>
+                          <div className="font-mono text-lg">{keyData.charges.internet.toLocaleString()} FCFA</div>
+                        </div>
+                        <div>
+                          <span className="text-sm text-gray-600">Sacs Livraison:</span>
+                          <div className="font-mono text-lg">{keyData.charges.sacsLivraison.toLocaleString()} FCFA</div>
+                        </div>
+                        <div>
+                          <span className="text-sm text-gray-600">Transport:</span>
+                          <div className="font-mono text-lg">{keyData.charges.chargesTransport.toLocaleString()} FCFA</div>
+                        </div>
+                        <div>
+                          <span className="text-sm text-gray-600">Loyer:</span>
+                          <div className="font-mono text-lg">{keyData.charges.loyer.toLocaleString()} FCFA</div>
+                        </div>
+                        <div>
+                          <span className="text-sm text-gray-600">Autres:</span>
+                          <div className="font-mono text-lg">{keyData.charges.autresCharges.toLocaleString()} FCFA</div>
+                        </div>
+                      </div>
+                      <div className="mt-3 p-3 bg-orange-100 rounded">
+                        <div className="font-semibold text-orange-800">Total Charges: {keyData.charges.total.toLocaleString()} FCFA</div>
+                      </div>
+                    </div>
+
+                    {/* Paramètres DCF */}
+                    <div className="bg-indigo-50 p-4 rounded-lg">
+                      <h4 className="font-semibold text-indigo-800 mb-3">📈 Paramètres DCF</h4>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div>
+                          <span className="text-sm text-gray-600">Taux Actualisation:</span>
+                          <div className="font-mono text-lg">{keyData.dcf.tauxActualisation}%</div>
+                        </div>
+                        <div>
+                          <span className="text-sm text-gray-600">Durée Analyse:</span>
+                          <div className="font-mono text-lg">{keyData.dcf.dureeAnalyse} mois</div>
+                        </div>
+                        <div>
+                          <span className="text-sm text-gray-600">CAPEX:</span>
+                          <div className="font-mono text-lg">{keyData.dcf.capex.toLocaleString()} FCFA</div>
+                        </div>
+                        <div>
+                          <span className="text-sm text-gray-600">BFR:</span>
+                          <div className="font-mono text-lg">{keyData.dcf.bfr.toLocaleString()} FCFA</div>
+                        </div>
+                        <div>
+                          <span className="text-sm text-gray-600">WACC:</span>
+                          <div className="font-mono text-lg">{keyData.dcf.wacc}%</div>
+                        </div>
+                        <div>
+                          <span className="text-sm text-gray-600">Croissance Terminale:</span>
+                          <div className="font-mono text-lg">{keyData.dcf.croissanceTerminale}%</div>
+                        </div>
+                        <div>
+                          <span className="text-sm text-gray-600">Dette:</span>
+                          <div className="font-mono text-lg">{keyData.dcf.dette.toLocaleString()} FCFA</div>
+                        </div>
+                        <div>
+                          <span className="text-sm text-gray-600">Trésorerie:</span>
+                          <div className="font-mono text-lg">{keyData.dcf.tresorerie.toLocaleString()} FCFA</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Paramètres spécifiques */}
+                    <div className="bg-teal-50 p-4 rounded-lg">
+                      <h4 className="font-semibold text-teal-800 mb-3">⚙️ Paramètres Spécifiques</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                          <span className="text-sm text-gray-600">Abats par Kg:</span>
+                          <div className="font-mono text-lg">{keyData.abatsParKg} FCFA</div>
+                        </div>
+                        <div>
+                          <span className="text-sm text-gray-600">Pération:</span>
+                          <div className="font-mono text-lg">{keyData.peration}%</div>
+                        </div>
+                        <div>
+                          <span className="text-sm text-gray-600">Durée Amortissement:</span>
+                          <div className="font-mono text-lg">{keyData.dureeAmortissement} mois</div>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           </div>
         )}
@@ -1705,16 +2203,28 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
         )}
 
         {/* Section d'affichage de l'analyse contextuelle */}
-        {analyseContextuelleVisible && (
+        {aiAnalysisVisible && analyseContextuelleVisible && (
           <div className="bg-white border border-indigo-200 rounded-lg p-4 sm:p-6 mb-4 sm:mb-6 md:mb-8 shadow-lg">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-indigo-800">🎯 Analyse Contextuelle Point de Vente MATA Trading</h3>
-              <button
-                onClick={() => setAnalyseContextuelleVisible(false)}
-                className="text-gray-500 hover:text-gray-700 text-xl font-bold"
-              >
-                ×
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(analyseContextuelleText);
+                    alert('Analyse contextuelle copiée dans le presse-papiers !');
+                  }}
+                  className="px-3 py-1 text-sm bg-indigo-500 text-white rounded hover:bg-indigo-600 transition-colors"
+                  title="Copier l'analyse contextuelle"
+                >
+                  📋 Copier
+                </button>
+                <button
+                  onClick={() => setAnalyseContextuelleVisible(false)}
+                  className="text-gray-500 hover:text-gray-700 text-xl font-bold"
+                >
+                  ×
+                </button>
+              </div>
             </div>
             <div className="prose max-w-none">
               {analyseContextuelleLoading ? (
@@ -1734,62 +2244,76 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
         )}
 
         {/* Section d'analyse complète personnalisée */}
-        <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-lg p-4 sm:p-6 mb-4 sm:mb-6 md:mb-8">
-          <div className="mb-4">
-            <h3 className="text-lg font-semibold text-emerald-800 mb-2">🔍 Analyse Complète Personnalisée</h3>
-            <p className="text-sm text-gray-600 mb-4">Générez une analyse complète intégrant votre contexte spécifique et toutes les données financières en temps réel</p>
-            
-            {/* Champ de saisie du contexte personnalisé */}
+        {aiAnalysisVisible && (
+          <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-lg p-4 sm:p-6 mb-4 sm:mb-6 md:mb-8">
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                📝 Contexte personnalisé pour l'analyse
-              </label>
-              <textarea
-                value={contextePersonnalise}
-                onChange={(e) => setContextePersonnalise(e.target.value)}
-                placeholder="Décrivez votre contexte spécifique, vos objectifs, vos contraintes, vos questions particulières... Cette analyse intégrera toutes les données financières actuelles de l'application."
-                className="w-full p-3 border border-gray-300 rounded-lg text-sm resize-vertical min-h-[100px] focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                style={{ fontSize: '16px' }}
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Exemples : "Analysez la viabilité pour un investisseur en capital-risque", "Évaluez l'impact d'une expansion vers Dakar", "Comparez avec les standards du secteur agroalimentaire sénégalais"...
-              </p>
+              <h3 className="text-lg font-semibold text-emerald-800 mb-2">🔍 Analyse Complète Personnalisée</h3>
+              <p className="text-sm text-gray-600 mb-4">Générez une analyse complète intégrant votre contexte spécifique et toutes les données financières en temps réel</p>
+              
+              {/* Champ de saisie du contexte personnalisé */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  📝 Contexte personnalisé pour l'analyse
+                </label>
+                <textarea
+                  value={contextePersonnalise}
+                  onChange={(e) => setContextePersonnalise(e.target.value)}
+                  placeholder="Décrivez votre contexte spécifique, vos objectifs, vos contraintes, vos questions particulières... Cette analyse intégrera toutes les données financières actuelles de l'application."
+                  className="w-full p-3 border border-gray-300 rounded-lg text-sm resize-vertical min-h-[100px] focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  style={{ fontSize: '16px' }}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Exemples : "Analysez la viabilité pour un investisseur en capital-risque", "Évaluez l'impact d'une expansion vers Dakar", "Comparez avec les standards du secteur agroalimentaire sénégalais"...
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex justify-end">
+              <button
+                onClick={genererAnalyseComplete}
+                disabled={analyseCompleteLoading || !contextePersonnalise.trim()}
+                className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
+                  analyseCompleteLoading || !contextePersonnalise.trim()
+                    ? 'bg-gray-400 cursor-not-allowed' 
+                    : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-lg hover:shadow-xl'
+                }`}
+              >
+                {analyseCompleteLoading ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Analyse complète en cours...
+                  </div>
+                ) : (
+                  '🔍 Générer Analyse Complète'
+                )}
+              </button>
             </div>
           </div>
-          
-          <div className="flex justify-end">
-            <button
-              onClick={genererAnalyseComplete}
-              disabled={analyseCompleteLoading || !contextePersonnalise.trim()}
-              className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
-                analyseCompleteLoading || !contextePersonnalise.trim()
-                  ? 'bg-gray-400 cursor-not-allowed' 
-                  : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-lg hover:shadow-xl'
-              }`}
-            >
-              {analyseCompleteLoading ? (
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  Analyse complète en cours...
-                </div>
-              ) : (
-                '🔍 Générer Analyse Complète'
-              )}
-            </button>
-          </div>
-        </div>
+        )}
 
         {/* Section d'affichage de l'analyse complète */}
-        {analyseCompleteVisible && (
+        {aiAnalysisVisible && analyseCompleteVisible && (
           <div className="bg-white border border-emerald-200 rounded-lg p-4 sm:p-6 mb-4 sm:mb-6 md:mb-8 shadow-lg">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-emerald-800">🔍 Analyse Complète Personnalisée MATA Trading</h3>
-              <button
-                onClick={() => setAnalyseCompleteVisible(false)}
-                className="text-gray-500 hover:text-gray-700 text-xl font-bold"
-              >
-                ×
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(analyseCompleteText);
+                    alert('Analyse complète copiée dans le presse-papiers !');
+                  }}
+                  className="px-3 py-1 text-sm bg-emerald-500 text-white rounded hover:bg-emerald-600 transition-colors"
+                  title="Copier l'analyse complète"
+                >
+                  📋 Copier
+                </button>
+                <button
+                  onClick={() => setAnalyseCompleteVisible(false)}
+                  className="text-gray-500 hover:text-gray-700 text-xl font-bold"
+                >
+                  ×
+                </button>
+              </div>
             </div>
             <div className="prose max-w-none">
               {analyseCompleteLoading ? (
