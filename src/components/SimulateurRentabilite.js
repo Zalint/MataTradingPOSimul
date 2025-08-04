@@ -45,7 +45,7 @@ const SimulateurRentabilite = () => {
   const [contextePersonnalise, setContextePersonnalise] = useState('');
   
   // État pour le modèle ChatGPT sélectionné
-  const [modeleChatGPT, setModeleChatGPT] = useState('gpt-4');
+  const [modeleChatGPT, setModeleChatGPT] = useState('gpt-4o-mini');
 
   // État pour garder les prix originaux pour les graphiques de sensibilité
   const [produitsOriginaux] = useState({
@@ -1592,6 +1592,8 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
                 className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
               >
                 <option value="gpt-4">GPT-4 (Plus avancé, plus cher)</option>
+                <option value="gpt-4o">GPT-4o (Nouveau, équilibré)</option>
+                <option value="gpt-4o-mini">GPT-4o-mini (Recommandé, économique)</option>
                 <option value="gpt-4-turbo">GPT-4 Turbo (Équilibré)</option>
                 <option value="gpt-3.5-turbo">GPT-3.5 Turbo (Rapide, économique)</option>
                 <option value="gpt-3.5-turbo-16k">GPT-3.5 Turbo 16K (Long contexte)</option>
