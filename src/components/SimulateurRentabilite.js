@@ -116,7 +116,7 @@ const SimulateurRentabilite = () => {
       ...prev,
       [key]: {
         ...prev[key],
-        [field]: field === 'value' ? (value === '' ? '' : parseFloat(value) || 0) : value
+        [field]: field === 'value' ? (parseFloat(value) || 0) : value
       }
     }));
 
@@ -4000,16 +4000,16 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
     };
 
     // Appliquer les contraintes fixées
-    if (solverConstraints.volumeMensuel.fixed && solverConstraints.volumeMensuel.value !== '') {
+    if (solverConstraints.volumeMensuel.fixed) {
       params.volume = parseFloat(solverConstraints.volumeMensuel.value) || 0;
     }
-    if (solverConstraints.chargesTotales.fixed && solverConstraints.chargesTotales.value !== '') {
+    if (solverConstraints.chargesTotales.fixed) {
       params.chargesTotales = parseFloat(solverConstraints.chargesTotales.value) || 0;
     }
-    if (solverConstraints.peration.fixed && solverConstraints.peration.value !== '') {
+    if (solverConstraints.peration.fixed) {
       params.peration = (parseFloat(solverConstraints.peration.value) || 0) / 100; // Convertir % en décimal
     }
-    if (solverConstraints.abatsParKg.fixed && solverConstraints.abatsParKg.value !== '') {
+    if (solverConstraints.abatsParKg.fixed) {
       params.abatsParKg = parseFloat(solverConstraints.abatsParKg.value) || 0;
     }
 
@@ -4218,7 +4218,13 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
       console.log(`   ➡️ Estimation initiale: ${x0.toLocaleString()} FCFA`);
     } else if (solverVariable === 'peration') {
       x0 = getNumericPeration() * 100; // Partir de la pération actuelle (convertir en %)
-      console.log(`🎲 Initialisation pération: ${x0}% (valeur actuelle)`);
+      // Si la valeur actuelle est 0 ou très faible, partir de 10%
+      if (x0 < 1) {
+        x0 = 10;
+        console.log(`🎲 Initialisation pération: ${x0}% (valeur par défaut car actuelle trop faible)`);
+      } else {
+        console.log(`🎲 Initialisation pération: ${x0}% (valeur actuelle)`);
+      }
     } else if (solverVariable === 'abatsParKg') {
       x0 = getNumericAbatsParKg(); // Partir de la valeur actuelle des abats
       console.log(`🎲 Initialisation abats: ${x0.toLocaleString()} FCFA/kg (valeur actuelle)`);
@@ -4236,7 +4242,7 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
       minBound = -50000000; // Permettre des "charges négatives" (subventions)
       maxBound = 100000000; // 100M maximum
     } else if (solverVariable === 'peration') {
-      minBound = 0; // 0% minimum
+      minBound = 0; // 0% minimum (pas de perte)
       maxBound = 50; // 50% maximum (pération très élevée)
     } else if (solverVariable === 'abatsParKg') {
       minBound = 0; // 0 FCFA/kg minimum
