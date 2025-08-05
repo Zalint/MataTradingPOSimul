@@ -135,6 +135,20 @@ const SimulateurRentabilite = () => {
     }));
   };
 
+  // Fonction pour vérifier et ajuster la variable à résoudre si elle devient fixe
+  const checkAndAdjustSolverVariable = (newConstraints) => {
+    if (newConstraints[solverVariable] && newConstraints[solverVariable].fixed) {
+      // La variable actuellement sélectionnée est maintenant fixe, on doit en choisir une autre
+      const availableVariables = Object.entries(newConstraints)
+        .filter(([key, constraint]) => !constraint.fixed)
+        .map(([key]) => key);
+      
+      if (availableVariables.length > 0) {
+        setSolverVariable(availableVariables[0]);
+      }
+    }
+  };
+
   // Fonction pour générer l'explication détaillée de la marge
   const genererExplicationMarge = () => {
     const produitsActuels = getNumericAdditionalVolume() > 0 ? getAdjustedRepartitions() : produits;
@@ -4360,17 +4374,31 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
             
             {/* Bénéfice Net */}
             <div className="flex items-center justify-between mb-3 p-2 bg-gray-50 rounded">
-              <div className="flex items-center space-x-2">
+              <div 
+                className="flex items-center space-x-2 cursor-pointer"
+                onClick={() => {
+                  const newConstraints = {
+                    ...solverConstraints,
+                    beneficeNet: { ...solverConstraints.beneficeNet, fixed: !solverConstraints.beneficeNet.fixed }
+                  };
+                  setSolverConstraints(newConstraints);
+                  checkAndAdjustSolverVariable(newConstraints);
+                }}
+              >
                 <input
                   type="checkbox"
                   checked={solverConstraints.beneficeNet.fixed}
-                  onChange={(e) => setSolverConstraints(prev => ({
-                    ...prev,
-                    beneficeNet: { ...prev.beneficeNet, fixed: e.target.checked }
-                  }))}
+                  onChange={(e) => {
+                    const newConstraints = {
+                      ...solverConstraints,
+                      beneficeNet: { ...solverConstraints.beneficeNet, fixed: e.target.checked }
+                    };
+                    setSolverConstraints(newConstraints);
+                    checkAndAdjustSolverVariable(newConstraints);
+                  }}
                   className="rounded"
                 />
-                <label className="text-sm font-medium">Bénéfice Net Mensuel</label>
+                <label className="text-sm font-medium cursor-pointer">Bénéfice Net Mensuel</label>
               </div>
               <input
                 type="number"
@@ -4394,17 +4422,31 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
               { key: 'margeOeuf', label: 'Marge Œuf (%)', produit: 'Oeuf' }
             ].map(({ key, label, produit }) => (
               <div key={key} className="flex items-center justify-between mb-3 p-2 bg-gray-50 rounded">
-                <div className="flex items-center space-x-2">
+                <div 
+                  className="flex items-center space-x-2 cursor-pointer"
+                                  onClick={() => {
+                  const newConstraints = {
+                    ...solverConstraints,
+                    [key]: { ...solverConstraints[key], fixed: !solverConstraints[key].fixed }
+                  };
+                  setSolverConstraints(newConstraints);
+                  checkAndAdjustSolverVariable(newConstraints);
+                }}
+                >
                   <input
                     type="checkbox"
                     checked={solverConstraints[key].fixed}
-                    onChange={(e) => setSolverConstraints(prev => ({
-                      ...prev,
-                      [key]: { ...prev[key], fixed: e.target.checked }
-                    }))}
+                    onChange={(e) => {
+                      const newConstraints = {
+                        ...solverConstraints,
+                        [key]: { ...solverConstraints[key], fixed: e.target.checked }
+                      };
+                      setSolverConstraints(newConstraints);
+                      checkAndAdjustSolverVariable(newConstraints);
+                    }}
                     className="rounded"
                   />
-                  <label className="text-sm font-medium">{label}</label>
+                  <label className="text-sm font-medium cursor-pointer">{label}</label>
                 </div>
                 <input
                   type="number"
@@ -4423,17 +4465,31 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
 
             {/* Volume Mensuel */}
             <div className="flex items-center justify-between mb-3 p-2 bg-gray-50 rounded">
-              <div className="flex items-center space-x-2">
+              <div 
+                className="flex items-center space-x-2 cursor-pointer"
+                onClick={() => {
+                  const newConstraints = {
+                    ...solverConstraints,
+                    volumeMensuel: { ...solverConstraints.volumeMensuel, fixed: !solverConstraints.volumeMensuel.fixed }
+                  };
+                  setSolverConstraints(newConstraints);
+                  checkAndAdjustSolverVariable(newConstraints);
+                }}
+              >
                 <input
                   type="checkbox"
                   checked={solverConstraints.volumeMensuel.fixed}
-                  onChange={(e) => setSolverConstraints(prev => ({
-                    ...prev,
-                    volumeMensuel: { ...prev.volumeMensuel, fixed: e.target.checked }
-                  }))}
+                  onChange={(e) => {
+                    const newConstraints = {
+                      ...solverConstraints,
+                      volumeMensuel: { ...solverConstraints.volumeMensuel, fixed: e.target.checked }
+                    };
+                    setSolverConstraints(newConstraints);
+                    checkAndAdjustSolverVariable(newConstraints);
+                  }}
                   className="rounded"
                 />
-                <label className="text-sm font-medium">Volume Mensuel</label>
+                <label className="text-sm font-medium cursor-pointer">Volume Mensuel</label>
               </div>
               <input
                 type="number"
@@ -4450,17 +4506,31 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
 
             {/* Charges Totales */}
             <div className="flex items-center justify-between mb-3 p-2 bg-gray-50 rounded">
-              <div className="flex items-center space-x-2">
+              <div 
+                className="flex items-center space-x-2 cursor-pointer"
+                onClick={() => {
+                  const newConstraints = {
+                    ...solverConstraints,
+                    chargesTotales: { ...solverConstraints.chargesTotales, fixed: !solverConstraints.chargesTotales.fixed }
+                  };
+                  setSolverConstraints(newConstraints);
+                  checkAndAdjustSolverVariable(newConstraints);
+                }}
+              >
                 <input
                   type="checkbox"
                   checked={solverConstraints.chargesTotales.fixed}
-                  onChange={(e) => setSolverConstraints(prev => ({
-                    ...prev,
-                    chargesTotales: { ...prev.chargesTotales, fixed: e.target.checked }
-                  }))}
+                  onChange={(e) => {
+                    const newConstraints = {
+                      ...solverConstraints,
+                      chargesTotales: { ...solverConstraints.chargesTotales, fixed: e.target.checked }
+                    };
+                    setSolverConstraints(newConstraints);
+                    checkAndAdjustSolverVariable(newConstraints);
+                  }}
                   className="rounded"
                 />
-                <label className="text-sm font-medium">Charges Totales</label>
+                <label className="text-sm font-medium cursor-pointer">Charges Totales</label>
               </div>
               <input
                 type="number"
@@ -4477,17 +4547,31 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
 
             {/* Pération % */}
             <div className="flex items-center justify-between mb-3 p-2 bg-gray-50 rounded">
-              <div className="flex items-center space-x-2">
+              <div 
+                className="flex items-center space-x-2 cursor-pointer"
+                onClick={() => {
+                  const newConstraints = {
+                    ...solverConstraints,
+                    peration: { ...solverConstraints.peration, fixed: !solverConstraints.peration.fixed }
+                  };
+                  setSolverConstraints(newConstraints);
+                  checkAndAdjustSolverVariable(newConstraints);
+                }}
+              >
                 <input
                   type="checkbox"
                   checked={solverConstraints.peration.fixed}
-                  onChange={(e) => setSolverConstraints(prev => ({
-                    ...prev,
-                    peration: { ...prev.peration, fixed: e.target.checked }
-                  }))}
+                  onChange={(e) => {
+                    const newConstraints = {
+                      ...solverConstraints,
+                      peration: { ...solverConstraints.peration, fixed: e.target.checked }
+                    };
+                    setSolverConstraints(newConstraints);
+                    checkAndAdjustSolverVariable(newConstraints);
+                  }}
                   className="rounded"
                 />
-                <label className="text-sm font-medium">Pération % (Bœuf/Veau)</label>
+                <label className="text-sm font-medium cursor-pointer">Pération % (Bœuf/Veau)</label>
               </div>
               <input
                 type="number"
@@ -4505,17 +4589,31 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
 
             {/* Abats par Kg */}
             <div className="flex items-center justify-between mb-3 p-2 bg-gray-50 rounded">
-              <div className="flex items-center space-x-2">
+              <div 
+                className="flex items-center space-x-2 cursor-pointer"
+                onClick={() => {
+                  const newConstraints = {
+                    ...solverConstraints,
+                    abatsParKg: { ...solverConstraints.abatsParKg, fixed: !solverConstraints.abatsParKg.fixed }
+                  };
+                  setSolverConstraints(newConstraints);
+                  checkAndAdjustSolverVariable(newConstraints);
+                }}
+              >
                 <input
                   type="checkbox"
                   checked={solverConstraints.abatsParKg.fixed}
-                  onChange={(e) => setSolverConstraints(prev => ({
-                    ...prev,
-                    abatsParKg: { ...prev.abatsParKg, fixed: e.target.checked }
-                  }))}
+                  onChange={(e) => {
+                    const newConstraints = {
+                      ...solverConstraints,
+                      abatsParKg: { ...solverConstraints.abatsParKg, fixed: e.target.checked }
+                    };
+                    setSolverConstraints(newConstraints);
+                    checkAndAdjustSolverVariable(newConstraints);
+                  }}
                   className="rounded"
                 />
-                <label className="text-sm font-medium">Foie, Yell, Filet (Bœuf/Veau)</label>
+                <label className="text-sm font-medium cursor-pointer">Foie, Yell, Filet (Bœuf/Veau)</label>
               </div>
               <input
                 type="number"
@@ -4549,15 +4647,33 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
               onChange={(e) => setSolverVariable(e.target.value)}
               className="w-full p-2 border rounded mb-4"
             >
-              <option value="chargesTotales">Charges Totales</option>
-              <option value="volumeMensuel">Volume Mensuel</option>
-              <option value="margeBoeuf">Marge Bœuf (%)</option>
-              <option value="margeVeau">Marge Veau (%)</option>
-              <option value="margeOvin">Marge Ovin (%)</option>
-              <option value="margePoulet">Marge Poulet (%)</option>
-              <option value="margeOeuf">Marge Œuf (%)</option>
-              <option value="peration">Pération % (Bœuf/Veau)</option>
-              <option value="abatsParKg">Foie, Yell, Filet (Bœuf/Veau)</option>
+              {!solverConstraints.chargesTotales.fixed && (
+                <option value="chargesTotales">Charges Totales</option>
+              )}
+              {!solverConstraints.volumeMensuel.fixed && (
+                <option value="volumeMensuel">Volume Mensuel</option>
+              )}
+              {!solverConstraints.margeBoeuf.fixed && (
+                <option value="margeBoeuf">Marge Bœuf (%)</option>
+              )}
+              {!solverConstraints.margeVeau.fixed && (
+                <option value="margeVeau">Marge Veau (%)</option>
+              )}
+              {!solverConstraints.margeOvin.fixed && (
+                <option value="margeOvin">Marge Ovin (%)</option>
+              )}
+              {!solverConstraints.margePoulet.fixed && (
+                <option value="margePoulet">Marge Poulet (%)</option>
+              )}
+              {!solverConstraints.margeOeuf.fixed && (
+                <option value="margeOeuf">Marge Œuf (%)</option>
+              )}
+              {!solverConstraints.peration.fixed && (
+                <option value="peration">Pération % (Bœuf/Veau)</option>
+              )}
+              {!solverConstraints.abatsParKg.fixed && (
+                <option value="abatsParKg">Foie, Yell, Filet (Bœuf/Veau)</option>
+              )}
             </select>
 
             <button
