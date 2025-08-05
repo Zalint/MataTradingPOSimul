@@ -110,29 +110,6 @@ const SimulateurRentabilite = () => {
   const [solverLoading, setSolverLoading] = useState(false);
   const [solverIterations, setSolverIterations] = useState([]);
 
-  // Fonction pour gérer les changements de contraintes avec logique automatique
-  const handleConstraintChange = (key, field, value) => {
-    setSolverConstraints(prev => ({
-      ...prev,
-      [key]: {
-        ...prev[key],
-        [field]: field === 'value' ? (parseFloat(value) || 0) : value
-      }
-    }));
-
-    // Si on fixe la variable actuellement sélectionnée, changer automatiquement
-    if (field === 'fixed' && value === true && solverVariable === key) {
-      // Trouver la première variable non fixe
-      const availableVariables = Object.keys(solverConstraints).filter(constraintKey => 
-        constraintKey !== key && !solverConstraints[constraintKey].fixed
-      );
-      
-      if (availableVariables.length > 0) {
-        setSolverVariable(availableVariables[0]);
-      }
-    }
-  };
-
   // Fonction pour mettre à jour les valeurs par défaut du solveur avec les vraies marges
   const updateSolverDefaults = () => {
     const vraiesMarges = {};
@@ -4000,16 +3977,16 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
     };
 
     // Appliquer les contraintes fixées
-    if (solverConstraints.volumeMensuel.fixed) {
+    if (solverConstraints.volumeMensuel.fixed && solverConstraints.volumeMensuel.value !== '') {
       params.volume = parseFloat(solverConstraints.volumeMensuel.value) || 0;
     }
-    if (solverConstraints.chargesTotales.fixed) {
+    if (solverConstraints.chargesTotales.fixed && solverConstraints.chargesTotales.value !== '') {
       params.chargesTotales = parseFloat(solverConstraints.chargesTotales.value) || 0;
     }
-    if (solverConstraints.peration.fixed) {
+    if (solverConstraints.peration.fixed && solverConstraints.peration.value !== '') {
       params.peration = (parseFloat(solverConstraints.peration.value) || 0) / 100; // Convertir % en décimal
     }
-    if (solverConstraints.abatsParKg.fixed) {
+    if (solverConstraints.abatsParKg.fixed && solverConstraints.abatsParKg.value !== '') {
       params.abatsParKg = parseFloat(solverConstraints.abatsParKg.value) || 0;
     }
 
@@ -4218,13 +4195,7 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
       console.log(`   ➡️ Estimation initiale: ${x0.toLocaleString()} FCFA`);
     } else if (solverVariable === 'peration') {
       x0 = getNumericPeration() * 100; // Partir de la pération actuelle (convertir en %)
-      // Si la valeur actuelle est 0 ou très faible, partir de 10%
-      if (x0 < 1) {
-        x0 = 10;
-        console.log(`🎲 Initialisation pération: ${x0}% (valeur par défaut car actuelle trop faible)`);
-      } else {
-        console.log(`🎲 Initialisation pération: ${x0}% (valeur actuelle)`);
-      }
+      console.log(`🎲 Initialisation pération: ${x0}% (valeur actuelle)`);
     } else if (solverVariable === 'abatsParKg') {
       x0 = getNumericAbatsParKg(); // Partir de la valeur actuelle des abats
       console.log(`🎲 Initialisation abats: ${x0.toLocaleString()} FCFA/kg (valeur actuelle)`);
@@ -4242,7 +4213,7 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
       minBound = -50000000; // Permettre des "charges négatives" (subventions)
       maxBound = 100000000; // 100M maximum
     } else if (solverVariable === 'peration') {
-      minBound = 0; // 0% minimum (pas de perte)
+      minBound = 0; // 0% minimum
       maxBound = 50; // 50% maximum (pération très élevée)
     } else if (solverVariable === 'abatsParKg') {
       minBound = 0; // 0 FCFA/kg minimum
@@ -4393,7 +4364,10 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
                 <input
                   type="checkbox"
                   checked={solverConstraints.beneficeNet.fixed}
-                  onChange={(e) => handleConstraintChange('beneficeNet', 'fixed', e.target.checked)}
+                  onChange={(e) => setSolverConstraints(prev => ({
+                    ...prev,
+                    beneficeNet: { ...prev.beneficeNet, fixed: e.target.checked }
+                  }))}
                   className="rounded"
                 />
                 <label className="text-sm font-medium">Bénéfice Net Mensuel</label>
@@ -4424,7 +4398,10 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
                   <input
                     type="checkbox"
                     checked={solverConstraints[key].fixed}
-                    onChange={(e) => handleConstraintChange(key, 'fixed', e.target.checked)}
+                    onChange={(e) => setSolverConstraints(prev => ({
+                      ...prev,
+                      [key]: { ...prev[key], fixed: e.target.checked }
+                    }))}
                     className="rounded"
                   />
                   <label className="text-sm font-medium">{label}</label>
@@ -4433,7 +4410,10 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
                   type="number"
                   step="0.1"
                   value={solverConstraints[key].value}
-                  onChange={(e) => handleConstraintChange(key, 'value', e.target.value)}
+                  onChange={(e) => setSolverConstraints(prev => ({
+                    ...prev,
+                    [key]: { ...prev[key], value: parseFloat(e.target.value) || 0 }
+                  }))}
                   disabled={!solverConstraints[key].fixed}
                   className="w-20 p-1 text-sm border rounded"
                   placeholder="15.0"
@@ -4447,7 +4427,10 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
                 <input
                   type="checkbox"
                   checked={solverConstraints.volumeMensuel.fixed}
-                  onChange={(e) => handleConstraintChange('volumeMensuel', 'fixed', e.target.checked)}
+                  onChange={(e) => setSolverConstraints(prev => ({
+                    ...prev,
+                    volumeMensuel: { ...prev.volumeMensuel, fixed: e.target.checked }
+                  }))}
                   className="rounded"
                 />
                 <label className="text-sm font-medium">Volume Mensuel</label>
@@ -4455,7 +4438,10 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
               <input
                 type="number"
                 value={solverConstraints.volumeMensuel.value}
-                onChange={(e) => handleConstraintChange('volumeMensuel', 'value', e.target.value)}
+                onChange={(e) => setSolverConstraints(prev => ({
+                  ...prev,
+                  volumeMensuel: { ...prev.volumeMensuel, value: parseFloat(e.target.value) || 0 }
+                }))}
                 disabled={!solverConstraints.volumeMensuel.fixed}
                 className="w-32 p-1 text-sm border rounded"
                 placeholder="20000000"
@@ -4468,7 +4454,10 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
                 <input
                   type="checkbox"
                   checked={solverConstraints.chargesTotales.fixed}
-                  onChange={(e) => handleConstraintChange('chargesTotales', 'fixed', e.target.checked)}
+                  onChange={(e) => setSolverConstraints(prev => ({
+                    ...prev,
+                    chargesTotales: { ...prev.chargesTotales, fixed: e.target.checked }
+                  }))}
                   className="rounded"
                 />
                 <label className="text-sm font-medium">Charges Totales</label>
@@ -4476,7 +4465,10 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
               <input
                 type="number"
                 value={solverConstraints.chargesTotales.value}
-                onChange={(e) => handleConstraintChange('chargesTotales', 'value', e.target.value)}
+                onChange={(e) => setSolverConstraints(prev => ({
+                  ...prev,
+                  chargesTotales: { ...prev.chargesTotales, value: parseFloat(e.target.value) || 0 }
+                }))}
                 disabled={!solverConstraints.chargesTotales.fixed}
                 className="w-32 p-1 text-sm border rounded"
                 placeholder="500000"
@@ -4489,7 +4481,10 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
                 <input
                   type="checkbox"
                   checked={solverConstraints.peration.fixed}
-                  onChange={(e) => handleConstraintChange('peration', 'fixed', e.target.checked)}
+                  onChange={(e) => setSolverConstraints(prev => ({
+                    ...prev,
+                    peration: { ...prev.peration, fixed: e.target.checked }
+                  }))}
                   className="rounded"
                 />
                 <label className="text-sm font-medium">Pération % (Bœuf/Veau)</label>
@@ -4498,7 +4493,10 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
                 type="number"
                 step="0.1"
                 value={solverConstraints.peration.value}
-                onChange={(e) => handleConstraintChange('peration', 'value', e.target.value)}
+                onChange={(e) => setSolverConstraints(prev => ({
+                  ...prev,
+                  peration: { ...prev.peration, value: parseFloat(e.target.value) || 0 }
+                }))}
                 disabled={!solverConstraints.peration.fixed}
                 className="w-20 p-1 text-sm border rounded"
                 placeholder="13.0"
@@ -4511,7 +4509,10 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
                 <input
                   type="checkbox"
                   checked={solverConstraints.abatsParKg.fixed}
-                  onChange={(e) => handleConstraintChange('abatsParKg', 'fixed', e.target.checked)}
+                  onChange={(e) => setSolverConstraints(prev => ({
+                    ...prev,
+                    abatsParKg: { ...prev.abatsParKg, fixed: e.target.checked }
+                  }))}
                   className="rounded"
                 />
                 <label className="text-sm font-medium">Foie, Yell, Filet (Bœuf/Veau)</label>
@@ -4519,7 +4520,10 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
               <input
                 type="number"
                 value={solverConstraints.abatsParKg.value}
-                onChange={(e) => handleConstraintChange('abatsParKg', 'value', e.target.value)}
+                onChange={(e) => setSolverConstraints(prev => ({
+                  ...prev,
+                  abatsParKg: { ...prev.abatsParKg, value: parseFloat(e.target.value) || 0 }
+                }))}
                 disabled={!solverConstraints.abatsParKg.fixed}
                 className="w-20 p-1 text-sm border rounded"
                 placeholder="200"
@@ -4545,33 +4549,15 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
               onChange={(e) => setSolverVariable(e.target.value)}
               className="w-full p-2 border rounded mb-4"
             >
-              <option value="chargesTotales" disabled={solverConstraints.chargesTotales.fixed}>
-                Charges Totales
-              </option>
-              <option value="volumeMensuel" disabled={solverConstraints.volumeMensuel.fixed}>
-                Volume Mensuel
-              </option>
-              <option value="margeBoeuf" disabled={solverConstraints.margeBoeuf.fixed}>
-                Marge Bœuf (%)
-              </option>
-              <option value="margeVeau" disabled={solverConstraints.margeVeau.fixed}>
-                Marge Veau (%)
-              </option>
-              <option value="margeOvin" disabled={solverConstraints.margeOvin.fixed}>
-                Marge Ovin (%)
-              </option>
-              <option value="margePoulet" disabled={solverConstraints.margePoulet.fixed}>
-                Marge Poulet (%)
-              </option>
-              <option value="margeOeuf" disabled={solverConstraints.margeOeuf.fixed}>
-                Marge Œuf (%)
-              </option>
-              <option value="peration" disabled={solverConstraints.peration.fixed}>
-                Pération % (Bœuf/Veau)
-              </option>
-              <option value="abatsParKg" disabled={solverConstraints.abatsParKg.fixed}>
-                Foie, Yell, Filet (Bœuf/Veau)
-              </option>
+              <option value="chargesTotales">Charges Totales</option>
+              <option value="volumeMensuel">Volume Mensuel</option>
+              <option value="margeBoeuf">Marge Bœuf (%)</option>
+              <option value="margeVeau">Marge Veau (%)</option>
+              <option value="margeOvin">Marge Ovin (%)</option>
+              <option value="margePoulet">Marge Poulet (%)</option>
+              <option value="margeOeuf">Marge Œuf (%)</option>
+              <option value="peration">Pération % (Bœuf/Veau)</option>
+              <option value="abatsParKg">Foie, Yell, Filet (Bœuf/Veau)</option>
             </select>
 
             <button
