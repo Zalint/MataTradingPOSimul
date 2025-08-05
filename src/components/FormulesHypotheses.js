@@ -77,7 +77,7 @@ const FormulesHypotheses = () => {
               <div>• WACC : 12% par défaut</div>
               <div>• Croissance terminale : 3%</div>
               <div>• Taux d'imposition : 30%</div>
-              <div>• D&A : 25% du CAPEX</div>
+                              <div>• D&A : Charges fixes ÷ Durée amortissement × 12</div>
             </div>
           </div>
           <div className="bg-white p-4 rounded border">

@@ -272,14 +272,14 @@ const SimulateurRentabilite = () => {
   const [dureeAnalyse, setDureeAnalyse] = useState('60'); // 5 ans par défaut
   
   // États pour le DCF avancé
-  const [capex, setCapex] = useState('5000000'); // 5M par défaut
+  const [capex, setCapex] = useState('2500000'); // 2.5M par défaut
   const [bfr, setBfr] = useState('2500000'); // 2.5M par défaut
   const [wacc, setWacc] = useState('12'); // 12% par défaut (corrigé)
   const [croissanceTerminale, setCroissanceTerminale] = useState('3'); // 3% par défaut
   const [dette, setDette] = useState('0'); // 0 par défaut
   const [tresorerie, setTresorerie] = useState('500000'); // 500K par défaut
   const [tauxImposition, setTauxImposition] = useState('30'); // 30% par défaut
-  const [depreciationAmortissement, setDepreciationAmortissement] = useState('1250000'); // 1.25M par défaut (25% du CAPEX)
+  const [depreciationAmortissement, setDepreciationAmortissement] = useState(''); // Calculé automatiquement
   
   const [produits, setProduits] = useState({
     'Boeuf': {
@@ -358,7 +358,29 @@ const SimulateurRentabilite = () => {
   const getNumericDette = () => getNumericValue(dette);
   const getNumericTresorerie = () => getNumericValue(tresorerie);
   const getNumericTauxImposition = () => getNumericValue(tauxImposition);
-  const getNumericDepreciationAmortissement = () => getNumericValue(depreciationAmortissement);
+  // Fonction pour calculer automatiquement le DA basé sur les charges fixes et durée d'amortissement
+  const calculerDAAutomatique = () => {
+    const chargesFixes = getNumericChargesFixes();
+    const dureeAmortissement = getNumericDureeAmortissement();
+    
+    if (chargesFixes > 0 && dureeAmortissement > 0) {
+      // DA = Charges fixes / Durée amortissement (mois) * 12
+      return (chargesFixes / dureeAmortissement) * 12;
+    }
+    
+    // Valeur par défaut si pas de calcul possible
+    return 1250000;
+  };
+
+  const getNumericDepreciationAmortissement = () => {
+    // Si une valeur manuelle est saisie, l'utiliser
+    if (depreciationAmortissement && depreciationAmortissement.trim() !== '') {
+      return getNumericValue(depreciationAmortissement);
+    }
+    
+    // Sinon, calculer automatiquement
+    return calculerDAAutomatique();
+  };
 
   // Calcul du volume ajusté pour la simulation
   const getAdjustedVolume = () => {
@@ -1132,14 +1154,14 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
     // Reset DCF
     setTauxActualisationAnnuel('12');
     setDureeAnalyse('60');
-    setCapex('5000000');
+    setCapex('2500000');
     setBfr('2500000');
     setWacc('12');
     setCroissanceTerminale('3');
     setDette('0');
     setTresorerie('500000');
     setTauxImposition('30');
-    setDepreciationAmortissement('1250000');
+    setDepreciationAmortissement('');
     setSelectedProductForPricing('Tous');
   };
 
@@ -2867,7 +2889,7 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
         
                  {/* Charges fixes */}
          <div className="mb-6">
-           <h4 className="text-sm font-semibold text-orange-700 mb-3">🏗️ Charges Fixes (Mise en place)</h4>
+           <h4 className="text-sm font-semibold text-orange-700 mb-3">🏗️ Immobilisations (Mise en place)</h4>
            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
              <div>
                <label className="block text-sm font-medium text-gray-700 mb-1">Charges fixes</label>
@@ -3106,8 +3128,14 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
                 onChange={(e) => setDepreciationAmortissement(e.target.value)}
                 className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
                 style={{ fontSize: '16px' }}
+                placeholder="Calculé automatiquement"
               />
-              <div className="text-xs text-gray-500 mt-1">Dépréciation & Amortissement</div>
+              <div className="text-xs text-gray-500 mt-1">
+                {depreciationAmortissement && depreciationAmortissement.trim() !== '' 
+                  ? 'Valeur manuelle saisie' 
+                  : `Auto: ${getNumericChargesFixes().toLocaleString()} ÷ ${getNumericDureeAmortissement()} × 12 = ${Math.round(calculerDAAutomatique()).toLocaleString()} FCFA`
+                }
+              </div>
             </div>
           </div>
           </div>
@@ -3620,10 +3648,11 @@ FCF: ${Math.round(calculerFCF()).toLocaleString()} FCFA`}>
           </div>
         </div>
         <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-          <div className="cursor-help" title={`D&A = 25% du CAPEX - Simulation
-CAPEX: ${Math.round(capex).toLocaleString()} FCFA
-D&A: ${Math.round(depreciationAmortissement).toLocaleString()} FCFA
-D&A Mensuel: ${Math.round(depreciationAmortissement / 12).toLocaleString()} FCFA`}>
+                          <div className="cursor-help" title={`D&A = Charges fixes ÷ Durée amortissement × 12 - Simulation
+                Charges fixes: ${getNumericChargesFixes().toLocaleString()} FCFA
+                Durée amortissement: ${getNumericDureeAmortissement()} mois
+                D&A: ${Math.round(getNumericDepreciationAmortissement()).toLocaleString()} FCFA
+                D&A Mensuel: ${Math.round(getNumericDepreciationAmortissement() / 12).toLocaleString()} FCFA`}>
             <div className="text-sm text-gray-600">D&A (annuel):</div>
             <div className="text-lg sm:text-xl font-bold text-yellow-600">
               {Math.round(getNumericDepreciationAmortissement()).toLocaleString()}
@@ -4922,7 +4951,12 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
             <div className="bg-white p-3 rounded border">
               <div className="font-medium text-gray-800">D&A (annuel)</div>
               <div className="text-lg font-bold text-indigo-600">1,250,000</div>
-              <div className="text-sm text-gray-600">25% du CAPEX (5M × 25%)</div>
+                              <div className="text-sm text-gray-600">
+                  {depreciationAmortissement && depreciationAmortissement.trim() !== '' 
+                    ? 'Valeur manuelle' 
+                    : `Charges fixes ÷ Durée amortissement × 12`
+                  }
+                </div>
             </div>
           </div>
         </div>
