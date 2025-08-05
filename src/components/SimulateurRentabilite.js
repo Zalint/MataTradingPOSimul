@@ -48,7 +48,7 @@ const SimulateurRentabilite = () => {
 
   // Tous les autres hooks doivent être déclarés avant toute condition
   const mainContainerRef = useRef(null);
-  const [activeTab, setActiveTab] = useState('main'); // 'main', 'volume', 'charges', 'dcf', 'dcfSimulation' ou 'faq'
+  const [activeTab, setActiveTab] = useState('main'); // 'main', 'volume', 'charges', 'dcf', 'dcfSimulation', 'solver' ou 'faq'
   const [pageFluxDCF, setPageFluxDCF] = useState(1);
   const [pageFluxDCFSimulation, setPageFluxDCFSimulation] = useState(1);
   const [itemsPerPage] = useState(12);
@@ -91,6 +91,49 @@ const SimulateurRentabilite = () => {
   
   // État pour l'explication de la marge
   const [margeExplicationVisible, setMargeExplicationVisible] = useState(false);
+
+  // États pour le Solveur (Goal Seek)
+  const [solverConstraints, setSolverConstraints] = useState({
+    beneficeNet: { fixed: false, value: '' },
+    margeBoeuf: { fixed: false, value: '' },
+    margeVeau: { fixed: false, value: '' },
+    margeOvin: { fixed: false, value: '' },
+    margePoulet: { fixed: false, value: '' },
+    margeOeuf: { fixed: false, value: '' },
+    volumeMensuel: { fixed: false, value: '' },
+    chargesTotales: { fixed: false, value: '' },
+    peration: { fixed: false, value: '' },
+    abatsParKg: { fixed: false, value: '' }
+  });
+  const [solverVariable, setSolverVariable] = useState('chargesTotales'); // Variable à résoudre
+  const [solverResult, setSolverResult] = useState(null);
+  const [solverLoading, setSolverLoading] = useState(false);
+  const [solverIterations, setSolverIterations] = useState([]);
+
+  // Fonction pour mettre à jour les valeurs par défaut du solveur avec les vraies marges
+  const updateSolverDefaults = () => {
+    const vraiesMarges = {};
+    Object.entries(produits).forEach(([nom, data]) => {
+      if (data.editable && data.prixAchat && data.prixVente) {
+        if (data.hasAbats) {
+          vraiesMarges[`marge${nom}`] = ((data.prixVente * (1 - getNumericPeration()) + getNumericAbatsParKg()) / data.prixAchat - 1) * 100;
+        } else {
+          vraiesMarges[`marge${nom}`] = ((data.prixVente / data.prixAchat) - 1) * 100;
+        }
+      }
+    });
+
+    setSolverConstraints(prev => ({
+      ...prev,
+      margeBoeuf: { ...prev.margeBoeuf, value: vraiesMarges.margeBoeuf ? vraiesMarges.margeBoeuf.toFixed(2) : '' },
+      margeVeau: { ...prev.margeVeau, value: vraiesMarges.margeVeau ? vraiesMarges.margeVeau.toFixed(2) : '' },
+      margeOvin: { ...prev.margeOvin, value: vraiesMarges.margeOvin ? vraiesMarges.margeOvin.toFixed(2) : '' },
+      margePoulet: { ...prev.margePoulet, value: vraiesMarges.margePoulet ? vraiesMarges.margePoulet.toFixed(2) : '' },
+      margeOeuf: { ...prev.margeOeuf, value: vraiesMarges.margeOeuf ? vraiesMarges.margeOeuf.toFixed(2) : '' },
+      peration: { ...prev.peration, value: getNumericPeration() ? (getNumericPeration() * 100).toFixed(2) : '' },
+      abatsParKg: { ...prev.abatsParKg, value: getNumericAbatsParKg() ? getNumericAbatsParKg().toString() : '' }
+    }));
+  };
 
   // Fonction pour générer l'explication détaillée de la marge
   const genererExplicationMarge = () => {
@@ -368,9 +411,9 @@ const SimulateurRentabilite = () => {
     Object.entries(produitsActuels).forEach(([nom, data]) => {
       if (data.editable && data.prixAchat && data.prixVente) {
         let marge;
-        if (data.hasAbats) {
+      if (data.hasAbats) {
           marge = ((data.prixVente * (1 - getNumericPeration()) + getNumericAbatsParKg()) / data.prixAchat) - 1;
-        } else {
+      } else {
           marge = (data.prixVente / data.prixAchat) - 1;
         }
         console.log(`📈 ${nom}: ${data.prixAchat} → ${data.prixVente} = ${(marge * 100).toFixed(2)}%`);
@@ -2037,8 +2080,13 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
             <div className="text-xs text-orange-600 italic">Hypothèse de travail</div>
             </div>
             <div>
-              <div className="text-sm text-gray-600">Bénéfice Total:</div>
-            <div className="text-lg sm:text-xl font-bold text-green-600">{Math.round(getBeneficeTotalActif()).toLocaleString()}</div>
+              <div className="text-sm text-gray-600">Bénéfice Net Mensuel:</div>
+              <div className={`text-lg sm:text-xl font-bold ${
+                (getBeneficeTotalActif() - chargesTotales) > 0 ? 'text-green-600' : 'text-red-600'
+              }`}>
+                {Math.round(getBeneficeTotalActif() - chargesTotales).toLocaleString()}
+              </div>
+              <div className="text-xs text-gray-500">FCFA (après charges)</div>
             </div>
             <div>
               <div className="text-sm text-gray-600 flex items-center gap-2">
@@ -3822,6 +3870,897 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
     </>
   );
 
+  // Fonctions utilitaires pour le Solveur
+  const getSolverVariableLabel = (variable) => {
+    const labels = {
+      'chargesTotales': 'Charges Totales',
+      'volumeMensuel': 'Volume Mensuel',
+      'margeBoeuf': 'Marge Bœuf (%)',
+      'margeVeau': 'Marge Veau (%)',
+      'margeOvin': 'Marge Ovin (%)',
+      'margePoulet': 'Marge Poulet (%)',
+      'margeOeuf': 'Marge Œuf (%)',
+      'peration': 'Pération % (Bœuf/Veau)',
+      'abatsParKg': 'Foie, Yell, Filet (Bœuf/Veau)'
+    };
+    return labels[variable] || variable;
+  };
+
+  const formatSolverResult = (value) => {
+    if (solverVariable.includes('marge') || solverVariable === 'peration') {
+      return `${value.toFixed(2)}%`;
+    }
+    if (solverVariable === 'abatsParKg') {
+      return `${Math.round(value).toLocaleString()} FCFA/kg`;
+    }
+    return Math.round(value).toLocaleString() + ' FCFA';
+  };
+
+  // Fonction principale de résolution
+  const handleSolve = async () => {
+    setSolverLoading(true);
+    setSolverResult(null);
+    setSolverIterations([]);
+
+    try {
+      // Vérifier qu'au moins une contrainte est fixée avec une valeur valide
+      const fixedConstraints = Object.values(solverConstraints).filter(c => c.fixed && c.value !== '');
+      if (fixedConstraints.length === 0) {
+        alert('Veuillez fixer au moins une variable et saisir une valeur avant de résoudre.');
+        setSolverLoading(false);
+        return;
+      }
+
+      console.log('🎯 SOLVEUR - Démarrage de la résolution');
+      console.log('📋 Contraintes fixées:', fixedConstraints.map(c => `${c.value}`));
+      console.log('🎲 Variable à résoudre:', solverVariable);
+
+      // Résolution par méthode de Newton-Raphson
+      const result = await solveNewtonRaphson();
+      
+      if (result.found) {
+        setSolverResult({
+          value: result.value,
+          beneficeNet: result.beneficeNet,
+          success: true,
+          iterations: result.iterations,
+          iterationHistory: result.iterationHistory,
+          finalMargins: result.finalMargins,
+          finalParams: result.finalParams
+        });
+      } else {
+        const currentBenefit = getBeneficeTotalActif() - chargesTotales;
+        const targetBenefit = parseFloat(solverConstraints.beneficeNet.value) || 0;
+        
+        let errorMessage = `Aucune solution trouvée.\n\n`;
+        errorMessage += `Bénéfice actuel: ${Math.round(currentBenefit).toLocaleString()} FCFA\n`;
+        errorMessage += `Objectif: ${Math.round(targetBenefit).toLocaleString()} FCFA\n`;
+        errorMessage += `Écart: ${Math.round(Math.abs(currentBenefit - targetBenefit)).toLocaleString()} FCFA\n\n`;
+        
+        if (result.reason) {
+          errorMessage += `Raison: ${result.reason}\n\n`;
+        }
+        
+        if (solverVariable === 'chargesTotales') {
+          if (currentBenefit > targetBenefit) {
+            errorMessage += `💡 Suggestion: Il faut AUGMENTER les charges de ${Math.round(currentBenefit - targetBenefit).toLocaleString()} FCFA pour atteindre l'objectif.`;
+          } else {
+            errorMessage += `💡 Suggestion: Il faut RÉDUIRE les charges de ${Math.round(targetBenefit - currentBenefit).toLocaleString()} FCFA pour atteindre l'objectif.`;
+          }
+        }
+        
+        alert(errorMessage);
+        
+        setSolverResult({
+          success: false,
+          currentBenefit: currentBenefit,
+          targetBenefit: targetBenefit,
+          suggestion: currentBenefit > targetBenefit ? 'Augmenter les charges' : 'Réduire les charges'
+        });
+      }
+    } catch (error) {
+      console.error('Erreur lors de la résolution:', error);
+      alert('Erreur lors de la résolution. Veuillez vérifier vos paramètres.');
+    } finally {
+      setSolverLoading(false);
+    }
+  };
+
+  // Obtenir les paramètres temporaires avec la nouvelle valeur testée
+  const getTemporaryParams = (testValue) => {
+    const params = {
+      volume: getNumericVolume(),
+      chargesTotales: chargesTotales,
+      peration: getNumericPeration(),
+      abatsParKg: getNumericAbatsParKg(),
+      marges: {}
+    };
+
+    // Appliquer les contraintes fixées
+    if (solverConstraints.volumeMensuel.fixed && solverConstraints.volumeMensuel.value !== '') {
+      params.volume = parseFloat(solverConstraints.volumeMensuel.value) || 0;
+    }
+    if (solverConstraints.chargesTotales.fixed && solverConstraints.chargesTotales.value !== '') {
+      params.chargesTotales = parseFloat(solverConstraints.chargesTotales.value) || 0;
+    }
+    if (solverConstraints.peration.fixed && solverConstraints.peration.value !== '') {
+      params.peration = (parseFloat(solverConstraints.peration.value) || 0) / 100; // Convertir % en décimal
+    }
+    if (solverConstraints.abatsParKg.fixed && solverConstraints.abatsParKg.value !== '') {
+      params.abatsParKg = parseFloat(solverConstraints.abatsParKg.value) || 0;
+    }
+
+    // Appliquer la valeur testée à la variable à résoudre
+    if (solverVariable === 'volumeMensuel') {
+      params.volume = testValue;
+    } else if (solverVariable === 'chargesTotales') {
+      params.chargesTotales = testValue;
+    } else if (solverVariable === 'peration') {
+      params.peration = testValue / 100; // Convertir % en décimal
+    } else if (solverVariable === 'abatsParKg') {
+      params.abatsParKg = testValue;
+    } else if (solverVariable.startsWith('marge')) {
+      const produit = solverVariable.replace('marge', '').toLowerCase();
+      params.marges[produit] = testValue / 100; // Convertir % en décimal
+    }
+
+    return params;
+  };
+
+  // Calculer le bénéfice net avec des paramètres donnés
+  const calculateBeneficeNetWithParams = (params) => {
+    console.log(`🧮 CALCUL BÉNÉFICE AVEC PARAMÈTRES:`);
+    console.log(`   Volume: ${params.volume.toLocaleString()}`);
+    console.log(`   Charges: ${params.chargesTotales.toLocaleString()}`);
+    console.log(`   Pération: ${(params.peration * 100).toFixed(2)}%`);
+    console.log(`   Abats: ${params.abatsParKg} FCFA/kg`);
+    
+    // Utiliser les répartitions exactes de l'interface principale
+    const repartitionsActuelles = getNumericAdditionalVolume() > 0 ? getAdjustedRepartitions() : produits;
+    console.log(`   📊 Utilisation des répartitions de l'interface principale`);
+    
+    // Calculer d'abord la marge moyenne des produits éditables avec les nouveaux paramètres
+    let margeMoyenneEditables = 0;
+    let nombreProduitsEditables = 0;
+    
+    Object.entries(produits).forEach(([nom, data]) => {
+      if (data.editable && data.prixAchat && data.prixVente) {
+        let margeTemp;
+        if (data.hasAbats) {
+          margeTemp = ((data.prixVente * (1 - params.peration) + params.abatsParKg) / data.prixAchat) - 1;
+        } else {
+          margeTemp = (data.prixVente / data.prixAchat) - 1;
+        }
+        margeMoyenneEditables += margeTemp;
+        nombreProduitsEditables++;
+        console.log(`   📊 ${nom}: marge = ${(margeTemp * 100).toFixed(2)}%`);
+      }
+    });
+    
+    margeMoyenneEditables = nombreProduitsEditables > 0 ? margeMoyenneEditables / nombreProduitsEditables : 0;
+    console.log(`   📈 Marge moyenne éditables: ${(margeMoyenneEditables * 100).toFixed(2)}%`);
+    
+    let beneficeBrut = 0;
+    
+    // Calculer le bénéfice brut pour chaque produit avec les répartitions exactes
+    Object.entries(produits).forEach(([nom, data]) => {
+      let marge;
+      const nomLower = nom.toLowerCase();
+      
+      // Utiliser la marge personnalisée si définie, sinon calculer selon le type de produit
+      if (params.marges && params.marges[nomLower] !== undefined) {
+        marge = params.marges[nomLower];
+        console.log(`   🎯 ${nom}: marge personnalisée = ${(marge * 100).toFixed(2)}%`);
+      } else if (data.editable && data.prixAchat && data.prixVente) {
+        // Calculer la marge avec les paramètres personnalisés (peration et abatsParKg)
+        if (data.hasAbats) {
+          marge = ((data.prixVente * (1 - params.peration) + params.abatsParKg) / data.prixAchat) - 1;
+        } else {
+          marge = (data.prixVente / data.prixAchat) - 1;
+        }
+        console.log(`   ✅ ${nom}: marge calculée = ${(marge * 100).toFixed(2)}%`);
+      } else {
+        // Pour les produits non-éditables, utiliser la marge moyenne
+        marge = margeMoyenneEditables;
+        console.log(`   ➡️ ${nom}: marge moyenne = ${(marge * 100).toFixed(2)}%`);
+      }
+      
+      // Utiliser la répartition exacte de l'interface principale
+      const repartitionExacte = repartitionsActuelles[nom] ? repartitionsActuelles[nom].repartition : data.repartition;
+      const benefice = calculerBenefice(marge, repartitionExacte, params.volume);
+      beneficeBrut += benefice;
+      console.log(`   💰 ${nom}: bénéfice = ${benefice.toLocaleString()} (part: ${(repartitionExacte * 100).toFixed(1)}%)`);
+    });
+    
+    const beneficeNet = beneficeBrut - params.chargesTotales;
+    console.log(`   🎯 BÉNÉFICE BRUT: ${beneficeBrut.toLocaleString()} FCFA`);
+    console.log(`   🎯 BÉNÉFICE NET: ${beneficeNet.toLocaleString()} FCFA`);
+    
+    // Validation avec la simulation principale
+    const currentBenefitUI = getBeneficeTotalActif() - chargesTotales;
+    console.log(`🔍 COMPARAISON:`);
+    console.log(`   📊 Bénéfice UI actuel: ${currentBenefitUI.toLocaleString()} FCFA`);
+    console.log(`   🧮 Bénéfice calculé solveur: ${beneficeNet.toLocaleString()} FCFA`);
+    console.log(`   📈 Différence: ${Math.abs(currentBenefitUI - beneficeNet).toLocaleString()} FCFA`);
+    
+    return beneficeNet;
+  };
+
+  // Calculer les marges finales après convergence
+  const calculateFinalMargins = (finalParams) => {
+    const margins = {};
+    
+    Object.entries(produits).forEach(([nom, data]) => {
+      let marge;
+      const nomLower = nom.toLowerCase();
+      
+      // Utiliser la marge personnalisée si définie dans les paramètres finaux
+      if (finalParams.marges && finalParams.marges[nomLower] !== undefined) {
+        marge = finalParams.marges[nomLower];
+      } else if (data.editable && data.prixAchat && data.prixVente) {
+        // Calculer la marge avec les paramètres finaux (peration et abatsParKg)
+        if (data.hasAbats) {
+          marge = ((data.prixVente * (1 - finalParams.peration) + finalParams.abatsParKg) / data.prixAchat) - 1;
+        } else {
+          marge = (data.prixVente / data.prixAchat) - 1;
+        }
+      } else {
+        // Pour les produits non-éditables, calculer une marge moyenne avec les paramètres finaux
+        let margeMoyenneEditables = 0;
+        let nombreProduitsEditables = 0;
+        
+        Object.entries(produits).forEach(([nomProd, dataProd]) => {
+          if (dataProd.editable && dataProd.prixAchat && dataProd.prixVente) {
+            let margeTemp;
+            if (dataProd.hasAbats) {
+              margeTemp = ((dataProd.prixVente * (1 - finalParams.peration) + finalParams.abatsParKg) / dataProd.prixAchat) - 1;
+            } else {
+              margeTemp = (dataProd.prixVente / dataProd.prixAchat) - 1;
+            }
+            margeMoyenneEditables += margeTemp;
+            nombreProduitsEditables++;
+          }
+        });
+        
+        marge = nombreProduitsEditables > 0 ? margeMoyenneEditables / nombreProduitsEditables : 0;
+      }
+      
+      margins[nom] = {
+        value: marge,
+        percentage: marge * 100,
+        editable: data.editable,
+        hasAbats: data.hasAbats,
+        prixAchat: data.prixAchat,
+        prixVente: data.prixVente
+      };
+    });
+    
+    console.log('📊 MARGES FINALES CALCULÉES:');
+    Object.entries(margins).forEach(([nom, info]) => {
+      console.log(`   ${nom}: ${(info.percentage).toFixed(2)}% (${info.editable ? 'éditable' : 'calculé'})`);
+    });
+    
+    return margins;
+  };
+
+  // Algorithme de Newton-Raphson pour résoudre l'équation
+  const solveNewtonRaphson = async () => {
+    const tolerance = 100; // Tolérance d'erreur pour Newton-Raphson
+    const maxIterations = 50; // Newton-Raphson converge plus vite
+    const h = 1; // Pas pour le calcul numérique de la dérivée
+    
+    const iterations = []; // Historique des itérations pour l'affichage
+    
+    console.log('🎯 SOLVEUR NEWTON-RAPHSON - DÉBUT');
+    console.log('='.repeat(80));
+    console.log(`📋 Variable à résoudre: ${solverVariable}`);
+    console.log(`🎯 Objectif: ${(parseFloat(solverConstraints.beneficeNet.value) || 0).toLocaleString()} FCFA`);
+    
+    // Fonction objectif : f(x) = bénéfice_net(x) - bénéfice_cible
+    const f = (x) => {
+      const tempParams = getTemporaryParams(x);
+      const beneficeNet = calculateBeneficeNetWithParams(tempParams);
+      const target = solverConstraints.beneficeNet.fixed ? (parseFloat(solverConstraints.beneficeNet.value) || 0) : 0;
+      const result = beneficeNet - target;
+      
+      console.log(`   📊 f(${x.toLocaleString()}) = ${beneficeNet.toLocaleString()} - ${target.toLocaleString()} = ${result.toLocaleString()}`);
+      return result;
+    };
+    
+    // Calcul numérique de la dérivée : f'(x) ≈ (f(x+h) - f(x)) / h
+    const df = (x) => {
+      const fx = f(x);
+      const fxh = f(x + h);
+      const derivative = (fxh - fx) / h;
+      console.log(`   📈 f'(${x.toLocaleString()}) = (${fxh.toLocaleString()} - ${fx.toLocaleString()}) / ${h} = ${derivative.toFixed(6)}`);
+      return derivative;
+    };
+    
+    // Valeur initiale intelligente selon la variable
+    let x0;
+    if (solverVariable === 'volumeMensuel') {
+      x0 = getNumericVolume(); // Partir du volume actuel
+      console.log(`🎲 Initialisation volume: ${x0.toLocaleString()} (volume actuel)`);
+    } else if (solverVariable === 'chargesTotales') {
+      // Estimation intelligente : charges actuelles + écart nécessaire
+      const currentBenefit = getBeneficeTotalActif() - chargesTotales;
+      const targetBenefit = parseFloat(solverConstraints.beneficeNet.value) || 0;
+      const adjustment = currentBenefit - targetBenefit;
+      x0 = chargesTotales + adjustment;
+      console.log(`🎲 Initialisation charges:`);
+      console.log(`   💰 Bénéfice actuel: ${currentBenefit.toLocaleString()} FCFA`);
+      console.log(`   🎯 Bénéfice cible: ${targetBenefit.toLocaleString()} FCFA`);
+      console.log(`   📊 Charges actuelles: ${chargesTotales.toLocaleString()} FCFA`);
+      console.log(`   🔧 Ajustement: ${adjustment.toLocaleString()} FCFA`);
+      console.log(`   ➡️ Estimation initiale: ${x0.toLocaleString()} FCFA`);
+    } else if (solverVariable === 'peration') {
+      x0 = getNumericPeration() * 100; // Partir de la pération actuelle (convertir en %)
+      console.log(`🎲 Initialisation pération: ${x0}% (valeur actuelle)`);
+    } else if (solverVariable === 'abatsParKg') {
+      x0 = getNumericAbatsParKg(); // Partir de la valeur actuelle des abats
+      console.log(`🎲 Initialisation abats: ${x0.toLocaleString()} FCFA/kg (valeur actuelle)`);
+    } else if (solverVariable.includes('marge')) {
+      x0 = 15; // Partir de 15% comme marge de départ raisonnable
+      console.log(`🎲 Initialisation marge: ${x0}% (estimation standard)`);
+    }
+    
+    // Bornes de sécurité
+    let minBound, maxBound;
+    if (solverVariable === 'volumeMensuel') {
+      minBound = 100000; // 100K minimum
+      maxBound = 500000000; // 500M maximum
+    } else if (solverVariable === 'chargesTotales') {
+      minBound = -50000000; // Permettre des "charges négatives" (subventions)
+      maxBound = 100000000; // 100M maximum
+    } else if (solverVariable === 'peration') {
+      minBound = 0; // 0% minimum
+      maxBound = 50; // 50% maximum (pération très élevée)
+    } else if (solverVariable === 'abatsParKg') {
+      minBound = 0; // 0 FCFA/kg minimum
+      maxBound = 2000; // 2000 FCFA/kg maximum (très cher)
+    } else if (solverVariable.includes('marge')) {
+      minBound = 0; // 0%
+      maxBound = 500; // 500% maximum
+    }
+    
+    console.log(`🛡️ Bornes de sécurité: [${minBound.toLocaleString()}, ${maxBound.toLocaleString()}]`);
+    console.log('='.repeat(80));
+    
+    let x = x0;
+    
+    for (let i = 0; i < maxIterations; i++) {
+      console.log(`\n🔍 ITÉRATION ${i + 1}:`);
+      console.log(`-`.repeat(40));
+      
+      const fx = f(x);
+      const dfx = df(x);
+      
+      // Enregistrer l'itération pour l'affichage UI
+      const iteration = {
+        number: i + 1,
+        x: x,
+        fx: fx,
+        dfx: dfx,
+        converged: false,
+        clamped: false
+      };
+      
+      console.log(`🎯 Valeur actuelle: ${x.toLocaleString()}`);
+      console.log(`📊 Erreur f(x): ${fx.toLocaleString()}`);
+      console.log(`📈 Dérivée f'(x): ${dfx.toFixed(6)}`);
+      
+      // Vérifier la convergence
+      if (Math.abs(fx) < tolerance) {
+        const tempParams = getTemporaryParams(x);
+        const beneficeNet = calculateBeneficeNetWithParams(tempParams);
+        
+        iteration.converged = true;
+        iterations.push(iteration);
+        setSolverIterations(iterations);
+        
+        console.log(`✅ CONVERGENCE ATTEINTE!`);
+        console.log(`   📊 Erreur finale: ${Math.abs(fx).toLocaleString()} < ${tolerance.toLocaleString()}`);
+        console.log(`   🎯 Solution: ${x.toLocaleString()}`);
+        console.log(`   💰 Bénéfice net résultant: ${beneficeNet.toLocaleString()} FCFA`);
+        console.log(`   ⚡ Convergence en ${i + 1} itérations`);
+        console.log('='.repeat(80));
+        
+        // Calculer les marges finales pour affichage
+        const finalMargins = calculateFinalMargins(tempParams);
+        
+        return {
+          found: true,
+          value: x,
+          beneficeNet: beneficeNet,
+          iterations: i + 1,
+          iterationHistory: iterations,
+          finalMargins: finalMargins,
+          finalParams: tempParams
+        };
+      }
+      
+      // Vérifier que la dérivée n'est pas nulle (éviter division par zéro)
+      if (Math.abs(dfx) < 1e-10) {
+        console.log(`❌ ERREUR: Dérivée trop proche de zéro (${dfx})`);
+        console.log(`   Point stationnaire détecté - impossible de continuer`);
+        return { found: false, reason: 'Dérivée nulle - point stationnaire' };
+      }
+      
+      // Newton-Raphson: x_{n+1} = x_n - f(x_n) / f'(x_n)
+      const newX = x - fx / dfx;
+      console.log(`🧮 Newton-Raphson: ${x.toLocaleString()} - ${fx.toLocaleString()} / ${dfx.toFixed(6)} = ${newX.toLocaleString()}`);
+      
+      // Appliquer les bornes de sécurité
+      const clampedX = Math.max(minBound, Math.min(maxBound, newX));
+      
+      if (clampedX !== newX) {
+        iteration.clamped = true;
+        console.log(`⚠️ BRIDAGE APPLIQUÉ: ${newX.toLocaleString()} → ${clampedX.toLocaleString()}`);
+        console.log(`   Raison: Sortie des bornes [${minBound.toLocaleString()}, ${maxBound.toLocaleString()}]`);
+      }
+      
+      iteration.newX = clampedX;
+      iterations.push(iteration);
+      setSolverIterations([...iterations]); // Mise à jour temps réel
+      
+      // Vérifier la convergence du changement de x
+      const deltaX = Math.abs(clampedX - x);
+      console.log(`📏 Changement de x: ${deltaX.toLocaleString()}`);
+      
+      if (deltaX < 1) {
+        const tempParams = getTemporaryParams(clampedX);
+        const beneficeNet = calculateBeneficeNetWithParams(tempParams);
+        
+        console.log(`✅ CONVERGENCE PAR STABILITÉ!`);
+        console.log(`   📏 Changement: ${deltaX.toLocaleString()} < 1`);
+        console.log(`   🎯 Solution: ${clampedX.toLocaleString()}`);
+        console.log(`   💰 Bénéfice net résultant: ${beneficeNet.toLocaleString()} FCFA`);
+        console.log(`   ⚡ Convergence en ${i + 1} itérations`);
+        console.log('='.repeat(80));
+        
+        // Calculer les marges finales pour affichage
+        const finalMargins = calculateFinalMargins(tempParams);
+        
+        return {
+          found: true,
+          value: clampedX,
+          beneficeNet: beneficeNet,
+          iterations: i + 1,
+          iterationHistory: iterations,
+          finalMargins: finalMargins,
+          finalParams: tempParams
+        };
+      }
+      
+      console.log(`➡️ Prochaine valeur: ${clampedX.toLocaleString()}`);
+      x = clampedX;
+      
+      // Petit délai pour voir les itérations en temps réel
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    
+    console.log(`❌ ÉCHEC: Convergence non atteinte après ${maxIterations} itérations`);
+    console.log('='.repeat(80));
+    return { found: false, reason: `Max itérations atteint (${maxIterations})`, iterationHistory: iterations };
+  };
+
+  const renderSolverContent = () => (
+    <>
+      {/* Interface du Solveur */}
+      <div className="bg-green-50 border border-green-200 rounded-lg p-3 sm:p-4 md:p-6 mb-4 sm:mb-6 md:mb-8">
+        <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-green-800">🎯 Solveur (Goal Seek)</h3>
+        <p className="text-sm text-gray-600 mb-4">
+          Fixez certaines valeurs et laissez le solveur calculer automatiquement les autres variables pour atteindre votre objectif.
+        </p>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Variables à fixer */}
+          <div className="bg-white p-4 rounded-lg border border-gray-200">
+            <h4 className="text-md font-semibold mb-3 text-gray-800">📌 Variables à fixer</h4>
+            
+            {/* Bénéfice Net */}
+            <div className="flex items-center justify-between mb-3 p-2 bg-gray-50 rounded">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  checked={solverConstraints.beneficeNet.fixed}
+                  onChange={(e) => setSolverConstraints(prev => ({
+                    ...prev,
+                    beneficeNet: { ...prev.beneficeNet, fixed: e.target.checked }
+                  }))}
+                  className="rounded"
+                />
+                <label className="text-sm font-medium">Bénéfice Net Mensuel</label>
+              </div>
+              <input
+                type="number"
+                value={solverConstraints.beneficeNet.value}
+                onChange={(e) => setSolverConstraints(prev => ({
+                  ...prev,
+                  beneficeNet: { ...prev.beneficeNet, value: parseFloat(e.target.value) || 0 }
+                }))}
+                disabled={!solverConstraints.beneficeNet.fixed}
+                className="w-32 p-1 text-sm border rounded"
+                placeholder="1000000"
+              />
+            </div>
+
+            {/* Marges des produits */}
+            {[
+              { key: 'margeBoeuf', label: 'Marge Bœuf (%)', produit: 'Boeuf' },
+              { key: 'margeVeau', label: 'Marge Veau (%)', produit: 'Veau' },
+              { key: 'margeOvin', label: 'Marge Ovin (%)', produit: 'Ovin' },
+              { key: 'margePoulet', label: 'Marge Poulet (%)', produit: 'Poulet' },
+              { key: 'margeOeuf', label: 'Marge Œuf (%)', produit: 'Oeuf' }
+            ].map(({ key, label, produit }) => (
+              <div key={key} className="flex items-center justify-between mb-3 p-2 bg-gray-50 rounded">
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    checked={solverConstraints[key].fixed}
+                    onChange={(e) => setSolverConstraints(prev => ({
+                      ...prev,
+                      [key]: { ...prev[key], fixed: e.target.checked }
+                    }))}
+                    className="rounded"
+                  />
+                  <label className="text-sm font-medium">{label}</label>
+                </div>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={solverConstraints[key].value}
+                  onChange={(e) => setSolverConstraints(prev => ({
+                    ...prev,
+                    [key]: { ...prev[key], value: parseFloat(e.target.value) || 0 }
+                  }))}
+                  disabled={!solverConstraints[key].fixed}
+                  className="w-20 p-1 text-sm border rounded"
+                  placeholder="15.0"
+                />
+              </div>
+            ))}
+
+            {/* Volume Mensuel */}
+            <div className="flex items-center justify-between mb-3 p-2 bg-gray-50 rounded">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  checked={solverConstraints.volumeMensuel.fixed}
+                  onChange={(e) => setSolverConstraints(prev => ({
+                    ...prev,
+                    volumeMensuel: { ...prev.volumeMensuel, fixed: e.target.checked }
+                  }))}
+                  className="rounded"
+                />
+                <label className="text-sm font-medium">Volume Mensuel</label>
+              </div>
+              <input
+                type="number"
+                value={solverConstraints.volumeMensuel.value}
+                onChange={(e) => setSolverConstraints(prev => ({
+                  ...prev,
+                  volumeMensuel: { ...prev.volumeMensuel, value: parseFloat(e.target.value) || 0 }
+                }))}
+                disabled={!solverConstraints.volumeMensuel.fixed}
+                className="w-32 p-1 text-sm border rounded"
+                placeholder="20000000"
+              />
+            </div>
+
+            {/* Charges Totales */}
+            <div className="flex items-center justify-between mb-3 p-2 bg-gray-50 rounded">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  checked={solverConstraints.chargesTotales.fixed}
+                  onChange={(e) => setSolverConstraints(prev => ({
+                    ...prev,
+                    chargesTotales: { ...prev.chargesTotales, fixed: e.target.checked }
+                  }))}
+                  className="rounded"
+                />
+                <label className="text-sm font-medium">Charges Totales</label>
+              </div>
+              <input
+                type="number"
+                value={solverConstraints.chargesTotales.value}
+                onChange={(e) => setSolverConstraints(prev => ({
+                  ...prev,
+                  chargesTotales: { ...prev.chargesTotales, value: parseFloat(e.target.value) || 0 }
+                }))}
+                disabled={!solverConstraints.chargesTotales.fixed}
+                className="w-32 p-1 text-sm border rounded"
+                placeholder="500000"
+              />
+            </div>
+
+            {/* Pération % */}
+            <div className="flex items-center justify-between mb-3 p-2 bg-gray-50 rounded">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  checked={solverConstraints.peration.fixed}
+                  onChange={(e) => setSolverConstraints(prev => ({
+                    ...prev,
+                    peration: { ...prev.peration, fixed: e.target.checked }
+                  }))}
+                  className="rounded"
+                />
+                <label className="text-sm font-medium">Pération % (Bœuf/Veau)</label>
+              </div>
+              <input
+                type="number"
+                step="0.1"
+                value={solverConstraints.peration.value}
+                onChange={(e) => setSolverConstraints(prev => ({
+                  ...prev,
+                  peration: { ...prev.peration, value: parseFloat(e.target.value) || 0 }
+                }))}
+                disabled={!solverConstraints.peration.fixed}
+                className="w-20 p-1 text-sm border rounded"
+                placeholder="13.0"
+              />
+            </div>
+
+            {/* Abats par Kg */}
+            <div className="flex items-center justify-between mb-3 p-2 bg-gray-50 rounded">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  checked={solverConstraints.abatsParKg.fixed}
+                  onChange={(e) => setSolverConstraints(prev => ({
+                    ...prev,
+                    abatsParKg: { ...prev.abatsParKg, fixed: e.target.checked }
+                  }))}
+                  className="rounded"
+                />
+                <label className="text-sm font-medium">Foie, Yell, Filet (Bœuf/Veau)</label>
+              </div>
+              <input
+                type="number"
+                value={solverConstraints.abatsParKg.value}
+                onChange={(e) => setSolverConstraints(prev => ({
+                  ...prev,
+                  abatsParKg: { ...prev.abatsParKg, value: parseFloat(e.target.value) || 0 }
+                }))}
+                disabled={!solverConstraints.abatsParKg.fixed}
+                className="w-20 p-1 text-sm border rounded"
+                placeholder="200"
+              />
+            </div>
+          </div>
+
+          {/* Variable à résoudre */}
+          <div className="bg-white p-4 rounded-lg border border-gray-200">
+            <div className="flex justify-between items-center mb-3">
+              <h4 className="text-md font-semibold text-gray-800">🎲 Variable à résoudre</h4>
+              <button
+                onClick={updateSolverDefaults}
+                className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm font-medium transition-colors"
+                title="Mettre à jour avec les valeurs actuelles de l'application"
+              >
+                🔄 Valeurs actuelles
+              </button>
+            </div>
+            
+            <select
+              value={solverVariable}
+              onChange={(e) => setSolverVariable(e.target.value)}
+              className="w-full p-2 border rounded mb-4"
+            >
+              <option value="chargesTotales">Charges Totales</option>
+              <option value="volumeMensuel">Volume Mensuel</option>
+              <option value="margeBoeuf">Marge Bœuf (%)</option>
+              <option value="margeVeau">Marge Veau (%)</option>
+              <option value="margeOvin">Marge Ovin (%)</option>
+              <option value="margePoulet">Marge Poulet (%)</option>
+              <option value="margeOeuf">Marge Œuf (%)</option>
+              <option value="peration">Pération % (Bœuf/Veau)</option>
+              <option value="abatsParKg">Foie, Yell, Filet (Bœuf/Veau)</option>
+            </select>
+
+            <button
+              onClick={handleSolve}
+              disabled={solverLoading}
+              className="w-full bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded font-medium transition-colors disabled:opacity-50"
+            >
+              {solverLoading ? '🔄 Résolution...' : '🎯 Résoudre'}
+            </button>
+
+            {/* Résultats */}
+            {solverResult && (
+              <div className={`mt-4 p-3 border rounded ${
+                solverResult.success 
+                  ? 'bg-green-100 border-green-300' 
+                  : 'bg-red-100 border-red-300'
+              }`}>
+                {solverResult.success ? (
+                  <>
+                    <h5 className="font-semibold text-green-800 mb-2">
+                      ✅ Solution trouvée {solverResult.iterations && `(${solverResult.iterations} itérations)`}
+                    </h5>
+                    <p className="text-sm text-green-700">
+                      <strong>{getSolverVariableLabel(solverVariable)}:</strong> {formatSolverResult(solverResult.value)}
+                    </p>
+                    <p className="text-xs text-green-600 mt-1">
+                      Bénéfice net résultant: {Math.round(solverResult.beneficeNet).toLocaleString()} FCFA
+                    </p>
+                    <p className="text-xs text-green-500 mt-1">
+                      🚀 Algorithme Newton-Raphson utilisé
+                    </p>
+                    
+                    {/* Affichage des marges finales */}
+                    {solverResult.finalMargins && (
+                      <div className="mt-3 p-2 bg-green-50 border border-green-200 rounded">
+                        <h6 className="font-semibold text-green-800 mb-2 text-xs">📊 Marges finales de convergence :</h6>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          {Object.entries(solverResult.finalMargins).map(([nom, info]) => (
+                            <div key={nom} className="flex justify-between items-center">
+                              <span className="text-green-700">
+                                {nom} {info.hasAbats && '🥩'} {!info.editable && '†'}:
+                              </span>
+                              <span className="font-mono font-semibold text-green-800">
+                                {info.percentage.toFixed(2)}%
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                        <p className="text-xs text-green-600 mt-2">
+                          🥩 = Avec abats • † = Calculé (non-éditable)
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Affichage des répartitions utilisées */}
+                    <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded">
+                      <h6 className="font-semibold text-yellow-800 mb-2 text-xs">📊 Répartitions utilisées par le solveur :</h6>
+                      <div className="space-y-1 text-xs">
+                        {Object.entries(produits).map(([nom, data]) => (
+                          <div key={nom} className="flex justify-between">
+                            <span className="text-yellow-700">{nom}:</span>
+                            <span className="font-mono font-semibold text-yellow-800">
+                              {(data.repartition * 100).toFixed(1)}%
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Affichage des répartitions de l'interface principale */}
+                    <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded">
+                      <h6 className="font-semibold text-green-800 mb-2 text-xs">📊 Répartitions de l'interface principale :</h6>
+                      <div className="space-y-1 text-xs">
+                        {Object.entries(getNumericAdditionalVolume() > 0 ? getAdjustedRepartitions() : produits).map(([nom, data]) => (
+                          <div key={nom} className="flex justify-between">
+                            <span className="text-green-700">{nom}:</span>
+                            <span className="font-mono font-semibold text-green-800">
+                              {(data.repartition * 100).toFixed(1)}%
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Affichage des paramètres finaux */}
+                    {solverResult.finalParams && (
+                      <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded">
+                        <h6 className="font-semibold text-blue-800 mb-2 text-xs">⚙️ Paramètres finaux de convergence :</h6>
+                        <div className="space-y-1 text-xs">
+                          <div className="flex justify-between">
+                            <span className="text-blue-700">Volume Mensuel:</span>
+                            <span className="font-mono font-semibold text-blue-800">
+                              {Math.round(solverResult.finalParams.volume).toLocaleString()}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-blue-700">Charges Totales:</span>
+                            <span className="font-mono font-semibold text-blue-800">
+                              {Math.round(solverResult.finalParams.chargesTotales).toLocaleString()} FCFA
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-blue-700">Pération % (Bœuf/Veau):</span>
+                            <span className="font-mono font-semibold text-blue-800">
+                              {(solverResult.finalParams.peration * 100).toFixed(2)}%
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-blue-700">Foie, Yell, Filet:</span>
+                            <span className="font-mono font-semibold text-blue-800">
+                              {Math.round(solverResult.finalParams.abatsParKg).toLocaleString()} FCFA/kg
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <h5 className="font-semibold text-red-800 mb-2">❌ Aucune solution trouvée</h5>
+                    <p className="text-sm text-red-700 mb-1">
+                      <strong>Bénéfice actuel:</strong> {Math.round(solverResult.currentBenefit).toLocaleString()} FCFA
+                    </p>
+                    <p className="text-sm text-red-700 mb-1">
+                      <strong>Objectif:</strong> {Math.round(solverResult.targetBenefit).toLocaleString()} FCFA
+                    </p>
+                    <p className="text-xs text-red-600 mt-1">
+                      💡 {solverResult.suggestion}
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Tableau des itérations de convergence */}
+            {solverIterations.length > 0 && (
+              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
+                <h5 className="font-semibold text-blue-800 mb-3">📊 Historique de convergence Newton-Raphson</h5>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-blue-100">
+                        <th className="p-2 text-left">Itération</th>
+                        <th className="p-2 text-right">Valeur (x)</th>
+                        <th className="p-2 text-right">Erreur f(x)</th>
+                        <th className="p-2 text-right">Dérivée f'(x)</th>
+                        <th className="p-2 text-right">Nouvelle valeur</th>
+                        <th className="p-2 text-center">Statut</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {solverIterations.map((iter, index) => (
+                        <tr key={index} className={`${index % 2 === 0 ? 'bg-white' : 'bg-blue-25'} ${
+                          iter.converged ? 'bg-green-100 font-semibold' : ''
+                        }`}>
+                          <td className="p-2">{iter.number}</td>
+                          <td className="p-2 text-right font-mono">
+                            {solverVariable.includes('marge') 
+                              ? iter.x.toFixed(2) + '%'
+                              : Math.round(iter.x).toLocaleString()
+                            }
+                          </td>
+                          <td className="p-2 text-right font-mono">
+                            {Math.abs(iter.fx) < 1000 
+                              ? iter.fx.toFixed(1)
+                              : Math.round(iter.fx).toLocaleString()
+                            }
+                          </td>
+                          <td className="p-2 text-right font-mono">
+                            {iter.dfx.toFixed(4)}
+                          </td>
+                          <td className="p-2 text-right font-mono">
+                            {iter.newX !== undefined ? (
+                              solverVariable.includes('marge') 
+                                ? iter.newX.toFixed(2) + '%'
+                                : Math.round(iter.newX).toLocaleString()
+                            ) : '-'}
+                          </td>
+                          <td className="p-2 text-center">
+                            {iter.converged ? (
+                              <span className="text-green-600 font-bold">✅ Convergé</span>
+                            ) : iter.clamped ? (
+                              <span className="text-orange-600">⚠️ Bridé</span>
+                            ) : (
+                              <span className="text-blue-600">➡️ Continue</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="text-xs text-blue-600 mt-2">
+                  💡 Chaque itération applique Newton-Raphson: x_n+1 = x_n - f(x_n) / f'(x_n)
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+
   const renderFAQContent = () => (
     <>
       {/* FAQ Générale */}
@@ -4268,6 +5207,16 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
              📊 DCF Simulation
            </button>
            <button
+             onClick={() => setActiveTab('solver')}
+             className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+               activeTab === 'solver'
+                 ? 'bg-green-500 text-white'
+                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+             }`}
+           >
+             🎯 Solveur
+           </button>
+           <button
              onClick={() => setActiveTab('faq')}
              className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
                activeTab === 'faq'
@@ -4285,6 +5234,7 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
          {activeTab === 'charges' && renderChargesContent()}
          {activeTab === 'dcf' && renderDCFContent()}
          {activeTab === 'dcfSimulation' && renderDCFSimulationContent()}
+         {activeTab === 'solver' && renderSolverContent()}
          {activeTab === 'faq' && renderFAQContent()}
 
         {/* Graphiques */}
@@ -4440,9 +5390,9 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
                   Object.entries(tempProduits).forEach(([nom, data]) => {
                     if (data.editable && data.prixAchat && data.prixVente) {
                       let marge;
-                      if (data.hasAbats) {
+                    if (data.hasAbats) {
                         marge = ((data.prixVente * (1 - getNumericPeration()) + getNumericAbatsParKg()) / data.prixAchat) - 1;
-                      } else {
+                    } else {
                         marge = (data.prixVente / data.prixAchat) - 1;
                       }
                       margeMoyenneEditables += marge;
@@ -4568,9 +5518,9 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
                   Object.entries(tempProduits).forEach(([nom, data]) => {
                     if (data.editable && data.prixAchat && data.prixVente) {
                       let marge;
-                      if (data.hasAbats) {
+                    if (data.hasAbats) {
                         marge = ((data.prixVente * (1 - getNumericPeration()) + getNumericAbatsParKg()) / data.prixAchat) - 1;
-                      } else {
+                    } else {
                         marge = (data.prixVente / data.prixAchat) - 1;
                       }
                       margeMoyenneEditables += marge;
