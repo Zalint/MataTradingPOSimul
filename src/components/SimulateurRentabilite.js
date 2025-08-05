@@ -5674,7 +5674,7 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
           {/* Sensibilité prix de vente */}
           <div className="bg-white p-3 sm:p-4 md:p-6 rounded-lg shadow-md border">
             <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-gray-800">
-              📈 Sensibilité - Prix de Vente {selectedProductForPricing === 'Tous' ? '(Tous)' : selectedProductForPricing}
+              📈 Sensibilité - Bénéfice Net Mensuel {selectedProductForPricing === 'Tous' ? '(Tous)' : selectedProductForPricing}
             </h3>
             <ResponsiveContainer width="100%" height={250} className="sm:h-[300px]">
               <LineChart data={(() => {
@@ -5692,11 +5692,12 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
                   const benefice = calculerBenefice(margeBrute, data.repartition, getNumericVolume());
                   baseBeneficeOriginal += benefice;
                   return { nom, ...data, margeBrute, benefice };
-                });
+                                });
                 
-
+                // Calculer le bénéfice net de base en soustrayant les charges totales
+                const baseBeneficeNet = baseBeneficeOriginal - chargesTotales;
                 
-                data.push({ variation: 'Base', benefice: baseBeneficeOriginal });
+                data.push({ variation: 'Base', benefice: baseBeneficeNet });
                 
                 // Simuler chaque variation comme si on faisait un vrai bump
                 [50, 100, 150, 200].forEach(variation => {
@@ -5783,10 +5784,15 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
                     return { nom, ...data, margeBrute, benefice };
                   });
                   
-                  console.log(`💰 BÉNÉFICE GRAPHIQUE (+${variation}): ${beneficeTotal.toLocaleString()} FCFA`);
+                  // Calculer le bénéfice net en soustrayant les charges totales
+                  const beneficeNet = beneficeTotal - chargesTotales;
+                  
+                  console.log(`💰 BÉNÉFICE TOTAL GRAPHIQUE (+${variation}): ${beneficeTotal.toLocaleString()} FCFA`);
+                  console.log(`💰 BÉNÉFICE NET GRAPHIQUE (+${variation}): ${beneficeNet.toLocaleString()} FCFA`);
+                  console.log(`💸 CHARGES TOTALES: ${chargesTotales.toLocaleString()} FCFA`);
                   console.log(`🎯 GRAPHIQUE SENSIBILITÉ - Variation +${variation} - FIN`);
                   
-                  data.push({ variation: `+${variation}`, benefice: beneficeTotal });
+                  data.push({ variation: `+${variation}`, benefice: beneficeNet });
                 });
                 
                 return data;
@@ -5795,7 +5801,7 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
                 <XAxis dataKey="variation" tick={{ fontSize: 12 }} />
                 <YAxis tickFormatter={(value) => `${(value / 1000000).toFixed(1)}M`} tick={{ fontSize: 12 }} />
                 <Tooltip 
-                  formatter={(value) => [value.toLocaleString() + ' FCFA', 'Bénéfice Total']}
+                  formatter={(value) => [value.toLocaleString() + ' FCFA', 'Bénéfice Net Mensuel']}
                   labelFormatter={(label) => `Variation: ${label}`}
                 />
                 <Line 
@@ -5836,16 +5842,31 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
                   return { nom, ...data, margeBrute, benefice };
                 });
                 
-                data.push({ variation: 'Base', benefice: baseBeneficeOriginal });
+                // Calculer le bénéfice net de base en soustrayant les charges totales
+                const baseBeneficeNet = baseBeneficeOriginal - chargesTotales;
+                
+                data.push({ variation: 'Base', benefice: baseBeneficeNet });
                 
                 // Simuler chaque variation comme si on faisait un vrai bump
                 [-50, -100, -150, -200].forEach(variation => {
+                  console.log(`🎯 GRAPHIQUE SENSIBILITÉ PRIX ACHAT - Variation ${variation}`);
+                  console.log(`📊 Produit cible: ${selectedProductForPricing}`);
+                  
                   // Simuler le bump: partir des prix ACTUELS et appliquer la variation
                   const tempProduits = JSON.parse(JSON.stringify(produits));
+                  console.log('📊 Prix AVANT variation (graphique):');
+                  Object.keys(tempProduits).forEach(nom => {
+                    if (tempProduits[nom].editable && tempProduits[nom].prixAchat) {
+                      console.log(`   ${nom}: ${tempProduits[nom].prixAchat}`);
+                    }
+                  });
+                  
                   Object.keys(tempProduits).forEach(nom => {
                     if (tempProduits[nom].editable && tempProduits[nom].prixAchat) {
                       if (selectedProductForPricing === 'Tous' || nom === selectedProductForPricing) {
+                        const ancienPrix = tempProduits[nom].prixAchat;
                         tempProduits[nom].prixAchat = tempProduits[nom].prixAchat + variation;
+                        console.log(`✅ ${nom}: ${ancienPrix} → ${tempProduits[nom].prixAchat} (${variation})`);
                       }
                     }
                   });
@@ -5911,7 +5932,15 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
                     return { nom, ...data, margeBrute, benefice };
                   });
                   
-                  data.push({ variation: `${variation}`, benefice: beneficeTotal });
+                  // Calculer le bénéfice net en soustrayant les charges totales
+                  const beneficeNet = beneficeTotal - chargesTotales;
+                  
+                  console.log(`💰 BÉNÉFICE TOTAL GRAPHIQUE (${variation}): ${beneficeTotal.toLocaleString()} FCFA`);
+                  console.log(`💰 BÉNÉFICE NET GRAPHIQUE (${variation}): ${beneficeNet.toLocaleString()} FCFA`);
+                  console.log(`💸 CHARGES TOTALES: ${chargesTotales.toLocaleString()} FCFA`);
+                  console.log(`🎯 GRAPHIQUE SENSIBILITÉ PRIX ACHAT - Variation ${variation} - FIN`);
+                  
+                  data.push({ variation: `${variation}`, benefice: beneficeNet });
                 });
                 
                 return data;
@@ -5920,7 +5949,7 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
                 <XAxis dataKey="variation" tick={{ fontSize: 12 }} />
                 <YAxis tickFormatter={(value) => `${(value / 1000000).toFixed(1)}M`} tick={{ fontSize: 12 }} />
                 <Tooltip 
-                  formatter={(value) => [value.toLocaleString() + ' FCFA', 'Bénéfice Total']}
+                  formatter={(value) => [value.toLocaleString() + ' FCFA', 'Bénéfice Net Mensuel']}
                   labelFormatter={(label) => `Variation: ${label}`}
                 />
                 <Line 
