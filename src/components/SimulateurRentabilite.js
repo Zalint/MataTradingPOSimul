@@ -90,6 +90,9 @@ const SimulateurRentabilite = () => {
   
   // État pour l'explication de la marge
   const [margeExplicationVisible, setMargeExplicationVisible] = useState(false);
+  
+  // État pour l'explication du bénéfice net
+  const [beneficeExplicationVisible, setBeneficeExplicationVisible] = useState(false);
 
   // États pour le Solveur (Goal Seek)
   const [solverConstraints, setSolverConstraints] = useState({
@@ -2111,7 +2114,16 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
             <div className="text-xs text-orange-600 italic">Hypothèse de travail</div>
             </div>
             <div>
-              <div className="text-sm text-gray-600">Bénéfice Net Mensuel:</div>
+              <div className="text-sm text-gray-600 flex items-center gap-2">
+                Bénéfice Net Mensuel:
+                <button
+                  onClick={() => setBeneficeExplicationVisible(!beneficeExplicationVisible)}
+                  className="w-5 h-5 bg-green-500 text-white rounded-full text-xs font-bold hover:bg-green-600 transition-colors flex items-center justify-center"
+                  title="Explication du calcul du bénéfice net mensuel"
+                >
+                  i
+                </button>
+              </div>
               <div className={`text-lg sm:text-xl font-bold ${
                 (getBeneficeTotalActif() - chargesTotales) > 0 ? 'text-green-600' : 'text-red-600'
               }`}>
@@ -2279,6 +2291,191 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
                 </div>
               );
             })()}
+          </div>
+        )}
+
+        {/* Explication détaillée du bénéfice net mensuel */}
+        {beneficeExplicationVisible && (
+          <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-lg p-4 sm:p-6 mb-4 sm:mb-6 md:mb-8 shadow-lg">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-green-800 flex items-center gap-2">
+                💰 Calcul Détaillé du Bénéfice Net Mensuel
+                <span className="text-sm font-normal text-green-600">
+                  ({getNumericAdditionalVolume() > 0 ? 'Mode Simulation' : 'Mode Principal'})
+                </span>
+              </h3>
+              <button
+                onClick={() => setBeneficeExplicationVisible(false)}
+                className="text-green-500 hover:text-green-700 text-xl font-bold"
+              >
+                ×
+              </button>
+            </div>
+            
+            <div className="space-y-6">
+              {/* Formule principale */}
+              <div className="bg-white p-4 rounded-lg border border-green-200">
+                <h4 className="font-semibold text-green-800 mb-3">🧮 Formule</h4>
+                <div className="text-center p-4 bg-green-50 rounded-lg border-2 border-green-300">
+                  <div className="text-xl font-bold text-green-800">
+                    Bénéfice Net Mensuel = Bénéfice Total - Charges Totales
+                  </div>
+                  <div className="text-lg font-mono text-green-700 mt-2">
+                    {Math.round(getBeneficeTotalActif() - chargesTotales).toLocaleString()} = {Math.round(getBeneficeTotalActif()).toLocaleString()} - {Math.round(chargesTotales).toLocaleString()}
+                  </div>
+                </div>
+              </div>
+
+              {/* Détail du Bénéfice Total */}
+              <div className="bg-white p-4 rounded-lg border border-green-200">
+                <h4 className="font-semibold text-green-800 mb-3">📊 Détail du Bénéfice Total ({Math.round(getBeneficeTotalActif()).toLocaleString()} FCFA)</h4>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs sm:text-sm">
+                    <thead>
+                      <tr className="border-b-2 border-green-200 bg-green-50">
+                        <th className="text-left py-2 px-2 font-semibold text-green-800">Produit</th>
+                        <th className="text-right py-2 px-2 font-semibold text-green-800">Répartition</th>
+                        <th className="text-right py-2 px-2 font-semibold text-green-800">Marge</th>
+                        <th className="text-right py-2 px-2 font-semibold text-green-800">Volume</th>
+                        <th className="text-right py-2 px-2 font-semibold text-green-800">Bénéfice</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(() => {
+                        const produitsActifs = getNumericAdditionalVolume() > 0 ? 
+                          Object.entries(getAdjustedRepartitions()) : Object.entries(produits);
+                        const volumeActif = getNumericAdditionalVolume() > 0 ? 
+                          getAdjustedVolume() : getNumericVolume();
+                        
+                        return produitsActifs.map(([nom, data], index) => {
+                          let margeBrute;
+                          if (data.editable && data.prixAchat && data.prixVente) {
+                            margeBrute = calculerMargeBrute(data);
+                          } else {
+                            // Calculer la marge moyenne des produits éditables
+                            let margeMoyenneEditables = 0;
+                            let nombreEditables = 0;
+                            produitsActifs.forEach(([nomProd, dataProd]) => {
+                              if (dataProd.editable && dataProd.prixAchat && dataProd.prixVente) {
+                                let marge;
+                                if (dataProd.hasAbats) {
+                                  marge = ((dataProd.prixVente * (1 - getNumericPeration()) + getNumericAbatsParKg()) / dataProd.prixAchat) - 1;
+                                } else {
+                                  marge = (dataProd.prixVente / dataProd.prixAchat) - 1;
+                                }
+                                margeMoyenneEditables += marge;
+                                nombreEditables++;
+                              }
+                            });
+                            margeBrute = nombreEditables > 0 ? margeMoyenneEditables / nombreEditables : 0;
+                          }
+                          
+                          const benefice = calculerBenefice(margeBrute, data.repartition, volumeActif);
+                          
+                          return (
+                            <tr key={nom} className={`border-b border-green-100 ${index % 2 === 0 ? 'bg-green-25' : 'bg-white'} ${!data.editable ? 'bg-yellow-50' : ''}`}>
+                              <td className="py-2 px-2 font-medium text-gray-800">
+                                {nom}
+                                {data.hasAbats && <span className="text-orange-500 text-xs ml-1">🥩</span>}
+                                {!data.editable && <span className="text-gray-500 text-xs ml-1">†</span>}
+                              </td>
+                              <td className="text-right py-2 px-2 font-mono text-blue-600">{(data.repartition * 100).toFixed(1)}%</td>
+                              <td className="text-right py-2 px-2 font-mono font-semibold text-green-600">{(margeBrute * 100).toFixed(2)}%</td>
+                              <td className="text-right py-2 px-2 font-mono text-gray-700">{Math.round(data.repartition * volumeActif).toLocaleString()}</td>
+                              <td className="text-right py-2 px-2 font-mono font-semibold text-green-700">{Math.round(benefice).toLocaleString()}</td>
+                            </tr>
+                          );
+                        });
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="mt-3 text-xs text-gray-600">
+                  <div>🥩 = Avec abats (pération incluse) • † = Calculé avec marge moyenne</div>
+                  <div className="mt-1"><strong>Formule par produit :</strong> Bénéfice = Marge × Répartition × Volume Total</div>
+                </div>
+              </div>
+
+              {/* Détail des Charges Totales */}
+              <div className="bg-white p-4 rounded-lg border border-green-200">
+                <h4 className="font-semibold text-green-800 mb-3">💸 Détail des Charges Totales ({Math.round(chargesTotales).toLocaleString()} FCFA)</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <h5 className="font-medium text-gray-700 mb-2">📅 Charges Mensuelles</h5>
+                    <div className="space-y-1 text-sm">
+                      <div className="flex justify-between">
+                        <span>Salaire:</span>
+                        <span className="font-mono">{getNumericSalaire().toLocaleString()} FCFA</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Électricité:</span>
+                        <span className="font-mono">{getNumericElectricite().toLocaleString()} FCFA</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Eau:</span>
+                        <span className="font-mono">{getNumericEau().toLocaleString()} FCFA</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Internet:</span>
+                        <span className="font-mono">{getNumericInternet().toLocaleString()} FCFA</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Sacs livraison:</span>
+                        <span className="font-mono">{getNumericSacsLivraison().toLocaleString()} FCFA</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Transport:</span>
+                        <span className="font-mono">{getNumericChargesTransport().toLocaleString()} FCFA</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Loyer:</span>
+                        <span className="font-mono">{getNumericLoyer().toLocaleString()} FCFA</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Autres:</span>
+                        <span className="font-mono">{getNumericAutresCharges().toLocaleString()} FCFA</span>
+                      </div>
+                      <div className="flex justify-between border-t pt-1 font-semibold">
+                        <span>Sous-total:</span>
+                        <span className="font-mono text-blue-600">{Math.round(getNumericSalaire() + getNumericElectricite() + getNumericEau() + getNumericInternet() + getNumericSacsLivraison() + getNumericChargesTransport() + getNumericLoyer() + getNumericAutresCharges()).toLocaleString()} FCFA</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <h5 className="font-medium text-gray-700 mb-2">🏗️ Amortissement</h5>
+                    <div className="space-y-1 text-sm">
+                      <div className="flex justify-between">
+                        <span>Charges fixes:</span>
+                        <span className="font-mono">{getNumericChargesFixes().toLocaleString()} FCFA</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Durée amortissement:</span>
+                        <span className="font-mono">{getNumericDureeAmortissement()} mois</span>
+                      </div>
+                      <div className="flex justify-between border-t pt-1 font-semibold">
+                        <span>Amortissement mensuel:</span>
+                        <span className="font-mono text-orange-600">{Math.round(getNumericChargesFixes() / getNumericDureeAmortissement()).toLocaleString()} FCFA</span>
+                      </div>
+                    </div>
+                    <div className="mt-3 p-2 bg-gray-50 rounded text-xs">
+                      <strong>Formule :</strong> Charges fixes ÷ Durée amortissement
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Résumé final */}
+              <div className="bg-gradient-to-r from-green-100 to-emerald-100 p-4 rounded-lg border border-green-300">
+                <h4 className="font-semibold text-green-800 mb-3">🎯 Résumé du Calcul</h4>
+                <div className="text-sm text-gray-700 space-y-1">
+                  <div>• <strong>Bénéfice Total :</strong> Somme des bénéfices de tous les produits (marge × répartition × volume)</div>
+                  <div>• <strong>Charges Totales :</strong> Charges mensuelles + amortissement des charges fixes</div>
+                  <div>• <strong>Bénéfice Net :</strong> Ce qui reste après déduction de toutes les charges</div>
+                  <div>• <strong>Réalisme économique :</strong> Inclut l'amortissement des investissements initiaux</div>
+                  <div className="text-green-700 font-medium">• <strong>Résultat :</strong> {Math.round(getBeneficeTotalActif() - chargesTotales).toLocaleString()} FCFA disponibles par mois</div>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
@@ -2889,7 +3086,7 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
         
                  {/* Charges fixes */}
          <div className="mb-6">
-           <h4 className="text-sm font-semibold text-orange-700 mb-3">🏗️ Immobilisations (Mise en place)</h4>
+                       <h4 className="text-sm font-semibold text-orange-700 mb-3">🏗️ Immobilisations</h4>
            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
              <div>
                <label className="block text-sm font-medium text-gray-700 mb-1">Charges fixes</label>
