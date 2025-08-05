@@ -29,8 +29,7 @@ const deleteCookie = (name) => {
 const SimulateurRentabilite = () => {
   // Debug: Vérifier les variables d'environnement au démarrage
   console.log('🚀 DEBUG - Variables d\'environnement au démarrage:');
-  console.log('🔑 REACT_APP_OPENAI_API_KEY:', process.env.REACT_APP_OPENAI_API_KEY);
-  console.log('🔑 Longueur de la clé:', process.env.REACT_APP_OPENAI_API_KEY ? process.env.REACT_APP_OPENAI_API_KEY.length : 'undefined');
+  // API key logging removed for security
   console.log('🔑 Toutes les variables env:', process.env);
   
   // États d'authentification avec persistence des cookies
@@ -616,9 +615,7 @@ const SimulateurRentabilite = () => {
     
     try {
       // Debug: Vérifier la clé API
-      console.log('🔍 DEBUG - Clé API depuis .env:', process.env.REACT_APP_OPENAI_API_KEY);
-      console.log('🔍 DEBUG - Longueur de la clé:', process.env.REACT_APP_OPENAI_API_KEY ? process.env.REACT_APP_OPENAI_API_KEY.length : 'undefined');
-      console.log('🔍 DEBUG - Début de la clé:', process.env.REACT_APP_OPENAI_API_KEY ? process.env.REACT_APP_OPENAI_API_KEY.substring(0, 20) + '...' : 'undefined');
+          // API key logging removed for security
       
       // Préparer les données pour l'analyse
       const roiData = calculerROI();
@@ -1005,9 +1002,7 @@ Positionnez cette analyse complémentaire comme un renforcement de la crédibili
     
     try {
       // Debug: Vérifier la clé API
-      console.log('🔍 DEBUG - Clé API depuis .env (analyse complète):', process.env.REACT_APP_OPENAI_API_KEY);
-      console.log('🔍 DEBUG - Longueur de la clé (analyse complète):', process.env.REACT_APP_OPENAI_API_KEY ? process.env.REACT_APP_OPENAI_API_KEY.length : 'undefined');
-      console.log('🔍 DEBUG - Début de la clé (analyse complète):', process.env.REACT_APP_OPENAI_API_KEY ? process.env.REACT_APP_OPENAI_API_KEY.substring(0, 20) + '...' : 'undefined');
+          // API key logging removed for security
       
       // Préparer toutes les données de l'application en temps réel
       const roiData = calculerROI();
