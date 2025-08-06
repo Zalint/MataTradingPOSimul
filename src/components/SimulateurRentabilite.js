@@ -644,10 +644,20 @@ const SimulateurRentabilite = () => {
       
       // Préparer les données pour l'analyse
       const roiData = calculerROI();
+      
+      // Utiliser les données appropriées selon s'il y a un volume supplémentaire
+      const volumeActuel = getNumericAdditionalVolume() > 0 ? getAdjustedVolume() : getNumericVolume();
+      const produitsActuels = getNumericAdditionalVolume() > 0 ? adjustedProduits : produits;
+      const volumeSupplementaire = getNumericAdditionalVolume();
+      
       // Données complètes incluant DCF et métriques financières
       const donneesAnalyse = {
+        volumePointVente: getNumericVolume(),
+        volumeSupplementaire: volumeSupplementaire,
+        produitVolumeSupplementaire: volumeSupplementaire > 0 ? selectedProduct : null,
+        volumeTotal: volumeActuel,
         parametresGlobaux: {
-          volumeMensuel: getNumericVolume(),
+          volumeMensuel: volumeActuel,
           abatsParKg: getNumericAbatsParKg(),
           peration: getNumericPeration(),
           beneficeTotal: Math.round(beneficeTotal),
@@ -657,17 +667,26 @@ const SimulateurRentabilite = () => {
           roiAnnuel: (roiData.annuel * 100).toFixed(2) + '%',
           capexInvestissement: getNumericCapex()
         },
-        produits: Object.entries(produits).map(([nom, data]) => ({
+        repartitionProduits: Object.fromEntries(
+          Object.entries(produitsActuels).map(([nom, data]) => [nom, {
+            repartition: data.repartition,
+            prixAchat: data.prixAchat,
+            prixVente: data.prixVente,
+            editable: data.editable,
+            hasAbats: data.hasAbats
+          }])
+        ),
+        produits: Object.entries(produitsActuels).map(([nom, data]) => ({
           nom,
-          repartition: (data.repartition * 100).toFixed(1) + '%',
+          repartition: data.repartition,
           prixAchat: data.prixAchat,
           prixVente: data.prixVente,
-          marge: data.editable && data.prixAchat && data.prixVente ? 
-            ((calculerMargeBrute(data) * 100).toFixed(1) + '%') : 'N/A',
-          volume: Math.round(data.repartition * getNumericVolume()),
+          margeBrute: data.editable && data.prixAchat && data.prixVente ? 
+            calculerMargeBrute(data) : margeMoyenne,
+          volume: Math.round(data.repartition * volumeActuel),
           benefice: Math.round(data.editable && data.prixAchat && data.prixVente ? 
-            calculerBenefice(calculerMargeBrute(data), data.repartition, getNumericVolume()) :
-            calculerBenefice(margeMoyenne, data.repartition, getNumericVolume()))
+            calculerBenefice(calculerMargeBrute(data), data.repartition, volumeActuel) :
+            calculerBenefice(margeMoyenne, data.repartition, volumeActuel))
         })),
         charges: {
           chargesFixes: getNumericChargesFixes(),
@@ -728,7 +747,7 @@ OBJECTIF DE L'ANALYSE: Démontrer la viabilité économique d'un point de vente 
 DONNÉES FINANCIÈRES DU POINT DE VENTE:
 ${JSON.stringify(donneesAnalyse, null, 2)}
 
-IMPORTANT: Ce modèle de point de vente est basé sur un volume mensuel de 20,000,000 FCFA et une répartition des produits alignée sur vos points de vente actuels. Adaptez vos conclusions en précisant qu'il s'agit d'un modèle basé sur vos données réelles de vente.
+IMPORTANT: Ce modèle de point de vente est basé sur un volume mensuel de 20,000,000 FCFA et une répartition des produits alignée sur vos points de vente actuels. ${volumeSupplementaire > 0 ? `Un volume supplémentaire de ${volumeSupplementaire.toLocaleString()} FCFA a été ajouté spécifiquement pour le produit "${selectedProduct}", portant le volume total à ${volumeActuel.toLocaleString()} FCFA.` : ''} Adaptez vos conclusions en précisant qu'il s'agit d'un modèle basé sur vos données réelles de vente.
 
 Rédigez une analyse structurée style "due diligence" avec un ton formel et convaincant pour investisseurs, en positionnant ce point de vente comme le modèle de référence pour le réseau MATA Trading:
 
@@ -811,9 +830,19 @@ Positionnez ce point de vente comme le modèle de référence validé pour MATA 
     try {
       // Préparer les données complètes pour l'analyse contextuelle
       const roiData = calculerROI();
+      
+      // Utiliser les données appropriées selon s'il y a un volume supplémentaire
+      const volumeActuel = getNumericAdditionalVolume() > 0 ? getAdjustedVolume() : getNumericVolume();
+      const produitsActuels = getNumericAdditionalVolume() > 0 ? adjustedProduits : produits;
+      const volumeSupplementaire = getNumericAdditionalVolume();
+      
       const donneesAnalyse = {
+        volumePointVente: getNumericVolume(),
+        volumeSupplementaire: volumeSupplementaire,
+        produitVolumeSupplementaire: volumeSupplementaire > 0 ? selectedProduct : null,
+        volumeTotal: volumeActuel,
         parametresGlobaux: {
-          volumeMensuel: getNumericVolume(),
+          volumeMensuel: volumeActuel,
           abatsParKg: getNumericAbatsParKg(),
           peration: getNumericPeration(),
           beneficeTotal: Math.round(beneficeTotal),
@@ -823,17 +852,26 @@ Positionnez ce point de vente comme le modèle de référence validé pour MATA 
           roiAnnuel: (roiData.annuel * 100).toFixed(2) + '%',
           capexInvestissement: getNumericCapex()
         },
-        produits: Object.entries(produits).map(([nom, data]) => ({
+        repartitionProduits: Object.fromEntries(
+          Object.entries(produitsActuels).map(([nom, data]) => [nom, {
+            repartition: data.repartition,
+            prixAchat: data.prixAchat,
+            prixVente: data.prixVente,
+            editable: data.editable,
+            hasAbats: data.hasAbats
+          }])
+        ),
+        produits: Object.entries(produitsActuels).map(([nom, data]) => ({
           nom,
           repartition: (data.repartition * 100).toFixed(1) + '%',
           prixAchat: data.prixAchat,
           prixVente: data.prixVente,
           marge: data.editable && data.prixAchat && data.prixVente ? 
             ((calculerMargeBrute(data) * 100).toFixed(1) + '%') : 'N/A',
-          volume: Math.round(data.repartition * getNumericVolume()),
+          volume: Math.round(data.repartition * volumeActuel),
           benefice: Math.round(data.editable && data.prixAchat && data.prixVente ? 
-            calculerBenefice(calculerMargeBrute(data), data.repartition, getNumericVolume()) :
-            calculerBenefice(margeMoyenne, data.repartition, getNumericVolume()))
+            calculerBenefice(calculerMargeBrute(data), data.repartition, volumeActuel) :
+            calculerBenefice(margeMoyenne, data.repartition, volumeActuel))
         })),
         charges: {
           chargesFixes: getNumericChargesFixes(),
@@ -885,7 +923,7 @@ ${interpretationText}
 DONNÉES FINANCIÈRES ACTUELLES DU POINT DE VENTE:
 ${JSON.stringify(donneesAnalyse, null, 2)}
 
-IMPORTANT: Ce modèle de point de vente est basé sur un volume mensuel de 20,000,000 FCFA et une répartition des produits alignée sur vos points de vente actuels. Tenez compte de cette base de données réelles dans votre analyse.
+IMPORTANT: Ce modèle de point de vente est basé sur un volume mensuel de 20,000,000 FCFA et une répartition des produits alignée sur vos points de vente actuels. ${volumeSupplementaire > 0 ? `Un volume supplémentaire de ${volumeSupplementaire.toLocaleString()} FCFA a été ajouté spécifiquement pour le produit "${selectedProduct}", portant le volume total à ${volumeActuel.toLocaleString()} FCFA.` : ''} Tenez compte de cette base de données réelles dans votre analyse.
 
 CONTEXTE SUPPLÉMENTAIRE FOURNI:
 ${contexteSupplementaire}
@@ -1036,10 +1074,19 @@ Positionnez cette analyse complémentaire comme un renforcement de la crédibili
       const fluxDCFSimulation = calculerFluxDCFSimulation();
       const indicateursDCFSimulation = calculerIndicateursDCFSimulation();
       
+      // Utiliser les données appropriées selon s'il y a un volume supplémentaire
+      const volumeActuel = getNumericAdditionalVolume() > 0 ? getAdjustedVolume() : getNumericVolume();
+      const produitsActuels = getNumericAdditionalVolume() > 0 ? adjustedProduits : produits;
+      const volumeSupplementaire = getNumericAdditionalVolume();
+      
       // Optimisation : Réduire la taille des données pour éviter l'erreur 400
       const donneesComplete = {
+        volumePointVente: getNumericVolume(),
+        volumeSupplementaire: volumeSupplementaire,
+        produitVolumeSupplementaire: volumeSupplementaire > 0 ? selectedProduct : null,
+        volumeTotal: volumeActuel,
         parametresGlobaux: {
-          volumeMensuel: getNumericVolume(),
+          volumeMensuel: volumeActuel,
           beneficeTotal: Math.round(beneficeTotal),
           chargesTotales: Math.round(chargesTotales),
           margeMoyenne: (margeMoyenne * 100).toFixed(2) + '%',
@@ -1047,7 +1094,16 @@ Positionnez cette analyse complémentaire comme un renforcement de la crédibili
           roiAnnuel: (roiData.annuel * 100).toFixed(2) + '%',
           capexInvestissement: getNumericCapex()
         },
-        produits: Object.entries(produits).map(([nom, data]) => ({
+        repartitionProduits: Object.fromEntries(
+          Object.entries(produitsActuels).map(([nom, data]) => [nom, {
+            repartition: data.repartition,
+            prixAchat: data.prixAchat,
+            prixVente: data.prixVente,
+            editable: data.editable,
+            hasAbats: data.hasAbats
+          }])
+        ),
+        produits: Object.entries(produitsActuels).map(([nom, data]) => ({
           nom,
           repartition: (data.repartition * 100).toFixed(1) + '%',
           prixAchat: data.prixAchat,
@@ -1055,8 +1111,8 @@ Positionnez cette analyse complémentaire comme un renforcement de la crédibili
           marge: data.editable && data.prixAchat && data.prixVente ? 
             ((calculerMargeBrute(data) * 100).toFixed(1) + '%') : 'N/A',
           benefice: Math.round(data.editable && data.prixAchat && data.prixVente ? 
-            calculerBenefice(calculerMargeBrute(data), data.repartition, getNumericVolume()) :
-            calculerBenefice(margeMoyenne, data.repartition, getNumericVolume()))
+            calculerBenefice(calculerMargeBrute(data), data.repartition, volumeActuel) :
+            calculerBenefice(margeMoyenne, data.repartition, volumeActuel))
         })),
         charges: {
           total: Math.round(chargesTotales),
