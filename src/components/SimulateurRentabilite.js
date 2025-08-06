@@ -52,7 +52,7 @@ const SimulateurRentabilite = () => {
   const [pageFluxDCFSimulation, setPageFluxDCFSimulation] = useState(1);
   const [itemsPerPage] = useState(12);
   const [volume, setVolume] = useState('20000000');
-  const [abatsParKg, setAbatsParKg] = useState('200');
+  const [gainProduitsNobleFoieYellParKg, setGainProduitsNobleFoieYellParKg] = useState('200');
   const [peration, setPeration] = useState('0.13');
   
   // Nouveaux états pour la simulation de volume
@@ -105,7 +105,7 @@ const SimulateurRentabilite = () => {
     volumeMensuel: { fixed: false, value: '' },
     chargesTotales: { fixed: false, value: '' },
     peration: { fixed: false, value: '' },
-    abatsParKg: { fixed: false, value: '' }
+    gainProduitsNobleFoieYellParKg: { fixed: false, value: '' }
   });
   const [solverVariable, setSolverVariable] = useState('chargesTotales'); // Variable à résoudre
   const [solverResult, setSolverResult] = useState(null);
@@ -118,7 +118,7 @@ const SimulateurRentabilite = () => {
     Object.entries(produits).forEach(([nom, data]) => {
       if (data.editable && data.prixAchat && data.prixVente) {
         if (data.hasAbats) {
-          vraiesMarges[`marge${nom}`] = ((data.prixVente * (1 - getNumericPeration()) + getNumericAbatsParKg()) / data.prixAchat - 1) * 100;
+          vraiesMarges[`marge${nom}`] = ((data.prixVente * (1 - getNumericPeration()) + getNumericGainProduitsNobleFoieYellParKg()) / data.prixAchat - 1) * 100;
         } else {
           vraiesMarges[`marge${nom}`] = ((data.prixVente / data.prixAchat) - 1) * 100;
         }
@@ -133,7 +133,7 @@ const SimulateurRentabilite = () => {
       margePoulet: { ...prev.margePoulet, value: vraiesMarges.margePoulet ? vraiesMarges.margePoulet.toFixed(2) : '' },
       margeOeuf: { ...prev.margeOeuf, value: vraiesMarges.margeOeuf ? vraiesMarges.margeOeuf.toFixed(2) : '' },
       peration: { ...prev.peration, value: getNumericPeration() ? (getNumericPeration() * 100).toFixed(2) : '' },
-      abatsParKg: { ...prev.abatsParKg, value: getNumericAbatsParKg() ? getNumericAbatsParKg().toString() : '' }
+              gainProduitsNobleFoieYellParKg: { ...prev.gainProduitsNobleFoieYellParKg, value: getNumericGainProduitsNobleFoieYellParKg() ? getNumericGainProduitsNobleFoieYellParKg().toString() : '' }
     }));
   };
 
@@ -169,7 +169,7 @@ const SimulateurRentabilite = () => {
         let marge;
         if (data.hasAbats) {
           const prixVenteAjuste = data.prixVente * (1 - getNumericPeration());
-          const abats = getNumericAbatsParKg();
+          const abats = getNumericGainProduitsNobleFoieYellParKg();
           const total = prixVenteAjuste + abats;
           marge = (total / data.prixAchat) - 1;
         } else {
@@ -190,7 +190,7 @@ const SimulateurRentabilite = () => {
       if (data.editable && data.prixAchat && data.prixVente) {
         if (data.hasAbats) {
           const prixVenteAjuste = data.prixVente * (1 - getNumericPeration());
-          const abats = getNumericAbatsParKg();
+          const abats = getNumericGainProduitsNobleFoieYellParKg();
           const total = prixVenteAjuste + abats;
           marge = (total / data.prixAchat) - 1;
           calculDetail = `((${data.prixVente} × ${(1-getNumericPeration()).toFixed(3)} + ${abats}) / ${data.prixAchat}) - 1 = ${(marge * 100).toFixed(2)}%`;
@@ -242,7 +242,7 @@ const SimulateurRentabilite = () => {
       parametres: {
         peration: getNumericPeration(),
         perationPourcentage: (getNumericPeration() * 100).toFixed(1),
-        abatsParKg: getNumericAbatsParKg()
+        abatsParKg: getNumericGainProduitsNobleFoieYellParKg()
       }
     };
   };
@@ -260,7 +260,7 @@ const SimulateurRentabilite = () => {
   
   // États pour les charges
   const [chargesFixes, setChargesFixes] = useState('0');
-  const [dureeAmortissement, setDureeAmortissement] = useState('24'); // Durée en mois
+  const [dureeAmortissement, setDureeAmortissement] = useState('12'); // Durée en mois
   const [amortissementAnnuel, setAmortissementAnnuel] = useState('2500000'); // Amortissement fixe par an
   const [salaire, setSalaire] = useState('250000');
   const [electricite, setElectricite] = useState('25000');
@@ -277,7 +277,7 @@ const SimulateurRentabilite = () => {
   
   // États pour le DCF avancé
   const [capex, setCapex] = useState('5000000'); // 5M par défaut
-  const [bfr, setBfr] = useState('2500000'); // 2.5M par défaut
+  const [bfr, setBfr] = useState('250000'); // 250K par défaut
   const [wacc, setWacc] = useState('12'); // 12% par défaut (corrigé)
   const [croissanceTerminale, setCroissanceTerminale] = useState('3'); // 3% par défaut
   const [dette, setDette] = useState('0'); // 0 par défaut
@@ -351,7 +351,7 @@ const SimulateurRentabilite = () => {
     return numValue.toLocaleString();
   };
   const getNumericVolume = () => getNumericValue(volume);
-  const getNumericAbatsParKg = () => getNumericValue(abatsParKg);
+  const getNumericGainProduitsNobleFoieYellParKg = () => getNumericValue(gainProduitsNobleFoieYellParKg);
   const getNumericPeration = () => getNumericValue(peration);
   const getNumericAdditionalVolume = () => getNumericValue(additionalVolume);
   const getNumericChargesFixes = () => getNumericValue(chargesFixes);
@@ -458,7 +458,7 @@ const SimulateurRentabilite = () => {
       if (data.editable && data.prixAchat && data.prixVente) {
         let marge;
       if (data.hasAbats) {
-          marge = ((data.prixVente * (1 - getNumericPeration()) + getNumericAbatsParKg()) / data.prixAchat) - 1;
+          marge = ((data.prixVente * (1 - getNumericPeration()) + getNumericGainProduitsNobleFoieYellParKg()) / data.prixAchat) - 1;
       } else {
           marge = (data.prixVente / data.prixAchat) - 1;
         }
@@ -477,7 +477,7 @@ const SimulateurRentabilite = () => {
       
       if (data.editable && data.prixAchat && data.prixVente) {
         if (data.hasAbats) {
-          marge = ((data.prixVente * (1 - getNumericPeration()) + getNumericAbatsParKg()) / data.prixAchat) - 1;
+          marge = ((data.prixVente * (1 - getNumericPeration()) + getNumericGainProduitsNobleFoieYellParKg()) / data.prixAchat) - 1;
         } else {
           marge = (data.prixVente / data.prixAchat) - 1;
         }
@@ -502,7 +502,7 @@ const SimulateurRentabilite = () => {
     if (!produitData.prixVente || !produitData.prixAchat) return 0;
     
     if (produitData.hasAbats) {
-      return ((produitData.prixVente * (1 - getNumericPeration()) + getNumericAbatsParKg()) / produitData.prixAchat) - 1;
+      return ((produitData.prixVente * (1 - getNumericPeration()) + getNumericGainProduitsNobleFoieYellParKg()) / produitData.prixAchat) - 1;
     } else {
       return (produitData.prixVente / produitData.prixAchat) - 1;
     }
@@ -538,7 +538,7 @@ const SimulateurRentabilite = () => {
         
         // Calculer la marge brute avec les prix modifiés
         if (data.hasAbats) {
-          margeBrute = ((prixVente * (1 - getNumericPeration()) + getNumericAbatsParKg()) / prixAchat) - 1;
+          margeBrute = ((prixVente * (1 - getNumericPeration()) + getNumericGainProduitsNobleFoieYellParKg()) / prixAchat) - 1;
         } else {
           margeBrute = (prixVente / prixAchat) - 1;
         }
@@ -580,7 +580,7 @@ const SimulateurRentabilite = () => {
         
         // Calculer la marge brute avec les prix modifiés
         if (data.hasAbats) {
-          margeBrute = ((prixVente * (1 - getNumericPeration()) + getNumericAbatsParKg()) / prixAchat) - 1;
+          margeBrute = ((prixVente * (1 - getNumericPeration()) + getNumericGainProduitsNobleFoieYellParKg()) / prixAchat) - 1;
         } else {
           margeBrute = (prixVente / prixAchat) - 1;
         }
@@ -666,7 +666,7 @@ const SimulateurRentabilite = () => {
         volumeTotal: volumeActuel,
         parametresGlobaux: {
           volumeMensuel: volumeActuel,
-          abatsParKg: getNumericAbatsParKg(),
+          gainProduitsNobleFoieYellParKg: getNumericGainProduitsNobleFoieYellParKg(),
           peration: getNumericPeration(),
           beneficeBrut: Math.round(getBeneficeTotalActif()),
           beneficeNet: Math.round(calculerEBIT()),
@@ -852,7 +852,7 @@ Positionnez ce point de vente comme le modèle de référence validé pour MATA 
         volumeTotal: volumeActuel,
         parametresGlobaux: {
           volumeMensuel: volumeActuel,
-          abatsParKg: getNumericAbatsParKg(),
+          gainProduitsNobleFoieYellParKg: getNumericGainProduitsNobleFoieYellParKg(),
           peration: getNumericPeration(),
           beneficeBrut: Math.round(getBeneficeTotalActif()),
           beneficeNet: Math.round(calculerEBIT()),
@@ -1060,7 +1060,7 @@ Positionnez cette analyse complémentaire comme un renforcement de la crédibili
       },
       
       // Paramètres spécifiques
-      abatsParKg: getNumericAbatsParKg(),
+      gainProduitsNobleFoieYellParKg: getNumericGainProduitsNobleFoieYellParKg(),
       peration: getNumericPeration(),
       dureeAmortissement: getNumericDureeAmortissement()
     };
@@ -1210,7 +1210,7 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
       'Poulet': { repartition: 0.102932124, prixAchat: 2600, prixVente: 3400, editable: true, hasAbats: false }
     });
     setVolume('20000000');
-    setAbatsParKg('200');
+    setGainProduitsNobleFoieYellParKg('200');
     setPeration('0.13');
     setAdditionalVolume('0');
     setSelectedProduct('Poulet');
@@ -1344,7 +1344,7 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
         
         // Importer les données
         setVolume(data.volume || 20000000);
-        setAbatsParKg(data.abatsParKg || 200);
+        setGainProduitsNobleFoieYellParKg(data.gainProduitsNobleFoieYellParKg || data.abatsParKg || 200);
         setPeration(data.peration || 0.1);
         setSelectedProduct(data.selectedProduct || 'Poulet');
         setAdditionalVolume(data.additionalVolume || 5000000);
@@ -1531,7 +1531,7 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
     if (data.editable && data.prixAchat && data.prixVente) {
       let marge;
       if (data.hasAbats) {
-        marge = ((data.prixVente * (1 - getNumericPeration()) + getNumericAbatsParKg()) / data.prixAchat) - 1;
+        marge = ((data.prixVente * (1 - getNumericPeration()) + getNumericGainProduitsNobleFoieYellParKg()) / data.prixAchat) - 1;
       } else {
         marge = (data.prixVente / data.prixAchat) - 1;
       }
@@ -1567,7 +1567,7 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
     if (data.editable && data.prixAchat && data.prixVente) {
       let marge;
       if (data.hasAbats) {
-        marge = ((data.prixVente * (1 - getNumericPeration()) + getNumericAbatsParKg()) / data.prixAchat) - 1;
+        marge = ((data.prixVente * (1 - getNumericPeration()) + getNumericGainProduitsNobleFoieYellParKg()) / data.prixAchat) - 1;
       } else {
         marge = (data.prixVente / data.prixAchat) - 1;
       }
@@ -2061,8 +2061,8 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
               <label className="block text-sm font-medium text-gray-700 mb-1">Foie, Yell, Filet (Bœuf/Veau)</label>
               <input 
                 type="number"
-                value={abatsParKg}
-                onChange={(e) => setAbatsParKg(e.target.value)}
+                value={gainProduitsNobleFoieYellParKg}
+                onChange={(e) => setGainProduitsNobleFoieYellParKg(e.target.value)}
               className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
               style={{ fontSize: '16px' }}
               />
@@ -2430,7 +2430,7 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
                               if (dataProd.editable && dataProd.prixAchat && dataProd.prixVente) {
                                 let marge;
                                 if (dataProd.hasAbats) {
-                                  marge = ((dataProd.prixVente * (1 - getNumericPeration()) + getNumericAbatsParKg()) / dataProd.prixAchat) - 1;
+                                  marge = ((dataProd.prixVente * (1 - getNumericPeration()) + getNumericGainProduitsNobleFoieYellParKg()) / dataProd.prixAchat) - 1;
                                 } else {
                                   marge = (dataProd.prixVente / dataProd.prixAchat) - 1;
                                 }
@@ -2888,7 +2888,7 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
                           <span className="text-sm text-gray-600">Foie, Yell, Filet (Bœuf/Veau):</span>
-                          <div className="font-mono text-lg">{keyData.abatsParKg} FCFA</div>
+                          <div className="font-mono text-lg">{keyData.gainProduitsNobleFoieYellParKg} FCFA</div>
                         </div>
                         <div>
                           <span className="text-sm text-gray-600">Pération:</span>
@@ -4199,7 +4199,7 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
       'margePoulet': 'Marge Poulet (%)',
       'margeOeuf': 'Marge Œuf (%)',
       'peration': 'Pération % (Bœuf/Veau)',
-      'abatsParKg': 'Foie, Yell, Filet (Bœuf/Veau)'
+              'gainProduitsNobleFoieYellParKg': 'Foie, Yell, Filet (Bœuf/Veau)'
     };
     return labels[variable] || variable;
   };
@@ -4208,7 +4208,7 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
     if (solverVariable.includes('marge') || solverVariable === 'peration') {
       return `${value.toFixed(2)}%`;
     }
-    if (solverVariable === 'abatsParKg') {
+    if (solverVariable === 'gainProduitsNobleFoieYellParKg') {
       return `${Math.round(value).toLocaleString()} FCFA/kg`;
     }
     return Math.round(value).toLocaleString() + ' FCFA';
@@ -4290,7 +4290,7 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
       volume: getNumericVolume(),
       chargesTotales: chargesTotales,
       peration: getNumericPeration(),
-      abatsParKg: getNumericAbatsParKg(),
+      gainProduitsNobleFoieYellParKg: getNumericGainProduitsNobleFoieYellParKg(),
       marges: {}
     };
 
@@ -4304,8 +4304,8 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
     if (solverConstraints.peration.fixed && solverConstraints.peration.value !== '') {
       params.peration = (parseFloat(solverConstraints.peration.value) || 0) / 100; // Convertir % en décimal
     }
-    if (solverConstraints.abatsParKg.fixed && solverConstraints.abatsParKg.value !== '') {
-      params.abatsParKg = parseFloat(solverConstraints.abatsParKg.value) || 0;
+          if (solverConstraints.gainProduitsNobleFoieYellParKg.fixed && solverConstraints.gainProduitsNobleFoieYellParKg.value !== '') {
+      params.gainProduitsNobleFoieYellParKg = parseFloat(solverConstraints.gainProduitsNobleFoieYellParKg.value) || 0;
     }
 
     // Appliquer la valeur testée à la variable à résoudre
@@ -4315,8 +4315,8 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
       params.chargesTotales = testValue;
     } else if (solverVariable === 'peration') {
       params.peration = testValue / 100; // Convertir % en décimal
-    } else if (solverVariable === 'abatsParKg') {
-      params.abatsParKg = testValue;
+    } else if (solverVariable === 'gainProduitsNobleFoieYellParKg') {
+      params.gainProduitsNobleFoieYellParKg = testValue;
     } else if (solverVariable.startsWith('marge')) {
       const produit = solverVariable.replace('marge', '').toLowerCase();
       params.marges[produit] = testValue / 100; // Convertir % en décimal
@@ -4331,7 +4331,7 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
     console.log(`   Volume: ${params.volume.toLocaleString()}`);
     console.log(`   Charges: ${params.chargesTotales.toLocaleString()}`);
     console.log(`   Pération: ${(params.peration * 100).toFixed(2)}%`);
-    console.log(`   Abats: ${params.abatsParKg} FCFA/kg`);
+    console.log(`   Abats: ${params.gainProduitsNobleFoieYellParKg} FCFA/kg`);
     
     // Utiliser les répartitions exactes de l'interface principale
     const repartitionsActuelles = getNumericAdditionalVolume() > 0 ? getAdjustedRepartitions() : produits;
@@ -4345,7 +4345,7 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
       if (data.editable && data.prixAchat && data.prixVente) {
         let margeTemp;
         if (data.hasAbats) {
-          margeTemp = ((data.prixVente * (1 - params.peration) + params.abatsParKg) / data.prixAchat) - 1;
+          margeTemp = ((data.prixVente * (1 - params.peration) + params.gainProduitsNobleFoieYellParKg) / data.prixAchat) - 1;
         } else {
           margeTemp = (data.prixVente / data.prixAchat) - 1;
         }
@@ -4372,7 +4372,7 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
       } else if (data.editable && data.prixAchat && data.prixVente) {
         // Calculer la marge avec les paramètres personnalisés (peration et abatsParKg)
         if (data.hasAbats) {
-          marge = ((data.prixVente * (1 - params.peration) + params.abatsParKg) / data.prixAchat) - 1;
+          marge = ((data.prixVente * (1 - params.peration) + params.gainProduitsNobleFoieYellParKg) / data.prixAchat) - 1;
         } else {
           marge = (data.prixVente / data.prixAchat) - 1;
         }
@@ -4418,7 +4418,7 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
       } else if (data.editable && data.prixAchat && data.prixVente) {
         // Calculer la marge avec les paramètres finaux (peration et abatsParKg)
         if (data.hasAbats) {
-          marge = ((data.prixVente * (1 - finalParams.peration) + finalParams.abatsParKg) / data.prixAchat) - 1;
+          marge = ((data.prixVente * (1 - finalParams.peration) + finalParams.gainProduitsNobleFoieYellParKg) / data.prixAchat) - 1;
         } else {
           marge = (data.prixVente / data.prixAchat) - 1;
         }
@@ -4431,7 +4431,7 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
           if (dataProd.editable && dataProd.prixAchat && dataProd.prixVente) {
             let margeTemp;
             if (dataProd.hasAbats) {
-              margeTemp = ((dataProd.prixVente * (1 - finalParams.peration) + finalParams.abatsParKg) / dataProd.prixAchat) - 1;
+              margeTemp = ((dataProd.prixVente * (1 - finalParams.peration) + finalParams.gainProduitsNobleFoieYellParKg) / dataProd.prixAchat) - 1;
             } else {
               margeTemp = (dataProd.prixVente / dataProd.prixAchat) - 1;
             }
@@ -4514,8 +4514,8 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
     } else if (solverVariable === 'peration') {
       x0 = getNumericPeration() * 100; // Partir de la pération actuelle (convertir en %)
       console.log(`🎲 Initialisation pération: ${x0}% (valeur actuelle)`);
-    } else if (solverVariable === 'abatsParKg') {
-      x0 = getNumericAbatsParKg(); // Partir de la valeur actuelle des abats
+    } else if (solverVariable === 'gainProduitsNobleFoieYellParKg') {
+      x0 = getNumericGainProduitsNobleFoieYellParKg(); // Partir de la valeur actuelle des abats
       console.log(`🎲 Initialisation abats: ${x0.toLocaleString()} FCFA/kg (valeur actuelle)`);
     } else if (solverVariable.includes('marge')) {
       x0 = 15; // Partir de 15% comme marge de départ raisonnable
@@ -4533,7 +4533,7 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
     } else if (solverVariable === 'peration') {
       minBound = 0; // 0% minimum
       maxBound = 50; // 50% maximum (pération très élevée)
-    } else if (solverVariable === 'abatsParKg') {
+    } else if (solverVariable === 'gainProduitsNobleFoieYellParKg') {
       minBound = 0; // 0 FCFA/kg minimum
       maxBound = 2000; // 2000 FCFA/kg maximum (très cher)
     } else if (solverVariable.includes('marge')) {
@@ -4898,7 +4898,7 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
                 onClick={() => {
                   const newConstraints = {
                     ...solverConstraints,
-                    abatsParKg: { ...solverConstraints.abatsParKg, fixed: !solverConstraints.abatsParKg.fixed }
+                    gainProduitsNobleFoieYellParKg: { ...solverConstraints.gainProduitsNobleFoieYellParKg, fixed: !solverConstraints.gainProduitsNobleFoieYellParKg.fixed }
                   };
                   setSolverConstraints(newConstraints);
                   checkAndAdjustSolverVariable(newConstraints);
@@ -4906,11 +4906,11 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
               >
                 <input
                   type="checkbox"
-                  checked={solverConstraints.abatsParKg.fixed}
+                  checked={solverConstraints.gainProduitsNobleFoieYellParKg.fixed}
                   onChange={(e) => {
                     const newConstraints = {
                       ...solverConstraints,
-                      abatsParKg: { ...solverConstraints.abatsParKg, fixed: e.target.checked }
+                      gainProduitsNobleFoieYellParKg: { ...solverConstraints.gainProduitsNobleFoieYellParKg, fixed: e.target.checked }
                     };
                     setSolverConstraints(newConstraints);
                     checkAndAdjustSolverVariable(newConstraints);
@@ -4921,12 +4921,12 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
               </div>
               <input
                 type="number"
-                value={solverConstraints.abatsParKg.value}
+                value={solverConstraints.gainProduitsNobleFoieYellParKg.value}
                 onChange={(e) => setSolverConstraints(prev => ({
                   ...prev,
-                  abatsParKg: { ...prev.abatsParKg, value: parseFloat(e.target.value) || 0 }
+                  gainProduitsNobleFoieYellParKg: { ...prev.gainProduitsNobleFoieYellParKg, value: parseFloat(e.target.value) || 0 }
                 }))}
-                disabled={!solverConstraints.abatsParKg.fixed}
+                disabled={!solverConstraints.gainProduitsNobleFoieYellParKg.fixed}
                 className="w-20 p-1 text-sm border rounded"
                 placeholder="200"
               />
@@ -4975,8 +4975,8 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
               {!solverConstraints.peration.fixed && (
                 <option value="peration">Pération % (Bœuf/Veau)</option>
               )}
-              {!solverConstraints.abatsParKg.fixed && (
-                <option value="abatsParKg">Foie, Yell, Filet (Bœuf/Veau)</option>
+              {!solverConstraints.gainProduitsNobleFoieYellParKg.fixed && (
+                <option value="gainProduitsNobleFoieYellParKg">Foie, Yell, Filet (Bœuf/Veau)</option>
               )}
             </select>
 
@@ -5088,7 +5088,7 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
                           <div className="flex justify-between">
                             <span className="text-blue-700">Foie, Yell, Filet:</span>
                             <span className="font-mono font-semibold text-blue-800">
-                              {Math.round(solverResult.finalParams.abatsParKg).toLocaleString()} FCFA/kg
+                              {Math.round(solverResult.finalParams.gainProduitsNobleFoieYellParKg).toLocaleString()} FCFA/kg
                             </span>
                           </div>
                         </div>
@@ -5817,7 +5817,7 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
                     if (data.editable && data.prixAchat && data.prixVente) {
                       let marge;
                     if (data.hasAbats) {
-                        marge = ((data.prixVente * (1 - getNumericPeration()) + getNumericAbatsParKg()) / data.prixAchat) - 1;
+                        marge = ((data.prixVente * (1 - getNumericPeration()) + getNumericGainProduitsNobleFoieYellParKg()) / data.prixAchat) - 1;
                     } else {
                         marge = (data.prixVente / data.prixAchat) - 1;
                       }
@@ -5834,7 +5834,7 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
                     
                     if (data.editable && data.prixAchat && data.prixVente) {
                       if (data.hasAbats) {
-                        marge = ((data.prixVente * (1 - getNumericPeration()) + getNumericAbatsParKg()) / data.prixAchat) - 1;
+                        marge = ((data.prixVente * (1 - getNumericPeration()) + getNumericGainProduitsNobleFoieYellParKg()) / data.prixAchat) - 1;
                       } else {
                         marge = (data.prixVente / data.prixAchat) - 1;
                       }
@@ -5965,7 +5965,7 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
                     if (data.editable && data.prixAchat && data.prixVente) {
                       let marge;
                     if (data.hasAbats) {
-                        marge = ((data.prixVente * (1 - getNumericPeration()) + getNumericAbatsParKg()) / data.prixAchat) - 1;
+                        marge = ((data.prixVente * (1 - getNumericPeration()) + getNumericGainProduitsNobleFoieYellParKg()) / data.prixAchat) - 1;
                     } else {
                         marge = (data.prixVente / data.prixAchat) - 1;
                       }
@@ -5982,7 +5982,7 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
                     
                     if (data.editable && data.prixAchat && data.prixVente) {
                       if (data.hasAbats) {
-                        marge = ((data.prixVente * (1 - getNumericPeration()) + getNumericAbatsParKg()) / data.prixAchat) - 1;
+                        marge = ((data.prixVente * (1 - getNumericPeration()) + getNumericGainProduitsNobleFoieYellParKg()) / data.prixAchat) - 1;
                       } else {
                         marge = (data.prixVente / data.prixAchat) - 1;
                       }
