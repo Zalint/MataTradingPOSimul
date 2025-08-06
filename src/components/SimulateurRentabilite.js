@@ -3406,12 +3406,12 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
                 onChange={(e) => setDepreciationAmortissement(e.target.value)}
                 className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
                 style={{ fontSize: '16px' }}
-                placeholder="Calculé automatiquement"
+                placeholder="Valeur d'amortissement annuel"
               />
               <div className="text-xs text-gray-500 mt-1">
                 {depreciationAmortissement && depreciationAmortissement.trim() !== '' 
-                  ? 'Valeur manuelle saisie' 
-                  : `Auto: ${getNumericChargesFixes().toLocaleString()} ÷ ${getNumericDureeAmortissement()} × 12 = ${Math.round(calculerDAAutomatique()).toLocaleString()} FCFA`
+                  ? `Valeur manuelle: ${formatMillions(getNumericDepreciationAmortissement())} FCFA/an` 
+                  : `Synchronisé avec amortissement: ${formatMillions(getNumericAmortissementAnnuel())} FCFA/an`
                 }
               </div>
             </div>
