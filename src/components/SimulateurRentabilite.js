@@ -2389,7 +2389,7 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
                 <h4 className="font-semibold text-green-800 mb-3">🧮 Formule</h4>
                 <div className="text-center p-4 bg-green-50 rounded-lg border-2 border-green-300">
                   <div className="text-xl font-bold text-green-800">
-                    Bénéfice Net Mensuel = Bénéfice Total - Charges Totales
+                    Bénéfice Net Mensuel = Marge brute - Charges Totales
                   </div>
                   <div className="text-lg font-mono text-green-700 mt-2">
                     {Math.round(getBeneficeTotalActif() - chargesTotales).toLocaleString()} = {Math.round(getBeneficeTotalActif()).toLocaleString()} - {Math.round(chargesTotales).toLocaleString()}
@@ -3507,8 +3507,8 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4 md:p-6 mb-4 sm:mb-6 md:mb-8">
         <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-blue-800">🏦 Calculs Financiers Avancés</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-          <div className="cursor-help" title={`EBIT = Bénéfice Total - Charges Opérationnelles
-Bénéfice Total: ${Math.round(getBeneficeTotalActif()).toLocaleString()} FCFA
+          <div className="cursor-help" title={`EBIT = Marge brute - Charges Opérationnelles
+Marge brute: ${Math.round(getBeneficeTotalActif()).toLocaleString()} FCFA
 Charges Opérationnelles: ${Math.round(chargesTotales).toLocaleString()} FCFA
 EBIT Mensuel: ${Math.round(calculerEBIT()).toLocaleString()} FCFA
 EBIT Annuel: ${Math.round(calculerEBIT() * 12).toLocaleString()} FCFA`}>
@@ -3885,8 +3885,8 @@ Comparaison: TRI ${indicateursDCF.triAnnuel > (tauxActualisationAnnuel / 100) ? 
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4 md:p-6 mb-4 sm:mb-6 md:mb-8">
         <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-blue-800">🏦 Calculs Financiers Avancés - Simulation</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-          <div className="cursor-help" title={`EBIT = Bénéfice Total - Charges Opérationnelles
-Bénéfice Total: ${Math.round(getBeneficeTotalActif()).toLocaleString()} FCFA
+          <div className="cursor-help" title={`EBIT = Marge brute - Charges Opérationnelles
+Marge brute: ${Math.round(getBeneficeTotalActif()).toLocaleString()} FCFA
 Charges Opérationnelles: ${Math.round(chargesTotales).toLocaleString()} FCFA
 EBIT Mensuel: ${Math.round(calculerEBIT()).toLocaleString()} FCFA
 EBIT Annuel: ${Math.round(calculerEBIT() * 12).toLocaleString()} FCFA`}>
@@ -5329,7 +5329,7 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
                 le bénéfice généré à l'investissement initial.<br/><br/>
                 <strong>Formule :</strong> ROI = (Bénéfice Net / Investissement Initial) × 100<br/><br/>
                 <strong>Dans notre modèle :</strong><br/>
-                • Bénéfice Net = EBIT (Bénéfice Total - Charges)<br/>
+                • Bénéfice Net = EBIT (Marge brute - Charges)<br/>
                 • Investissement Initial = CAPEX<br/>
                 • ROI Mensuel = (EBIT mensuel / CAPEX) × 100<br/>
                 • ROI Annuel = (EBIT annuel / CAPEX) × 100<br/><br/>
