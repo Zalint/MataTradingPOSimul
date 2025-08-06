@@ -1749,7 +1749,7 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
     const flux = [];
     const beneficeBrutMensuel = beneficeTotal;
     const chargesFixesMensuelles = chargesTotales;
-    const investissementInitial = -getNumericChargesFixes(); // Décaissement initial
+    const investissementInitial = -getNumericCapex(); // Décaissement initial CAPEX
     
     // Mois 0 : investissement initial
     flux.push({
@@ -1846,7 +1846,7 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
     const flux = [];
     const beneficeBrutMensuel = beneficeTotalSimulation;
     const chargesFixesMensuelles = chargesTotales;
-    const investissementInitial = -getNumericChargesFixes(); // Décaissement initial
+    const investissementInitial = -getNumericCapex(); // Décaissement initial CAPEX
     
     // Mois 0 : investissement initial
     flux.push({
@@ -3611,7 +3611,7 @@ Interprétation: Valeur pour les actionnaires`}>
         <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-green-800">📈 Indicateurs DCF</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           <div className="cursor-help" title={`VAN = Σ(Flux Actualisés)
-Investissement Initial: ${Math.round(chargesFixes).toLocaleString()} FCFA
+Investissement Initial: ${Math.round(getNumericCapex()).toLocaleString()} FCFA
 Taux d'actualisation: ${tauxActualisationAnnuel}% (${(tauxActualisationMensuel * 100).toFixed(3)}% mensuel)
 VAN: ${indicateursDCF.van.toLocaleString()} FCFA
 Interprétation: ${indicateursDCF.van > 0 ? 'Projet rentable' : 'Projet non rentable'}`}>
@@ -3976,7 +3976,7 @@ Equity Value: ${Math.round(calculerEquityValue()).toLocaleString()} FCFA`}>
         <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-green-800">📈 Indicateurs DCF - Simulation</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           <div className="cursor-help" title={`VAN = Σ(Flux Actualisés) - Simulation
-Investissement Initial: ${Math.round(chargesFixes).toLocaleString()} FCFA
+Investissement Initial: ${Math.round(getNumericCapex()).toLocaleString()} FCFA
 Taux d'actualisation: ${tauxActualisationAnnuel}% (${(tauxActualisationMensuel * 100).toFixed(3)}% mensuel)
 VAN: ${indicateursDCFSimulation.van.toLocaleString()} FCFA
 Interprétation: ${indicateursDCFSimulation.van > 0 ? 'Projet rentable' : 'Projet non rentable'}`}>
