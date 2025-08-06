@@ -276,7 +276,7 @@ const SimulateurRentabilite = () => {
   const [dureeAnalyse, setDureeAnalyse] = useState('60'); // 5 ans par défaut
   
   // États pour le DCF avancé
-  const [capex, setCapex] = useState('2500000'); // 2.5M par défaut
+  const [capex, setCapex] = useState('5000000'); // 5M par défaut
   const [bfr, setBfr] = useState('2500000'); // 2.5M par défaut
   const [wacc, setWacc] = useState('12'); // 12% par défaut (corrigé)
   const [croissanceTerminale, setCroissanceTerminale] = useState('3'); // 3% par défaut
@@ -339,6 +339,17 @@ const SimulateurRentabilite = () => {
 
   // Fonctions helper pour convertir les chaînes en nombres
   const getNumericValue = (value) => parseFloat(value) || 0;
+  
+  // Fonction pour formater les millions
+  const formatMillions = (value) => {
+    const numValue = typeof value === 'string' ? getNumericValue(value) : value;
+    if (numValue >= 1000000) {
+      return `${(numValue / 1000000).toFixed(1)}M`;
+    } else if (numValue >= 1000) {
+      return `${(numValue / 1000).toFixed(0)}K`;
+    }
+    return numValue.toLocaleString();
+  };
   const getNumericVolume = () => getNumericValue(volume);
   const getNumericAbatsParKg = () => getNumericValue(abatsParKg);
   const getNumericPeration = () => getNumericValue(peration);
@@ -3167,7 +3178,7 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
                 className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
                 style={{ fontSize: '16px' }}
               />
-               <div className="text-xs text-gray-500 mt-1">{(getNumericAmortissementAnnuel() / 12).toLocaleString()} FCFA/mois</div>
+               <div className="text-xs text-gray-500 mt-1">{formatMillions(getNumericAmortissementAnnuel() / 12)} FCFA/mois ({formatMillions(getNumericAmortissementAnnuel())} FCFA/an)</div>
              </div>
            </div>
          </div>
@@ -3278,8 +3289,8 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
            </div>
            <div>
              <div className="text-sm text-gray-600">Amortissement mensuel:</div>
-             <div className="text-lg sm:text-xl font-bold text-blue-600">{amortissementFixeMensuel.toLocaleString()}</div>
-             <div className="text-xs text-gray-500">{getNumericAmortissementAnnuel().toLocaleString()} FCFA / 12 mois</div>
+             <div className="text-lg sm:text-xl font-bold text-blue-600">{formatMillions(amortissementFixeMensuel)} FCFA</div>
+             <div className="text-xs text-gray-500">{formatMillions(getNumericAmortissementAnnuel())} FCFA / 12 mois</div>
            </div>
                                              {/* Amortissement masqué - charges fixes à 0 */}
                       {false && (
@@ -3291,13 +3302,13 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
                       )}
            <div>
              <div className="text-sm text-gray-600">Total charges mensuelles:</div>
-             <div className="text-lg sm:text-xl font-bold text-red-700">{chargesTotales.toLocaleString()}</div>
+             <div className="text-lg sm:text-xl font-bold text-red-700">{formatMillions(chargesTotales)} FCFA</div>
            </div>
          </div>
          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
            <div>
              <div className="text-sm text-gray-600">Bénéfice net mensuel:</div>
-             <div className="text-lg sm:text-xl font-bold text-green-600">{(getBeneficeTotalActif() - chargesTotales).toLocaleString()}</div>
+             <div className="text-lg sm:text-xl font-bold text-green-600">{formatMillions(getBeneficeTotalActif() - chargesTotales)} FCFA</div>
            </div>
            <div>
              <div className="text-sm text-gray-600">Rentabilité:</div>
