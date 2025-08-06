@@ -261,6 +261,7 @@ const SimulateurRentabilite = () => {
   // États pour les charges
   const [chargesFixes, setChargesFixes] = useState('0');
   const [dureeAmortissement, setDureeAmortissement] = useState('24'); // Durée en mois
+  const [amortissementAnnuel, setAmortissementAnnuel] = useState('2500000'); // Amortissement fixe par an
   const [salaire, setSalaire] = useState('250000');
   const [electricite, setElectricite] = useState('25000');
   const [eau, setEau] = useState('5000');
@@ -352,6 +353,7 @@ const SimulateurRentabilite = () => {
   const getNumericChargesTransport = () => getNumericValue(chargesTransport);
   const getNumericLoyer = () => getNumericValue(loyer);
   const getNumericAutresCharges = () => getNumericValue(autresCharges);
+  const getNumericAmortissementAnnuel = () => getNumericValue(amortissementAnnuel);
   const getNumericTauxActualisationAnnuel = () => getNumericValue(tauxActualisationAnnuel);
   const getNumericDureeAnalyse = () => getNumericValue(dureeAnalyse);
   const getNumericCapex = () => getNumericValue(capex);
@@ -376,13 +378,8 @@ const SimulateurRentabilite = () => {
   };
 
   const getNumericDepreciationAmortissement = () => {
-    // Si une valeur manuelle est saisie, l'utiliser
-    if (depreciationAmortissement && depreciationAmortissement.trim() !== '') {
-      return getNumericValue(depreciationAmortissement);
-    }
-    
-    // Sinon, calculer automatiquement
-    return calculerDAAutomatique();
+    // Utiliser la valeur d'amortissement annuel modifiable
+    return getNumericAmortissementAnnuel();
   };
 
   // Calcul du volume ajusté pour la simulation
@@ -1506,8 +1503,9 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
   
   // Calcul des charges totales
   const chargesMensuelles = getNumericSalaire() + getNumericElectricite() + getNumericEau() + getNumericInternet() + getNumericSacsLivraison() + getNumericChargesTransport() + getNumericLoyer() + getNumericAutresCharges();
-  const amortissementChargesFixes = getNumericChargesFixes() / getNumericDureeAmortissement(); // Amortissement sur la durée définie
-  const chargesTotales = amortissementChargesFixes + chargesMensuelles;
+  const amortissementChargesFixes = getNumericChargesFixes() / getNumericDureeAmortissement(); // Amortissement sur la durée définie (maintenant 0)
+  const amortissementFixeMensuel = getNumericAmortissementAnnuel() / 12; // Amortissement mensuel modifiable
+  const chargesTotales = amortissementChargesFixes + chargesMensuelles + amortissementFixeMensuel;
   
   // Calcul avec les données originales (pour l'affichage principal et DCF simple)
   // CORRECTION: Calculer la marge moyenne en temps réel pour les produits non-éditables
@@ -3159,17 +3157,17 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
               />
                      </div>
             )}
-             <div>
-               <label className="block text-sm font-medium text-gray-700 mb-1">Durée amortissement (mois)</label>
+                          <div>
+               <label className="block text-sm font-medium text-gray-700 mb-1">Amortissement annuel (FCFA)</label>
                         <input 
-                          type="number"
-                 min="1"
-                 value={dureeAmortissement}
-                 onChange={(e) => setDureeAmortissement(e.target.value)}
-                 className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
-                 style={{ fontSize: '16px' }}
-               />
-               <div className="text-xs text-gray-500 mt-1">{(getNumericDureeAmortissement() / 12).toFixed(1)} années</div>
+                         type="number"
+                min="0"
+                value={amortissementAnnuel}
+                onChange={(e) => setAmortissementAnnuel(e.target.value)}
+                className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
+                style={{ fontSize: '16px' }}
+              />
+               <div className="text-xs text-gray-500 mt-1">{(getNumericAmortissementAnnuel() / 12).toLocaleString()} FCFA/mois</div>
              </div>
            </div>
          </div>
@@ -3277,6 +3275,11 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
            <div>
              <div className="text-sm text-gray-600">Charges mensuelles:</div>
              <div className="text-lg sm:text-xl font-bold text-orange-600">{chargesMensuelles.toLocaleString()}</div>
+           </div>
+           <div>
+             <div className="text-sm text-gray-600">Amortissement mensuel:</div>
+             <div className="text-lg sm:text-xl font-bold text-blue-600">{amortissementFixeMensuel.toLocaleString()}</div>
+             <div className="text-xs text-gray-500">{getNumericAmortissementAnnuel().toLocaleString()} FCFA / 12 mois</div>
            </div>
                                              {/* Amortissement masqué - charges fixes à 0 */}
                       {false && (
