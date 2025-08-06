@@ -1039,7 +1039,10 @@ Positionnez cette analyse complémentaire comme un renforcement de la crédibili
         totalAmortissement: getNumericAmortissementAnnuel(),
         total: getNumericChargesFixes() + getNumericSalaire() + getNumericElectricite() + 
                getNumericEau() + getNumericInternet() + getNumericSacsLivraison() + 
-               getNumericChargesTransport() + getNumericLoyer() + getNumericAutresCharges()
+               getNumericChargesTransport() + getNumericLoyer() + getNumericAutresCharges(),
+        totalChargesAvecAmortissement: (getNumericChargesFixes() + getNumericSalaire() + getNumericElectricite() + 
+               getNumericEau() + getNumericInternet() + getNumericSacsLivraison() + 
+               getNumericChargesTransport() + getNumericLoyer() + getNumericAutresCharges()) + (getNumericAmortissementAnnuel() / 12)
       },
       
       // Paramètres DCF
@@ -2836,6 +2839,7 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
                       </div>
                       <div className="mt-3 p-3 bg-orange-100 rounded">
                         <div className="font-semibold text-orange-800">Total Charges: {keyData.charges.total.toLocaleString()} FCFA</div>
+                        <div className="font-semibold text-orange-900 mt-2">Total Charges + Amortissement: {Math.round(keyData.charges.totalChargesAvecAmortissement).toLocaleString()} FCFA</div>
                       </div>
                     </div>
 
