@@ -1275,7 +1275,7 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
       data: {
         // Paramètres globaux
         volume,
-        abatsParKg,
+        gainProduitsNobleFoieYellParKg,
         peration,
         
         // Simulation de volume
