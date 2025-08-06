@@ -1036,6 +1036,7 @@ Positionnez cette analyse complémentaire comme un renforcement de la crédibili
         chargesTransport: getNumericChargesTransport(),
         loyer: getNumericLoyer(),
         autresCharges: getNumericAutresCharges(),
+        totalAmortissement: getNumericAmortissementAnnuel(),
         total: getNumericChargesFixes() + getNumericSalaire() + getNumericElectricite() + 
                getNumericEau() + getNumericInternet() + getNumericSacsLivraison() + 
                getNumericChargesTransport() + getNumericLoyer() + getNumericAutresCharges()
@@ -2758,7 +2759,7 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
                       <h4 className="font-semibold text-purple-800 mb-3">💰 Métriques Financières</h4>
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <div>
-                          <span className="text-sm text-gray-600">Bénéfice Total:</span>
+                          <span className="text-sm text-gray-600">Marge brute:</span>
                           <div className="font-mono text-lg">{keyData.beneficeTotal.toLocaleString()} FCFA</div>
                         </div>
                         <div>
@@ -2793,8 +2794,8 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
                       <h4 className="font-semibold text-orange-800 mb-3">💸 Charges</h4>
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                         <div>
-                          <span className="text-sm text-gray-600">Charges Fixes:</span>
-                          <div className="font-mono text-lg">{keyData.charges.fixes.toLocaleString()} FCFA</div>
+                          <span className="text-sm text-gray-600">Amortissement mensuel:</span>
+                          <div className="font-mono text-lg">{Math.round(keyData.charges.totalAmortissement / 12).toLocaleString()} FCFA</div>
                         </div>
                         <div>
                           <span className="text-sm text-gray-600">Salaire:</span>
@@ -2827,6 +2828,10 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
                         <div>
                           <span className="text-sm text-gray-600">Autres:</span>
                           <div className="font-mono text-lg">{keyData.charges.autresCharges.toLocaleString()} FCFA</div>
+                        </div>
+                        <div>
+                          <span className="text-sm text-gray-600">Total Amortissement:</span>
+                          <div className="font-mono text-lg">{keyData.charges.totalAmortissement.toLocaleString()} FCFA</div>
                         </div>
                       </div>
                       <div className="mt-3 p-3 bg-orange-100 rounded">
@@ -2878,17 +2883,14 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
                       <h4 className="font-semibold text-teal-800 mb-3">⚙️ Paramètres Spécifiques</h4>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
-                          <span className="text-sm text-gray-600">Abats par Kg:</span>
+                          <span className="text-sm text-gray-600">Foie, Yell, Filet (Bœuf/Veau):</span>
                           <div className="font-mono text-lg">{keyData.abatsParKg} FCFA</div>
                         </div>
                         <div>
                           <span className="text-sm text-gray-600">Pération:</span>
                           <div className="font-mono text-lg">{keyData.peration}%</div>
                         </div>
-                        <div>
-                          <span className="text-sm text-gray-600">Durée Amortissement:</span>
-                          <div className="font-mono text-lg">{keyData.dureeAmortissement} mois</div>
-                        </div>
+
                       </div>
                     </div>
                   </>
