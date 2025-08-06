@@ -259,7 +259,7 @@ const SimulateurRentabilite = () => {
   });
   
   // États pour les charges
-  const [chargesFixes, setChargesFixes] = useState('5000000');
+  const [chargesFixes, setChargesFixes] = useState('0');
   const [dureeAmortissement, setDureeAmortissement] = useState('24'); // Durée en mois
   const [salaire, setSalaire] = useState('250000');
   const [electricite, setElectricite] = useState('25000');
@@ -1466,11 +1466,10 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
   // Fonction d'export des flux de trésorerie
   const exportFluxTresorerie = (fluxData, nomFichier) => {
     const csvContent = [
-      ['Mois', 'Bénéfice Brut', 'Charges Fixes', 'Flux Net', 'Flux Actualisé', 'Cumul Actualisé'],
+              ['Mois', 'Bénéfice Brut', 'Flux Net', 'Flux Actualisé', 'Cumul Actualisé'],
       ...fluxData.map(flux => [
         flux.mois === 0 ? 'Mois 0' : `Mois ${flux.mois}`,
         flux.beneficeBrut.toLocaleString(),
-        flux.chargesFixes.toLocaleString(),
         flux.fluxNet.toLocaleString(),
         flux.fluxActualise.toLocaleString(),
         flux.cumulActualise.toLocaleString()
@@ -3147,16 +3146,19 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
          <div className="mb-6">
                        <h4 className="text-sm font-semibold text-orange-700 mb-3">🏗️ Immobilisations</h4>
            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-             <div>
-               <label className="block text-sm font-medium text-gray-700 mb-1">Charges fixes</label>
-                      <input 
-                        type="number"
-                 value={chargesFixes}
-                 onChange={(e) => setChargesFixes(e.target.value)}
-                 className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
-                 style={{ fontSize: '16px' }}
-               />
-                      </div>
+                         {/* Charges fixes masquées - maintenant à 0 par défaut */}
+            {false && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Charges fixes</label>
+                     <input 
+                       type="number"
+                value={chargesFixes}
+                onChange={(e) => setChargesFixes(e.target.value)}
+                className="w-full p-2 sm:p-3 border border-gray-300 rounded text-base"
+                style={{ fontSize: '16px' }}
+              />
+                     </div>
+            )}
              <div>
                <label className="block text-sm font-medium text-gray-700 mb-1">Durée amortissement (mois)</label>
                         <input 
@@ -3264,20 +3266,26 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
        <div className="bg-red-50 border border-red-200 rounded-lg p-3 sm:p-4 md:p-6 mb-4 sm:mb-6 md:mb-8">
          <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-red-800">📊 Résumé des Charges</h3>
          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-                       <div>
-              <div className="text-sm text-gray-600">Charges fixes (total):</div>
-              <div className="text-lg sm:text-xl font-bold text-red-600">{chargesFixes.toLocaleString()}</div>
-              <div className="text-xs text-gray-500">Amorti sur {dureeAmortissement} mois</div>
-            </div>
+                                             {/* Charges fixes masquées - maintenant à 0 */}
+                      {false && (
+                      <div>
+             <div className="text-sm text-gray-600">Charges fixes (total):</div>
+             <div className="text-lg sm:text-xl font-bold text-red-600">{chargesFixes.toLocaleString()}</div>
+             <div className="text-xs text-gray-500">Amorti sur {dureeAmortissement} mois</div>
+           </div>
+                      )}
            <div>
              <div className="text-sm text-gray-600">Charges mensuelles:</div>
              <div className="text-lg sm:text-xl font-bold text-orange-600">{chargesMensuelles.toLocaleString()}</div>
            </div>
-                       <div>
-              <div className="text-sm text-gray-600">Amortissement mensuel:</div>
-              <div className="text-lg sm:text-xl font-bold text-blue-600">{amortissementChargesFixes.toLocaleString()}</div>
-              <div className="text-xs text-gray-500">Charges fixes / {dureeAmortissement}</div>
-            </div>
+                                             {/* Amortissement masqué - charges fixes à 0 */}
+                      {false && (
+                      <div>
+             <div className="text-sm text-gray-600">Amortissement mensuel:</div>
+             <div className="text-lg sm:text-xl font-bold text-blue-600">{amortissementChargesFixes.toLocaleString()}</div>
+             <div className="text-xs text-gray-500">Charges fixes / {dureeAmortissement}</div>
+           </div>
+                      )}
            <div>
              <div className="text-sm text-gray-600">Total charges mensuelles:</div>
              <div className="text-lg sm:text-xl font-bold text-red-700">{chargesTotales.toLocaleString()}</div>
@@ -3665,7 +3673,7 @@ Comparaison: TRI ${indicateursDCF.triAnnuel > (tauxActualisationAnnuel / 100) ? 
               <tr>
                 <th className="px-2 sm:px-4 py-3 text-left text-xs sm:text-sm font-medium text-white uppercase tracking-wider">Mois</th>
                 <th className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-medium text-white uppercase tracking-wider">Bénéfice Brut</th>
-                <th className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-medium text-white uppercase tracking-wider">Charges Fixes</th>
+                {/* Colonne Charges Fixes masquée */}
                 <th className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-medium text-white uppercase tracking-wider">Flux Net</th>
                 <th className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-medium text-white uppercase tracking-wider">Flux Actualisé</th>
                 <th className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-medium text-white uppercase tracking-wider">Cumul Actualisé</th>
@@ -3680,9 +3688,7 @@ Comparaison: TRI ${indicateursDCF.triAnnuel > (tauxActualisationAnnuel / 100) ? 
                   <td className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm">
                     {flux.beneficeBrut.toLocaleString()}
                   </td>
-                  <td className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm">
-                    {flux.chargesFixes.toLocaleString()}
-                  </td>
+                  {/* Cellule Charges Fixes masquée */}
                   <td className={`px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-bold ${
                     flux.fluxNet > 0 ? 'text-green-600' : 'text-red-600'
                   }`}>
@@ -4032,7 +4038,7 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
               <tr>
                 <th className="px-2 sm:px-4 py-3 text-left text-xs sm:text-sm font-medium text-white uppercase tracking-wider">Mois</th>
                 <th className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-medium text-white uppercase tracking-wider">Bénéfice Brut</th>
-                <th className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-medium text-white uppercase tracking-wider">Charges Fixes</th>
+                {/* Colonne Charges Fixes masquée */}
                 <th className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-medium text-white uppercase tracking-wider">Flux Net</th>
                 <th className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-medium text-white uppercase tracking-wider">Flux Actualisé</th>
                 <th className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-medium text-white uppercase tracking-wider">Cumul Actualisé</th>
@@ -4047,9 +4053,7 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
                   <td className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm">
                     {flux.beneficeBrut.toLocaleString()}
                   </td>
-                  <td className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm">
-                    {flux.chargesFixes.toLocaleString()}
-                  </td>
+                  {/* Cellule Charges Fixes masquée */}
                   <td className={`px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-bold ${
                     flux.fluxNet > 0 ? 'text-green-600' : 'text-red-600'
                   }`}>
