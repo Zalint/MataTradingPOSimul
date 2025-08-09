@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -151,73 +151,45 @@ const SimulateurRentabilite = () => {
     }
   };
 
-  // Fonction pour générer l'explication détaillée de la marge
+  // Fonction pour générer l'explication détaillée de la marge moyenne sur ventes
   const genererExplicationMarge = () => {
     const produitsActuels = getNumericAdditionalVolume() > 0 ? getAdjustedRepartitions() : produits;
     const volumeActuel = getNumericAdditionalVolume() > 0 ? getAdjustedVolume() : getNumericVolume();
     const estSimulation = getNumericAdditionalVolume() > 0;
     
-    let margePonderee = 0;
+    let beneficeTotal = 0;
     const detailsProduits = [];
     
-    // Calculer d'abord la marge moyenne des produits éditables
-    let margeMoyenneEditables = 0;
-    let nombreProduitsEditables = 0;
+    // Utiliser la nouvelle fonction calculerAgregats pour obtenir les détails par produit
+    const agregats = calculerAgregats();
     
+    // Traiter chaque produit avec ses métriques calculées
     Object.entries(produitsActuels).forEach(([nom, data]) => {
-      if (data.editable && data.prixAchat && data.prixVente) {
-        let marge;
-        if (data.hasAbats) {
-          const prixVenteAjuste = data.prixVente * (1 - getNumericPeration());
-          const abats = getNumericGainProduitsNobleFoieYellParKg();
-          const total = prixVenteAjuste + abats;
-          marge = (total / data.prixAchat) - 1;
-        } else {
-          marge = (data.prixVente / data.prixAchat) - 1;
-        }
-        margeMoyenneEditables += marge;
-        nombreProduitsEditables++;
-      }
-    });
-    
-    margeMoyenneEditables = nombreProduitsEditables > 0 ? margeMoyenneEditables / nombreProduitsEditables : 0;
-
-    // Ensuite traiter TOUS les produits
-    Object.entries(produitsActuels).forEach(([nom, data]) => {
-      let marge;
+      const metriques = agregats.detailsProduits[nom] || { benefice: 0, margeBrute: 0 };
+      
       let calculDetail = '';
+      const volumeProduit = data.repartition * volumeActuel;
       
       if (data.editable && data.prixAchat && data.prixVente) {
         if (data.hasAbats) {
-          const prixVenteAjuste = data.prixVente * (1 - getNumericPeration());
-          const abats = getNumericGainProduitsNobleFoieYellParKg();
-          const total = prixVenteAjuste + abats;
-          marge = (total / data.prixAchat) - 1;
-          calculDetail = `((${data.prixVente} × ${(1-getNumericPeration()).toFixed(3)} + ${abats}) / ${data.prixAchat}) - 1 = ${(marge * 100).toFixed(2)}%`;
+          calculDetail = `CA: ${Math.round(volumeProduit).toLocaleString()} → Bénéfice: ${Math.round(metriques.benefice).toLocaleString()} FCFA`;
         } else {
-          marge = (data.prixVente / data.prixAchat) - 1;
-          calculDetail = `(${data.prixVente} / ${data.prixAchat}) - 1 = ${(marge * 100).toFixed(2)}%`;
+          calculDetail = `CA: ${Math.round(volumeProduit).toLocaleString()} → Bénéfice: ${Math.round(metriques.benefice).toLocaleString()} FCFA`;
         }
       } else {
-        // Pour les produits non éditables, utiliser la marge moyenne des éditables
-        marge = margeMoyenneEditables;
-        calculDetail = `Marge moyenne des produits éditables = ${(marge * 100).toFixed(2)}%`;
+        calculDetail = `Produit non-éditable → Bénéfice: ${Math.round(metriques.benefice).toLocaleString()} FCFA`;
       }
       
-      const poids = data.repartition;
-      const contribution = marge * poids;
-      margePonderee += contribution;
-      
-      const volumeProduit = poids * volumeActuel;
+      beneficeTotal += metriques.benefice;
       
       detailsProduits.push({
         nom,
-        repartition: poids,
-        repartitionPourcentage: (poids * 100).toFixed(2),
-        marge: marge,
-        margePourcentage: (marge * 100).toFixed(2),
-        contribution: contribution,
-        contributionPourcentage: (contribution * 100).toFixed(2),
+        repartition: data.repartition,
+        repartitionPourcentage: (data.repartition * 100).toFixed(2),
+        marge: metriques.margeBrute,
+        margePourcentage: (metriques.margeBrute * 100).toFixed(2),
+        benefice: metriques.benefice,
+        beneficeArrondi: Math.round(metriques.benefice),
         calculDetail,
         volumeProduit: Math.round(volumeProduit),
         hasAbats: data.hasAbats,
@@ -227,7 +199,8 @@ const SimulateurRentabilite = () => {
       });
     });
 
-    const margeFinale = margePonderee; // Pas de division car les répartitions font 100%
+    // Marge moyenne sur ventes = beneficeTotal / volumeTotal
+    const margeFinale = volumeActuel > 0 ? beneficeTotal / volumeActuel : 0;
 
     return {
       estSimulation,
@@ -237,8 +210,8 @@ const SimulateurRentabilite = () => {
       produitAjoute: selectedProduct,
       margeFinale,
       margeFinalePourcentage: (margeFinale * 100).toFixed(2),
+      beneficeTotal,
       detailsProduits,
-      sommePonderee: margePonderee,
       parametres: {
         peration: getNumericPeration(),
         perationPourcentage: (getNumericPeration() * 100).toFixed(1),
@@ -260,7 +233,7 @@ const SimulateurRentabilite = () => {
   
   // États pour les charges
   const [chargesFixes, setChargesFixes] = useState('0');
-  const [dureeAmortissement, setDureeAmortissement] = useState('12'); // Durée en mois
+  const [dureeAmortissement, setDureeAmortissement] = useState('24'); // Durée en mois
   const [amortissementAnnuel, setAmortissementAnnuel] = useState('2500000'); // Amortissement fixe par an
   const [salaire, setSalaire] = useState('250000');
   const [electricite, setElectricite] = useState('25000');
@@ -284,6 +257,56 @@ const SimulateurRentabilite = () => {
   const [tresorerie, setTresorerie] = useState('500000'); // 500K par défaut
   const [tauxImposition, setTauxImposition] = useState('30'); // 30% par défaut
   const [depreciationAmortissement, setDepreciationAmortissement] = useState(''); // Calculé automatiquement
+  
+  // États pour les formules personnalisées
+  const [formulesPersonnalisees, setFormulesPersonnalisees] = useState({
+    ebitda: 'beneficeTotal - chargesMensuelles',
+    ebit: 'ebitda - daMensuel',
+    nopat: 'ebit * (1 - tauxImposition / 100)',
+    fcfMensuel: 'nopat + daMensuel',
+    fcfAnnuel: 'fcfMensuel * 12',
+    roicMensuel: 'nopat / (capex + bfr - tresorerie)',
+    roicAnnuel: 'Math.pow(1 + roicMensuel, 12) - 1',
+    beneficeNetMensuel: 'beneficeTotal - chargesTotales',
+    vanFluxOperationnels: '0', // Sera calculé avec boucle DCF
+    vanValeurTerminale: 'valeurTerminale / Math.pow(1 + tauxActualisation, dureeAnalyse)',
+    investissementInitial: 'capex + bfr',
+    van: 'vanFluxOperationnels + vanValeurTerminale - investissementInitial'
+  });
+  const [editeurFormuleVisible, setEditeurFormuleVisible] = useState(false);
+  
+  // Charger les formules sauvegardées au démarrage
+  useEffect(() => {
+    const savedFormules = getCookie('mata_formules_personnalisees');
+    if (savedFormules) {
+      try {
+        const formules = JSON.parse(savedFormules);
+        // S'assurer que toutes les nouvelles formules sont présentes (rétrocompatibilité)
+        if (!formules.van) {
+          formules.van = 'vanFluxOperationnels + vanValeurTerminale - investissementInitial';
+        }
+        if (!formules.vanFluxOperationnels) {
+          formules.vanFluxOperationnels = '0'; // Sera calculé avec boucle DCF
+        }
+        if (!formules.vanValeurTerminale) {
+          formules.vanValeurTerminale = 'valeurTerminale / Math.pow(1 + tauxActualisation, dureeAnalyse)';
+        }
+        if (!formules.investissementInitial) {
+          formules.investissementInitial = 'capex + bfr';
+        }
+        setFormulesPersonnalisees(formules);
+        console.log('📐 Formules personnalisées chargées depuis le cookie');
+      } catch (error) {
+        console.error('❌ Erreur lors du chargement des formules:', error);
+      }
+    } else {
+      // Si aucune formule sauvegardée, s'assurer que VAN est dans l'état par défaut
+      setFormulesPersonnalisees(prev => ({
+        ...prev,
+        van: prev.van || 'vanFluxOperationnels + vanValeurTerminale - investissementInitial'
+      }));
+    }
+  }, []);
   
   const [produits, setProduits] = useState({
     'Boeuf': {
@@ -389,7 +412,13 @@ const SimulateurRentabilite = () => {
   };
 
   const getNumericDepreciationAmortissement = () => {
-    // Utiliser la valeur d'amortissement annuel modifiable
+    // D&A = CAPEX / durée d'amortissement (en mois) × 12 pour obtenir l'annuel
+    const capex = getNumericCapex();
+    const duree = getNumericDureeAmortissement();
+    if (capex > 0 && duree > 0) {
+      return (capex / duree) * 12; // Conversion en annuel
+    }
+    // Fallback vers la valeur manuelle si définie
     return getNumericAmortissementAnnuel();
   };
 
@@ -441,66 +470,16 @@ const SimulateurRentabilite = () => {
   };
 
   const calculerMargeMoyenne = () => {
-    // Utiliser les répartitions appropriées selon le contexte (simulation ou principal)
-    const produitsActuels = getNumericAdditionalVolume() > 0 ? getAdjustedRepartitions() : produits;
-    
-    console.log('🔍 CALCUL MARGE MOYENNE - Début');
-    console.log('📊 Produits actuels:', Object.keys(produitsActuels));
-    console.log('📊 Volume supplémentaire:', getNumericAdditionalVolume());
-    
-    let margePonderee = 0;
-    
-    // Calculer d'abord la marge moyenne des produits éditables
-    let margeMoyenneEditables = 0;
-    let nombreProduitsEditables = 0;
-    
-    Object.entries(produitsActuels).forEach(([nom, data]) => {
-      if (data.editable && data.prixAchat && data.prixVente) {
-        let marge;
-      if (data.hasAbats) {
-          marge = ((data.prixVente * (1 - getNumericPeration()) + getNumericGainProduitsNobleFoieYellParKg()) / data.prixAchat) - 1;
-      } else {
-          marge = (data.prixVente / data.prixAchat) - 1;
-        }
-        console.log(`📈 ${nom}: ${data.prixAchat} → ${data.prixVente} = ${(marge * 100).toFixed(2)}%`);
-        margeMoyenneEditables += marge;
-        nombreProduitsEditables++;
-      }
-    });
-    
-    margeMoyenneEditables = nombreProduitsEditables > 0 ? margeMoyenneEditables / nombreProduitsEditables : 0;
-    console.log(`📊 Marge moyenne éditables: ${(margeMoyenneEditables * 100).toFixed(2)}%`);
-
-    // Ensuite calculer la moyenne pondérée de TOUS les produits
-    Object.entries(produitsActuels).forEach(([nom, data]) => {
-      let marge;
-      
-      if (data.editable && data.prixAchat && data.prixVente) {
-        if (data.hasAbats) {
-          marge = ((data.prixVente * (1 - getNumericPeration()) + getNumericGainProduitsNobleFoieYellParKg()) / data.prixAchat) - 1;
-        } else {
-          marge = (data.prixVente / data.prixAchat) - 1;
-        }
-      } else {
-        // Pour les produits non éditables, utiliser la marge moyenne des éditables
-        marge = margeMoyenneEditables;
-      }
-      
-      // Pondérer par la répartition du produit
-      const contribution = marge * data.repartition;
-      margePonderee += contribution;
-      console.log(`📊 ${nom}: ${(marge * 100).toFixed(2)}% × ${(data.repartition * 100).toFixed(2)}% = ${(contribution * 100).toFixed(3)}%`);
-    });
-
-    console.log(`🎯 RÉSULTAT FINAL: ${(margePonderee * 100).toFixed(2)}%`);
-    console.log('🔍 CALCUL MARGE MOYENNE - Fin');
-    
-    return margePonderee; // Pas de division par poidsTotal car les répartitions font déjà 100%
+    const agregats = calculerAgregats();
+    console.log('🔍 CALCUL MARGE MOYENNE - Utilisation nouvelles formules');
+    console.log(`🎯 RÉSULTAT: ${(agregats.margeMoyenne * 100).toFixed(2)}%`);
+    return agregats.margeMoyenne;
   };
 
   const calculerMargeBrute = (produitData) => {
     if (!produitData.prixVente || !produitData.prixAchat) return 0;
     
+    // Markup (PV-PA)/PA harmonisé avec calculerMetriquesProduit
     if (produitData.hasAbats) {
       return ((produitData.prixVente * (1 - getNumericPeration()) + getNumericGainProduitsNobleFoieYellParKg()) / produitData.prixAchat) - 1;
     } else {
@@ -508,6 +487,358 @@ const SimulateurRentabilite = () => {
     }
   };
 
+  // ==========================================
+  // NOUVELLES FORMULES FINANCIÈRES STANDARDISÉES
+  // ==========================================
+
+  // 1) Calcul par produit selon les nouvelles formules
+  const calculerMetriquesProduit = (produitData, nom, volumeTotal) => {
+    // CA_p = volumeTotal * repartitionProduits[p].repartition
+    const CA_p = volumeTotal * produitData.repartition;
+    
+    // Pour les produits non-éditables (pas de prix), retourner des valeurs nulles
+    if (!produitData.editable || !produitData.prixAchat || !produitData.prixVente) {
+      return {
+        CA_p,
+        COGS_p: 0,
+        Abats_p: 0,
+        Pertes_p: 0,
+        benefice: 0,
+        margeBrute: 0
+      };
+    }
+    
+    // COGS_p = CA_p * (prixAchat / prixVente)
+    const COGS_p = CA_p * (produitData.prixAchat / produitData.prixVente);
+    
+    // Abats_p = (hasAbats ? (abatsParKg * CA_p / prixVente) : 0)
+    const Abats_p = produitData.hasAbats ? 
+      (getNumericGainProduitsNobleFoieYellParKg() * CA_p / produitData.prixVente) : 0;
+    
+    // Pertes_p = peration * CA_p (uniquement pour les produits à carcasse)
+    const Pertes_p = produitData.hasAbats ? (getNumericPeration() * CA_p) : 0;
+    
+    // benefice = max(0, CA_p - COGS_p - Pertes_p + Abats_p)
+    const benefice = Math.max(0, CA_p - COGS_p - Pertes_p + Abats_p);
+    
+    // margeBrute = markup (PV-PA)/PA pour harmoniser avec les calculs existants
+    let margeBrute = 0;
+    if (produitData.editable && produitData.prixAchat && produitData.prixVente) {
+      if (produitData.hasAbats) {
+        // Pour les produits à abats : ((PV × (1-peration) + abats) / PA) - 1
+        margeBrute = ((produitData.prixVente * (1 - getNumericPeration()) + getNumericGainProduitsNobleFoieYellParKg()) / produitData.prixAchat) - 1;
+      } else {
+        // Pour les autres produits : (PV / PA) - 1
+        margeBrute = (produitData.prixVente / produitData.prixAchat) - 1;
+      }
+    }
+    
+    return {
+      CA_p,
+      COGS_p,
+      Abats_p,
+      Pertes_p,
+      benefice,
+      margeBrute
+    };
+  };
+
+  // 2) Agrégats
+  const calculerAgregats = () => {
+    const volumeTotal = getNumericVolume() + getNumericAdditionalVolume();
+    const produitsActuels = getNumericAdditionalVolume() > 0 ? getAdjustedRepartitions() : produits;
+    
+    // ÉTAPE 1: Calculer d'abord les produits éditables pour obtenir margeMoyenneVentes
+    let beneficeTotalEditables = 0;
+    let volumeTotalEditables = 0;
+    const detailsProduitsEditables = {};
+    
+    Object.entries(produitsActuels).forEach(([nom, data]) => {
+      if (data.editable && data.prixAchat && data.prixVente) {
+        const metriques = calculerMetriquesProduit(data, nom, volumeTotal);
+        detailsProduitsEditables[nom] = metriques;
+        beneficeTotalEditables += metriques.benefice;
+        volumeTotalEditables += metriques.CA_p;
+      }
+    });
+    
+    // margeMoyenneVentes des produits éditables seulement
+    const margeMoyenneVentesEditables = volumeTotalEditables > 0 ? 
+      beneficeTotalEditables / volumeTotalEditables : 0;
+    
+    console.log(`📊 MARGE MOYENNE VENTES ÉDITABLES: ${(margeMoyenneVentesEditables * 100).toFixed(2)}%`);
+    console.log(`💰 Bénéfice éditables: ${beneficeTotalEditables.toLocaleString()} FCFA`);
+    console.log(`📦 Volume éditables: ${volumeTotalEditables.toLocaleString()} FCFA`);
+    
+    // ÉTAPE 2: Calculer tous les produits (éditables + non-éditables avec margeMoyenneVentesEditables)
+    let beneficeTotal = 0;
+    const detailsProduits = {};
+    
+    Object.entries(produitsActuels).forEach(([nom, data]) => {
+      if (data.editable && data.prixAchat && data.prixVente) {
+        // Produits éditables: utiliser le calcul normal
+        const metriques = calculerMetriquesProduit(data, nom, volumeTotal);
+        detailsProduits[nom] = metriques;
+        beneficeTotal += metriques.benefice;
+      } else {
+        // Produits non-éditables (Autres, Pack): utiliser margeMoyenneVentesEditables
+        const CA_p = volumeTotal * data.repartition;
+        const benefice = CA_p * margeMoyenneVentesEditables;
+        
+        console.log(`🔧 ${nom}: CA=${CA_p.toLocaleString()}, Marge=${(margeMoyenneVentesEditables*100).toFixed(2)}%, Bénéfice=${benefice.toLocaleString()}`);
+        
+        detailsProduits[nom] = {
+          CA_p,
+          COGS_p: 0,
+          Abats_p: 0,
+          Pertes_p: 0,
+          benefice,
+          margeBrute: margeMoyenneVentesEditables
+        };
+        beneficeTotal += benefice;
+      }
+    });
+      
+    // margeMoyenne = moyenne pondérée des markups (PV-PA)/PA
+    let margeMoyenne = 0;
+    Object.entries(produitsActuels).forEach(([nom, data]) => {
+      let markup = 0;
+      if (data.editable && data.prixAchat && data.prixVente) {
+      if (data.hasAbats) {
+          markup = ((data.prixVente * (1 - getNumericPeration()) + getNumericGainProduitsNobleFoieYellParKg()) / data.prixAchat) - 1;
+      } else {
+          markup = (data.prixVente / data.prixAchat) - 1;
+        }
+      }
+      margeMoyenne += markup * data.repartition;
+    });
+    
+    // margeMoyenneVentes = beneficeTotal / volumeTotal (marge sur ventes)
+    const margeMoyenneVentes = volumeTotal > 0 ? beneficeTotal / volumeTotal : 0;
+    
+    return {
+      volumeTotal,
+      beneficeTotal,
+      margeMoyenne,
+      margeMoyenneVentes,
+      detailsProduits
+    };
+  };
+
+  // 3) Charges et résultats d'exploitation (mensualisés)
+  const calculerChargesEtResultats = () => {
+    const agregats = calculerAgregats();
+    
+    // chargesMensuelles = charges détaillées (déjà mensuelles)
+    const chargesMensuelles = getNumericSalaire() + getNumericElectricite() + getNumericEau() + 
+                             getNumericInternet() + getNumericSacsLivraison() + getNumericChargesTransport() + 
+                             getNumericLoyer() + getNumericAutresCharges();
+    
+    // daMensuel = depreciationAmortissement / 12
+    const daMensuel = getNumericDepreciationAmortissement() / 12;
+    
+    // Variables disponibles pour les formules personnalisées
+    const variables = {
+      beneficeTotal: agregats.beneficeTotal,
+      chargesMensuelles,
+      chargesTotales: chargesMensuelles, // Alias pour compatibilité
+      daMensuel,
+      tauxImposition: getNumericTauxImposition(),
+      capex: getNumericCapex(),
+      bfr: getNumericBfr(),
+      tresorerie: getNumericTresorerie()
+    };
+    
+    // Calculer EBITDA (avec formule personnalisée si définie)
+    let ebitda;
+    if (formulesPersonnalisees.ebitda && formulesPersonnalisees.ebitda.trim()) {
+      try {
+        ebitda = evaluerFormule(formulesPersonnalisees.ebitda, variables);
+      } catch (error) {
+        console.warn('Erreur dans la formule EBITDA personnalisée:', error);
+        ebitda = agregats.beneficeTotal - chargesMensuelles; // Formule par défaut
+      }
+        } else {
+      ebitda = agregats.beneficeTotal - chargesMensuelles; // Formule par défaut
+    }
+    
+    // Ajouter EBITDA aux variables pour les calculs suivants
+    variables.ebitda = ebitda;
+    
+    // Calculer EBIT (avec formule personnalisée si définie)
+    let ebit;
+    if (formulesPersonnalisees.ebit && formulesPersonnalisees.ebit.trim()) {
+      try {
+        ebit = evaluerFormule(formulesPersonnalisees.ebit, variables);
+      } catch (error) {
+        console.warn('Erreur dans la formule EBIT personnalisée:', error);
+        ebit = ebitda - daMensuel; // Formule par défaut
+        }
+      } else {
+      ebit = ebitda - daMensuel; // Formule par défaut
+    }
+    
+    // Ajouter EBIT aux variables pour les calculs suivants
+    variables.ebit = ebit;
+    
+    // Calculer NOPAT (avec formule personnalisée si définie)
+    let nopat;
+    if (formulesPersonnalisees.nopat && formulesPersonnalisees.nopat.trim()) {
+      try {
+        nopat = evaluerFormule(formulesPersonnalisees.nopat, variables);
+      } catch (error) {
+        console.warn('Erreur dans la formule NOPAT personnalisée:', error);
+        nopat = ebit * (1 - getNumericTauxImposition() / 100); // Formule par défaut
+      }
+    } else {
+      nopat = ebit * (1 - getNumericTauxImposition() / 100); // Formule par défaut
+    }
+    
+    return {
+      ...agregats,
+      chargesMensuelles,
+      ebitda,
+      daMensuel,
+      ebit,
+      nopat
+    };
+  };
+
+  // 4) Free Cash Flow selon nouvelles formules
+  const calculerFCFStandardise = () => {
+    const resultats = calculerChargesEtResultats();
+    
+    // Variables disponibles pour les formules FCF personnalisées
+    const variables = {
+      beneficeTotal: resultats.beneficeTotal,
+      chargesMensuelles: resultats.chargesMensuelles,
+      chargesTotales: resultats.chargesMensuelles, // Alias pour compatibilité
+      daMensuel: resultats.daMensuel,
+      tauxImposition: getNumericTauxImposition(),
+      capex: getNumericCapex(),
+      bfr: getNumericBfr(),
+      tresorerie: getNumericTresorerie(),
+      ebitda: resultats.ebitda,
+      ebit: resultats.ebit,
+      nopat: resultats.nopat
+    };
+    
+    // Calculer FCF Mensuel (avec formule personnalisée si définie)
+    let fcfMensuel;
+    if (formulesPersonnalisees.fcfMensuel && formulesPersonnalisees.fcfMensuel.trim()) {
+      try {
+        fcfMensuel = evaluerFormule(formulesPersonnalisees.fcfMensuel, variables);
+      } catch (error) {
+        console.warn('Erreur dans la formule FCF Mensuel personnalisée:', error);
+        fcfMensuel = resultats.nopat + resultats.daMensuel; // Formule par défaut
+      }
+    } else {
+      fcfMensuel = resultats.nopat + resultats.daMensuel; // Formule par défaut
+    }
+    
+    // Ajouter FCF mensuel aux variables pour le calcul annuel
+    variables.fcfMensuel = fcfMensuel;
+    
+    // Calculer FCF Annuel (avec formule personnalisée si définie)
+    let fcfAnnuel;
+    if (formulesPersonnalisees.fcfAnnuel && formulesPersonnalisees.fcfAnnuel.trim()) {
+      try {
+        fcfAnnuel = evaluerFormule(formulesPersonnalisees.fcfAnnuel, variables);
+      } catch (error) {
+        console.warn('Erreur dans la formule FCF Annuel personnalisée:', error);
+        fcfAnnuel = 12 * fcfMensuel; // Formule par défaut
+      }
+    } else {
+      fcfAnnuel = 12 * fcfMensuel; // Formule par défaut
+    }
+    
+    return {
+      ...resultats,
+      fcfMensuel,
+      fcfAnnuel
+    };
+  };
+
+  // 5) Bénéfice Net Mensuel avec formules personnalisées
+  const calculerBeneficeNetMensuel = () => {
+    const resultats = calculerChargesEtResultats();
+    
+    // Variables disponibles pour la formule de bénéfice net personnalisée
+    const variables = {
+      beneficeTotal: resultats.beneficeTotal,
+      chargesMensuelles: resultats.chargesMensuelles,
+      chargesTotales: resultats.chargesMensuelles, // Alias pour compatibilité
+      daMensuel: resultats.daMensuel,
+      tauxImposition: getNumericTauxImposition(),
+      capex: getNumericCapex(),
+      bfr: getNumericBfr(),
+      tresorerie: getNumericTresorerie(),
+      ebitda: resultats.ebitda,
+      ebit: resultats.ebit,
+      nopat: resultats.nopat
+    };
+    
+    // Calculer Bénéfice Net Mensuel (avec formule personnalisée si définie)
+    let beneficeNetMensuel;
+    if (formulesPersonnalisees.beneficeNetMensuel && formulesPersonnalisees.beneficeNetMensuel.trim()) {
+      try {
+        beneficeNetMensuel = evaluerFormule(formulesPersonnalisees.beneficeNetMensuel, variables);
+      } catch (error) {
+        console.warn('Erreur dans la formule Bénéfice Net Mensuel personnalisée:', error);
+        beneficeNetMensuel = resultats.beneficeTotal - resultats.chargesMensuelles; // Formule par défaut
+      }
+    } else {
+      beneficeNetMensuel = resultats.beneficeTotal - resultats.chargesMensuelles; // Formule par défaut
+    }
+    
+    return {
+      ...resultats,
+      beneficeNetMensuel
+    };
+  };
+
+  // 6) Seuil de rentabilité avec margeMoyenneVentes
+  const calculerSeuilRentabilite = () => {
+    const resultats = calculerChargesEtResultats();
+    
+    // seuilCA = chargesMensuelles / margeMoyenneVentes
+    const seuilCA = resultats.margeMoyenneVentes > 0 ? 
+      resultats.chargesMensuelles / resultats.margeMoyenneVentes : 0;
+    
+    return {
+      seuilCA,
+      margeMoyenneVentes: resultats.margeMoyenneVentes,
+      chargesMensuelles: resultats.chargesMensuelles
+    };
+  };
+
+  // 6) Ratios et seuils avec margeMoyenneVentes (selon nouvelles formules)
+  const calculerRatiosAvecMargeMoyenneVentes = () => {
+    const resultats = calculerChargesEtResultats();
+    
+    // margeEBITDA = ebitda / volumeTotal
+    const margeEBITDA = resultats.volumeTotal > 0 ? resultats.ebitda / resultats.volumeTotal : 0;
+    
+    // margeEBIT = ebit / volumeTotal  
+    const margeEBIT = resultats.volumeTotal > 0 ? resultats.ebit / resultats.volumeTotal : 0;
+    
+    // margeNOPAT = nopat / volumeTotal
+    const margeNOPAT = resultats.volumeTotal > 0 ? resultats.nopat / resultats.volumeTotal : 0;
+    
+    // Seuil de rentabilité = seuilCA = chargesMensuelles / margeMoyenneVentes
+    const seuilCA = resultats.margeMoyenneVentes > 0 ? 
+      resultats.chargesMensuelles / resultats.margeMoyenneVentes : 0;
+    
+    return {
+      ...resultats,
+      margeEBITDA,
+      margeEBIT, 
+      margeNOPAT,
+      seuilCA
+    };
+  };
+
+  // Fonction de compatibilité (ancien nom)
   const calculerBenefice = (margeBrute, repartition, volume) => {
     return margeBrute * repartition * volume;
   };
@@ -521,9 +852,11 @@ const SimulateurRentabilite = () => {
     let beneficeTotal = 0;
     
     Object.entries(produitsActifs).forEach(([nom, data]) => {
-      let margeBrute;
+      // Pour les produits non-éditables (pas de prix), pas de bénéfice
+      if (!data.editable || !data.prixAchat || !data.prixVente) {
+        return;
+      }
       
-      if (data.editable && data.prixAchat && data.prixVente) {
         // Appliquer la variation seulement au produit spécifié
         let prixAchat = data.prixAchat;
         let prixVente = data.prixVente;
@@ -536,18 +869,14 @@ const SimulateurRentabilite = () => {
           }
         }
         
-        // Calculer la marge brute avec les prix modifiés
-        if (data.hasAbats) {
-          margeBrute = ((prixVente * (1 - getNumericPeration()) + getNumericGainProduitsNobleFoieYellParKg()) / prixAchat) - 1;
-        } else {
-          margeBrute = (prixVente / prixAchat) - 1;
-        }
-      } else {
-        // Pour les produits non éditables, utiliser la marge moyenne
-        margeBrute = calculerMargeMoyenne();
-      }
+      // Utiliser la nouvelle logique de calcul directement
+      const CA_p = volumeActif * data.repartition;
+      const COGS_p = CA_p * (prixAchat / prixVente);
+      const Abats_p = data.hasAbats ? 
+        (getNumericGainProduitsNobleFoieYellParKg() * CA_p / prixVente) : 0;
+      const Pertes_p = data.hasAbats ? (getNumericPeration() * CA_p) : 0;
+      const benefice = Math.max(0, CA_p - COGS_p - Pertes_p + Abats_p);
       
-      const benefice = calculerBenefice(margeBrute, data.repartition, volumeActif);
       beneficeTotal += benefice;
     });
     
@@ -558,39 +887,82 @@ const SimulateurRentabilite = () => {
   const calculerBeneficeAvecVariationPrixCorrige = (typePrix, variation) => {
     // Utiliser les données appropriées selon l'onglet actif
     const produitsActifs = getNumericAdditionalVolume() > 0 ? adjustedProduits : produits;
-    const volumeActif = getNumericAdditionalVolume() > 0 ? adjustedVolume : getNumericVolume();
+    const volumeActif = getNumericAdditionalVolume() > 0 ? adjustedVolume : (getNumericVolume() || 0);
     
-    let beneficeTotal = 0;
+    // Vérifications de sécurité
+    if (!volumeActif || volumeActif <= 0) {
+      console.warn(`⚠️ Volume invalide: ${volumeActif}`);
+      return 0;
+    }
+    
+    if (!produitsActifs || Object.keys(produitsActifs).length === 0) {
+      console.warn(`⚠️ Produits invalides:`, produitsActifs);
+      return 0;
+    }
+    
+    // Calculer d'abord la marge moyenne ventes des produits éditables
+    let beneficeTotalEditables = 0;
+    let volumeTotalEditables = 0;
     
     Object.entries(produitsActifs).forEach(([nom, data]) => {
-      let margeBrute;
-      
       if (data.editable && data.prixAchat && data.prixVente) {
-        // Appliquer la variation selon le produit sélectionné (comme augmenterTousPrix)
-        let prixAchat = data.prixAchat;
-        let prixVente = data.prixVente;
+        let prixAchat = data.prixAchat || 0;
+        let prixVente = data.prixVente || 1;
         
         if (selectedProductForPricing === 'Tous' || nom === selectedProductForPricing) {
           if (typePrix === 'prixAchat') {
-            prixAchat += variation;
+            prixAchat += (variation || 0);
           } else if (typePrix === 'prixVente') {
-            prixVente += variation;
+            prixVente += (variation || 0);
           }
         }
         
-        // Calculer la marge brute avec les prix modifiés
-        if (data.hasAbats) {
-          margeBrute = ((prixVente * (1 - getNumericPeration()) + getNumericGainProduitsNobleFoieYellParKg()) / prixAchat) - 1;
-        } else {
-          margeBrute = (prixVente / prixAchat) - 1;
-        }
-      } else {
-        // Pour les produits non éditables, utiliser la marge moyenne
-        margeBrute = calculerMargeMoyenne();
+        const CA_p = volumeActif * (data.repartition || 0);
+        const COGS_p = CA_p * (prixAchat / prixVente);
+        const Abats_p = data.hasAbats ? 
+          ((getNumericGainProduitsNobleFoieYellParKg() || 0) * CA_p / prixVente) : 0;
+        const Pertes_p = data.hasAbats ? ((getNumericPeration() || 0) * CA_p) : 0;
+        const benefice = Math.max(0, CA_p - COGS_p - Pertes_p + Abats_p);
+        
+        beneficeTotalEditables += (benefice || 0);
+        volumeTotalEditables += CA_p;
       }
-      
-      const benefice = calculerBenefice(margeBrute, data.repartition, volumeActif);
-      beneficeTotal += benefice;
+    });
+    
+    const margeMoyenneVentesEditables = volumeTotalEditables > 0 ? 
+      beneficeTotalEditables / volumeTotalEditables : 0;
+    
+    // Maintenant calculer le bénéfice total avec tous les produits
+    let beneficeTotal = 0;
+    
+    Object.entries(produitsActifs).forEach(([nom, data]) => {
+      if (data.editable && data.prixAchat && data.prixVente) {
+        // Produits éditables: refaire le calcul normal
+        let prixAchat = data.prixAchat || 0;
+        let prixVente = data.prixVente || 1;
+        
+        if (selectedProductForPricing === 'Tous' || nom === selectedProductForPricing) {
+          if (typePrix === 'prixAchat') {
+            prixAchat += (variation || 0);
+          } else if (typePrix === 'prixVente') {
+            prixVente += (variation || 0);
+          }
+        }
+        
+        const CA_p = volumeActif * (data.repartition || 0);
+        const COGS_p = CA_p * (prixAchat / prixVente);
+        const Abats_p = data.hasAbats ? 
+          ((getNumericGainProduitsNobleFoieYellParKg() || 0) * CA_p / prixVente) : 0;
+        const Pertes_p = data.hasAbats ? ((getNumericPeration() || 0) * CA_p) : 0;
+        const benefice = Math.max(0, CA_p - COGS_p - Pertes_p + Abats_p);
+        
+        beneficeTotal += (benefice || 0);
+      } else {
+        // Produits non-éditables: utiliser margeMoyenneVentesEditables
+        const CA_p = volumeActif * (data.repartition || 0);
+        const benefice = CA_p * margeMoyenneVentesEditables;
+        beneficeTotal += (benefice || 0);
+      }
     });
     
     return beneficeTotal;
@@ -650,8 +1022,7 @@ const SimulateurRentabilite = () => {
       // Debug: Vérifier la clé API
           // API key logging removed for security
       
-      // Préparer les données pour l'analyse
-      const roiData = calculerROI();
+      // Préparer les données pour l'analyse (ROI supprimé, ROIC utilisé)
       
       // Utiliser les données appropriées selon s'il y a un volume supplémentaire
       const volumeActuel = getNumericAdditionalVolume() > 0 ? getAdjustedVolume() : getNumericVolume();
@@ -671,9 +1042,9 @@ const SimulateurRentabilite = () => {
           beneficeBrut: Math.round(getBeneficeTotalActif()),
           beneficeNet: Math.round(calculerEBIT()),
           chargesTotales: Math.round(chargesTotales),
-          margeMoyenne: (margeMoyenne * 100).toFixed(2) + '%',
-          roiMensuel: (roiData.mensuel * 100).toFixed(2) + '%',
-          roiAnnuel: (roiData.annuel * 100).toFixed(2) + '%',
+          margeMoyenneVentes: margeMoyenneVentes.toFixed(4),
+          margeMoyenneVentesPct: (margeMoyenneVentes * 100).toFixed(2) + '%',
+
           capexInvestissement: getNumericCapex()
         },
         repartitionProduits: Object.fromEntries(
@@ -837,8 +1208,7 @@ Positionnez ce point de vente comme le modèle de référence validé pour MATA 
     setAnalyseContextuelleVisible(true);
     
     try {
-      // Préparer les données complètes pour l'analyse contextuelle
-      const roiData = calculerROI();
+      // Préparer les données complètes pour l'analyse contextuelle (ROI supprimé)
       
       // Utiliser les données appropriées selon s'il y a un volume supplémentaire
       const volumeActuel = getNumericAdditionalVolume() > 0 ? getAdjustedVolume() : getNumericVolume();
@@ -857,9 +1227,9 @@ Positionnez ce point de vente comme le modèle de référence validé pour MATA 
           beneficeBrut: Math.round(getBeneficeTotalActif()),
           beneficeNet: Math.round(calculerEBIT()),
           chargesTotales: Math.round(chargesTotales),
-          margeMoyenne: (margeMoyenne * 100).toFixed(2) + '%',
-          roiMensuel: (roiData.mensuel * 100).toFixed(2) + '%',
-          roiAnnuel: (roiData.annuel * 100).toFixed(2) + '%',
+          margeMoyenneVentes: margeMoyenneVentes.toFixed(4),
+          margeMoyenneVentesPct: (margeMoyenneVentes * 100).toFixed(2) + '%',
+
           capexInvestissement: getNumericCapex()
         },
         repartitionProduits: Object.fromEntries(
@@ -986,15 +1356,21 @@ Positionnez cette analyse complémentaire comme un renforcement de la crédibili
   // Fonction pour générer l'analyse complète personnalisée
   // Fonction pour générer les données clés utilisées dans les analyses
   const genererKeyData = () => {
-    const margeMoyenne = calculerMargeMoyenne();
-    const beneficeTotal = getBeneficeTotalActif();
-    const ebit = calculerEBIT();
-    const ebitda = calculerEBITDA();
-    const nopat = calculerNOPAT();
-    const fcf = calculerFCF();
-    const roiData = calculerROI();
-    const roiMensuel = roiData.mensuel;
-    const roiAnnuel = roiData.annuel;
+    // Utiliser les nouvelles fonctions standardisées pour la cohérence
+    const resultats = calculerChargesEtResultats();
+    const fcfData = calculerFCFStandardise();
+    
+    const margeMoyenne = resultats.margeMoyenne;
+    const margeMoyenneVentes = resultats.margeMoyenneVentes;
+    const beneficeTotal = resultats.beneficeTotal;
+    const ebit = resultats.ebit;
+    const ebitda = resultats.ebitda;
+    const nopat = resultats.nopat;
+    const fcf = fcfData.fcfMensuel;
+    // ROIC uniquement (ROI supprimé)
+    const roicData = calculerROIC();
+    const roicMensuel = roicData.mensuel;
+    const roicAnnuel = roicData.annuel;
     
     const keyData = {
       // Données de base
@@ -1005,25 +1381,32 @@ Positionnez cette analyse complémentaire comme un renforcement de la crédibili
       // Répartition des produits
       repartitionProduits: getAdjustedRepartitions(),
       
-      // Prix et marges
-      produits: Object.keys(produits).map(nom => ({
+      // Prix et marges - utiliser les données standardisées
+      produits: Object.keys(produits).map(nom => {
+        const detailProduit = resultats.detailsProduits[nom] || { margeBrute: 0, benefice: 0 };
+        return {
         nom,
         repartition: produits[nom].repartition,
         prixAchat: produits[nom].prixAchat,
         prixVente: produits[nom].prixVente,
-        margeBrute: calculerMargeBrute(produits[nom]),
-        benefice: calculerBenefice(calculerMargeBrute(produits[nom]), produits[nom].repartition, getAdjustedVolume())
-      })),
+          margeBrute: detailProduit.margeBrute,
+          benefice: detailProduit.benefice
+        };
+      }),
       
       // Métriques financières
       margeMoyenne: margeMoyenne,
+      margeMoyenneVentes: margeMoyenneVentes,
+      seuilRentabilite: calculerSeuilRentabilite().seuilCA,
+      ratiosAvecMargeMoyenneVentes: calculerRatiosAvecMargeMoyenneVentes(),
       beneficeTotal: beneficeTotal,
       ebit: ebit,
       ebitda: ebitda,
       nopat: nopat,
       fcf: fcf,
-      roiMensuel: roiMensuel,
-      roiAnnuel: roiAnnuel,
+      // Seul ROIC inclus (ROI supprimé)
+      roicMensuel: roicMensuel,
+      roicAnnuel: roicAnnuel,
       
       // Charges
       charges: {
@@ -1040,9 +1423,10 @@ Positionnez cette analyse complémentaire comme un renforcement de la crédibili
         total: getNumericChargesFixes() + getNumericSalaire() + getNumericElectricite() + 
                getNumericEau() + getNumericInternet() + getNumericSacsLivraison() + 
                getNumericChargesTransport() + getNumericLoyer() + getNumericAutresCharges(),
-        totalChargesAvecAmortissement: (getNumericChargesFixes() + getNumericSalaire() + getNumericElectricite() + 
+        // Charges opérationnelles sans amortissements (gérés séparément dans D&A)
+        totalChargesOperationnelles: getNumericSalaire() + getNumericElectricite() + 
                getNumericEau() + getNumericInternet() + getNumericSacsLivraison() + 
-               getNumericChargesTransport() + getNumericLoyer() + getNumericAutresCharges()) + (getNumericAmortissementAnnuel() / 12)
+               getNumericChargesTransport() + getNumericLoyer() + getNumericAutresCharges()
       },
       
       // Paramètres DCF
@@ -1082,7 +1466,8 @@ Positionnez cette analyse complémentaire comme un renforcement de la crédibili
           // API key logging removed for security
       
       // Préparer toutes les données de l'application en temps réel
-      const roiData = calculerROI();
+      // Seul ROIC utilisé (ROI supprimé)
+      const roicData = calculerROIC();
       const fluxDCF = calculerFluxDCF();
       const indicateursDCF = calculerIndicateursDCF();
       const fluxDCFSimulation = calculerFluxDCFSimulation();
@@ -1104,9 +1489,11 @@ Positionnez cette analyse complémentaire comme un renforcement de la crédibili
           beneficeBrut: Math.round(getBeneficeTotalActif()),
           beneficeNet: Math.round(calculerEBIT()),
           chargesTotales: Math.round(chargesTotales),
-          margeMoyenne: (margeMoyenne * 100).toFixed(2) + '%',
-          roiMensuel: (roiData.mensuel * 100).toFixed(2) + '%',
-          roiAnnuel: (roiData.annuel * 100).toFixed(2) + '%',
+          margeMoyenneVentes: margeMoyenneVentes.toFixed(4),
+          margeMoyenneVentesPct: (margeMoyenneVentes * 100).toFixed(2) + '%',
+          // Seul ROIC inclus (ROI supprimé)
+          roicMensuel: (roicData.mensuel * 100).toFixed(2) + '%',
+          roicAnnuel: (roicData.annuel * 100).toFixed(2) + '%',
           capexInvestissement: getNumericCapex()
         },
         repartitionProduits: Object.fromEntries(
@@ -1199,6 +1586,157 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
     }
   };
 
+  const genererAnalysePlusPlus = async () => {
+    if (!contextePersonnalise.trim()) {
+      alert('Veuillez saisir un contexte personnalisé avant de générer l\'analyse ++.');
+      return;
+    }
+
+    setAnalyseCompleteLoading(true);
+    setAnalyseCompleteVisible(true);
+    
+    try {
+      const keyData = genererKeyData();
+      
+      // Créer un prompt pour générer 3 interprétations différentes
+      const promptMultipleInterpretations = `
+Tu es un expert financier spécialisé dans l'analyse de rentabilité des points de vente. 
+
+CONTEXTE BUSINESS:
+${contextePersonnalise}
+
+DONNÉES FINANCIÈRES (toutes mensuelles):
+${JSON.stringify(keyData, null, 2)}
+
+MISSION: Génère exactement 3 interprétations différentes et complémentaires de ces résultats financiers.
+
+INSTRUCTIONS:
+1. Chaque interprétation doit avoir un angle d'analyse différent:
+   - Interprétation 1: Focus RENTABILITÉ et PERFORMANCE OPÉRATIONNELLE
+   - Interprétation 2: Focus RISQUES et POINTS D'ATTENTION  
+   - Interprétation 3: Focus OPPORTUNITÉS et RECOMMANDATIONS STRATÉGIQUES
+
+2. Chaque interprétation doit être complète (3-4 paragraphes) et autonome
+3. Utilise les données financières précises pour argumenter
+4. Reste factuel et professionnel
+
+FORMAT DE RÉPONSE REQUIS:
+=== INTERPRÉTATION 1: RENTABILITÉ ===
+[Analyse complète 3-4 paragraphes]
+
+=== INTERPRÉTATION 2: RISQUES ===  
+[Analyse complète 3-4 paragraphes]
+
+=== INTERPRÉTATION 3: OPPORTUNITÉS ===
+[Analyse complète 3-4 paragraphes]
+`;
+
+      // Première requête : générer les 3 interprétations
+      const responseMultiple = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.REACT_APP_OPENAI_API_KEY}`
+        },
+        body: JSON.stringify({
+          model: modeleChatGPT,
+          messages: [{
+            role: 'user',
+            content: promptMultipleInterpretations
+          }],
+          max_tokens: 2000,
+          temperature: 0.7
+        })
+      });
+
+      if (!responseMultiple.ok) {
+        throw new Error(`Erreur API (multiple): ${responseMultiple.status}`);
+      }
+
+      const dataMultiple = await responseMultiple.json();
+      const interpretationsMultiples = dataMultiple.choices[0].message.content;
+
+      // Deuxième requête : sélectionner la meilleure interprétation
+      const promptSelection = `
+Tu es un expert en analyse financière. Je te présente 3 interprétations différentes d'une même analyse financière.
+
+CONTEXTE BUSINESS:
+${contextePersonnalise}
+
+DONNÉES FINANCIÈRES:
+${JSON.stringify(keyData, null, 2)}
+
+LES 3 INTERPRÉTATIONS À ÉVALUER:
+${interpretationsMultiples}
+
+MISSION: Sélectionne et améliore la meilleure interprétation selon ces critères:
+1. Pertinence par rapport au contexte business
+2. Utilisation précise des données financières  
+3. Qualité des insights et recommandations
+4. Cohérence et clarté de l'analyse
+
+INSTRUCTIONS:
+1. Identifie la meilleure interprétation (1, 2 ou 3)
+2. Améliore-la en intégrant les meilleurs éléments des 2 autres
+3. Ajoute des recommandations concrètes et actionnables
+4. Structure ta réponse de manière professionnelle
+
+FORMAT DE RÉPONSE:
+=== ANALYSE FINANCIÈRE OPTIMISÉE ===
+
+**Interprétation sélectionnée:** [1, 2 ou 3] - [Justification rapide]
+
+**Synthèse Executive:**
+[2-3 phrases clés sur la situation]
+
+**Analyse Détaillée:**
+[Analyse complète intégrant les meilleurs éléments]
+
+**Recommandations Prioritaires:**
+1. [Action concrète 1]
+2. [Action concrète 2] 
+3. [Action concrète 3]
+
+**Points de Vigilance:**
+[Risques et éléments à surveiller]
+`;
+
+      // Deuxième requête pour sélectionner et améliorer
+      const responseSelection = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.REACT_APP_OPENAI_API_KEY}`
+        },
+        body: JSON.stringify({
+          model: modeleChatGPT,
+          messages: [{
+            role: 'user',
+            content: promptSelection
+          }],
+          max_tokens: 2000,
+          temperature: 0.3
+        })
+      });
+
+      if (!responseSelection.ok) {
+        throw new Error(`Erreur API (sélection): ${responseSelection.status}`);
+      }
+
+      const dataSelection = await responseSelection.json();
+      const analyseFinalePlusPlus = dataSelection.choices[0].message.content;
+
+      // Afficher le résultat final optimisé
+      setAnalyseCompleteText(analyseFinalePlusPlus);
+      
+    } catch (error) {
+      console.error('Erreur lors de la génération de l\'analyse ++:', error);
+      setAnalyseCompleteText(`Erreur lors de la génération de l'analyse ++: ${error.message}`);
+    } finally {
+      setAnalyseCompleteLoading(false);
+    }
+  };
+
   const resetPrix = () => {
     setProduits({
       'Boeuf': { repartition: 0.701782462, prixAchat: 3150, prixVente: 3550, editable: true, hasAbats: true },
@@ -1229,7 +1767,7 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
     setTauxActualisationAnnuel('12');
     setDureeAnalyse('60');
     setCapex('2500000');
-    setBfr('2500000');
+    setBfr('250000');
     setWacc('12');
     setCroissanceTerminale('3');
     setDette('0');
@@ -1361,7 +1899,7 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
         setTauxActualisationAnnuel(data.tauxActualisationAnnuel || 12);
         setDureeAnalyse(data.dureeAnalyse || 60);
         setCapex(data.capex || 1000000);
-        setBfr(data.bfr || 500000);
+        setBfr(data.bfr || 250000);
         setWacc(data.wacc || 15);
         setCroissanceTerminale(data.croissanceTerminale || 3);
         setDette(data.dette || 5000000);
@@ -1478,12 +2016,15 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
   // Fonction d'export des flux de trésorerie
   const exportFluxTresorerie = (fluxData, nomFichier) => {
     const csvContent = [
-              ['Mois', 'Bénéfice Brut', 'Flux Net', 'Flux Actualisé', 'Cumul Actualisé'],
+              ['Mois', 'NOPAT', 'D&A', 'CAPEX', 'ΔBFR', 'FCF', 'FCF Actualisé', 'Cumul Actualisé'],
       ...fluxData.map(flux => [
         flux.mois === 0 ? 'Mois 0' : `Mois ${flux.mois}`,
-        flux.beneficeBrut.toLocaleString(),
-        flux.fluxNet.toLocaleString(),
-        flux.fluxActualise.toLocaleString(),
+        flux.nopat.toLocaleString(),
+        flux.depreciation.toLocaleString(),
+        flux.capex.toLocaleString(),
+        flux.deltaBfr.toLocaleString(),
+        flux.fcf.toLocaleString(),
+        flux.fcfActualise.toLocaleString(),
         flux.cumulActualise.toLocaleString()
       ])
     ].map(row => row.join(',')).join('\n');
@@ -1513,84 +2054,95 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
   };
 
   const margeMoyenne = calculerMargeMoyenne();
+  // Fonctions de gestion des formules personnalisées
+  const sauvegarderFormules = () => {
+    setCookie('mata_formules_personnalisees', JSON.stringify(formulesPersonnalisees), 365);
+    alert('Formules sauvegardées avec succès !');
+  };
+
+  const chargerFormules = () => {
+    const savedFormules = getCookie('mata_formules_personnalisees');
+    if (savedFormules) {
+      try {
+        const formules = JSON.parse(savedFormules);
+        setFormulesPersonnalisees(formules);
+        alert('Formules chargées avec succès !');
+      } catch (error) {
+        alert('Erreur lors du chargement des formules.');
+      }
+      } else {
+      alert('Aucune formule sauvegardée trouvée.');
+    }
+  };
+
+  const reinitialiserFormules = () => {
+    if (window.confirm('Êtes-vous sûr de vouloir remettre les formules par défaut ?')) {
+      setFormulesPersonnalisees({
+        ebitda: 'beneficeTotal - chargesMensuelles',
+        ebit: 'ebitda - daMensuel',
+        nopat: 'ebit * (1 - tauxImposition / 100)',
+        fcfMensuel: 'nopat + daMensuel',
+        fcfAnnuel: 'fcfMensuel * 12',
+        roicMensuel: 'nopat / (capex + bfr - tresorerie)',
+        roicAnnuel: 'Math.pow(1 + roicMensuel, 12) - 1',
+        beneficeNetMensuel: 'beneficeTotal - chargesTotales',
+        vanFluxOperationnels: '0', // Sera calculé avec boucle DCF
+        vanValeurTerminale: 'valeurTerminale / Math.pow(1 + tauxActualisation, dureeAnalyse)',
+        investissementInitial: 'capex + bfr',
+        van: 'vanFluxOperationnels + vanValeurTerminale - investissementInitial'
+      });
+      alert('Formules réinitialisées !');
+    }
+  };
+
+  // Fonction pour évaluer une formule personnalisée
+  const evaluerFormule = (formule, variables) => {
+    try {
+      // Créer une fonction qui évalue la formule avec les variables disponibles
+      const func = new Function(...Object.keys(variables), `return ${formule}`);
+      return func(...Object.values(variables));
+    } catch (error) {
+      console.error('Erreur lors de l\'évaluation de la formule:', formule, error);
+      return 0;
+    }
+  };
+
+  const margeMoyenneVentes = calculerAgregats().margeMoyenneVentes;
   const adjustedVolume = getAdjustedVolume();
   const adjustedProduits = getAdjustedRepartitions();
   
-  // Calcul des charges totales
+  // Calcul des charges totales (SANS amortissements - ils sont gérés séparément dans D&A)
   const chargesMensuelles = getNumericSalaire() + getNumericElectricite() + getNumericEau() + getNumericInternet() + getNumericSacsLivraison() + getNumericChargesTransport() + getNumericLoyer() + getNumericAutresCharges();
-  const amortissementChargesFixes = getNumericChargesFixes() / getNumericDureeAmortissement(); // Amortissement sur la durée définie (maintenant 0)
-  const amortissementFixeMensuel = getNumericAmortissementAnnuel() / 12; // Amortissement mensuel modifiable
-  const chargesTotales = amortissementChargesFixes + chargesMensuelles + amortissementFixeMensuel;
+  // Les amortissements ne sont plus inclus ici pour éviter la double comptabilisation
+  // const amortissementChargesFixes = getNumericChargesFixes() / getNumericDureeAmortissement(); // Amortissement sur la durée définie (maintenant 0)
+  // const amortissementFixeMensuel = getNumericAmortissementAnnuel() / 12; // Amortissement mensuel modifiable
+  const chargesTotales = chargesMensuelles; // Charges opérationnelles uniquement
   
-  // Calcul avec les données originales (pour l'affichage principal et DCF simple)
-  // CORRECTION: Calculer la marge moyenne en temps réel pour les produits non-éditables
-  let margeMoyenneEditablesActuelle = 0;
-  let nombreProduitsEditables = 0;
-  
-  Object.entries(produits).forEach(([nom, data]) => {
-    if (data.editable && data.prixAchat && data.prixVente) {
-      let marge;
-      if (data.hasAbats) {
-        marge = ((data.prixVente * (1 - getNumericPeration()) + getNumericGainProduitsNobleFoieYellParKg()) / data.prixAchat) - 1;
-      } else {
-        marge = (data.prixVente / data.prixAchat) - 1;
-      }
-      margeMoyenneEditablesActuelle += marge;
-      nombreProduitsEditables++;
-    }
-  });
-  
-  margeMoyenneEditablesActuelle = nombreProduitsEditables > 0 ? margeMoyenneEditablesActuelle / nombreProduitsEditables : 0;
-  console.log(`🔧 CORRECTION: Marge moyenne actuelle ${(margeMoyenneEditablesActuelle * 100).toFixed(2)}% (vs ancienne ${(margeMoyenne * 100).toFixed(2)}%)`);
-  
-  let beneficeTotal = 0;
+  // Utiliser les nouvelles formules standardisées
   const produitsAvecCalculs = Object.entries(produits).map(([nom, data]) => {
-    let margeBrute;
-    if (data.editable && data.prixAchat && data.prixVente) {
-      margeBrute = calculerMargeBrute(data);
-    } else {
-      margeBrute = margeMoyenneEditablesActuelle; // CORRECTION: Utiliser la marge recalculée !
-    }
+    const agregats = calculerAgregats();
+    const metriques = agregats.detailsProduits[nom] || { benefice: 0, margeBrute: 0 };
     
-    const benefice = calculerBenefice(margeBrute, data.repartition, getNumericVolume());
-    beneficeTotal += benefice;
-    
-    return { nom, ...data, margeBrute, benefice };
+    return { 
+      nom, 
+      ...data, 
+      margeBrute: metriques.margeBrute, 
+      benefice: metriques.benefice 
+    };
   });
 
-  // Calcul avec les données de simulation (pour l'affichage de simulation)
-  // CORRECTION: Calculer aussi la marge moyenne pour la simulation
-  let margeMoyenneEditablesSimulation = 0;
-  let nombreProduitsEditablesSimulation = 0;
+  // Calcul avec les données de simulation (utilise maintenant calculerAgregats())
   
-  Object.entries(adjustedProduits).forEach(([nom, data]) => {
-    if (data.editable && data.prixAchat && data.prixVente) {
-      let marge;
-      if (data.hasAbats) {
-        marge = ((data.prixVente * (1 - getNumericPeration()) + getNumericGainProduitsNobleFoieYellParKg()) / data.prixAchat) - 1;
-      } else {
-        marge = (data.prixVente / data.prixAchat) - 1;
-      }
-      margeMoyenneEditablesSimulation += marge;
-      nombreProduitsEditablesSimulation++;
-    }
-  });
-  
-  margeMoyenneEditablesSimulation = nombreProduitsEditablesSimulation > 0 ? margeMoyenneEditablesSimulation / nombreProduitsEditablesSimulation : 0;
-  
-  let beneficeTotalSimulation = 0;
   const produitsAvecCalculsSimulation = Object.entries(adjustedProduits).map(([nom, data]) => {
-    let margeBrute;
-    if (data.editable && data.prixAchat && data.prixVente) {
-      margeBrute = calculerMargeBrute(data);
-    } else {
-      margeBrute = margeMoyenneEditablesSimulation; // CORRECTION: Utiliser la marge recalculée pour simulation !
-    }
+    const agregats = calculerAgregats(); // Utilise déjà les volumes ajustés quand applicable
+    const metriques = agregats.detailsProduits[nom] || { benefice: 0, margeBrute: 0 };
     
-    const benefice = calculerBenefice(margeBrute, data.repartition, adjustedVolume);
-    beneficeTotalSimulation += benefice;
-    
-    return { nom, ...data, margeBrute, benefice };
+    return { 
+      nom, 
+      ...data, 
+      margeBrute: metriques.margeBrute, 
+      benefice: metriques.benefice 
+    };
   });
 
   // Utiliser les données appropriées selon l'onglet actif
@@ -1609,25 +2161,28 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
 
   // Fonction helper pour obtenir le bénéfice total approprié selon l'onglet
   const getBeneficeTotalActif = () => {
-    const result = getNumericAdditionalVolume() > 0 ? beneficeTotalSimulation : beneficeTotal;
-    console.log(`💰 BÉNÉFICE TOTAL ACTUEL (Interface): ${result.toLocaleString()} FCFA`);
-    return result;
+    const agregats = calculerAgregats();
+    console.log(`💰 BÉNÉFICE TOTAL ACTUEL (Interface): ${agregats.beneficeTotal.toLocaleString()} FCFA`);
+    return agregats.beneficeTotal;
   };
 
   // Calculs financiers avancés
   const calculerEBIT = () => {
-    return getBeneficeTotalActif() - chargesTotales;
+    const resultats = calculerChargesEtResultats();
+    return resultats.ebit;
   };
 
   const calculerEBITDA = () => {
-    return calculerEBIT() + (getNumericDepreciationAmortissement() / 12); // D&A mensuel
+    const resultats = calculerChargesEtResultats();
+    return resultats.ebitda;
   };
 
   const calculerNOPAT = () => {
-    return calculerEBIT() * (1 - getNumericTauxImposition() / 100);
+    const resultats = calculerChargesEtResultats();
+    return resultats.nopat;
   };
 
-  // Calcul du ROI (Return on Investment)
+  // Calcul du ROI traditionnel (Return on Investment)
   const calculerROI = () => {
     const investissement = getNumericCapex(); // CAPEX comme investissement initial
     const beneficeNetMensuel = calculerEBIT(); // EBIT comme proxy du bénéfice net
@@ -1641,144 +2196,303 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
     };
   };
 
+  // Calcul du ROIC (Return on Invested Capital)
+  const calculerROIC = () => {
+    // Capital investi net = CAPEX + BFR - Trésorerie excédentaire
+    const capitalInvesti = getNumericCapex() + getNumericBfr() - getNumericTresorerie();
+    
+    if (capitalInvesti === 0) return { mensuel: 0, annuel: 0 };
+    
+    // Obtenir NOPAT depuis les calculs standardisés
+    const resultats = calculerChargesEtResultats();
+    
+    // Variables disponibles pour les formules ROIC personnalisées
+    const variables = {
+      beneficeTotal: resultats.beneficeTotal,
+      chargesMensuelles: resultats.chargesMensuelles,
+      chargesTotales: resultats.chargesMensuelles,
+      daMensuel: resultats.daMensuel,
+      tauxImposition: getNumericTauxImposition(),
+      capex: getNumericCapex(),
+      bfr: getNumericBfr(),
+      tresorerie: getNumericTresorerie(),
+      ebitda: resultats.ebitda,
+      ebit: resultats.ebit,
+      nopat: resultats.nopat
+    };
+    
+    // Calculer ROIC Mensuel (avec formule personnalisée si définie)
+    let roicMensuel;
+    if (formulesPersonnalisees.roicMensuel && formulesPersonnalisees.roicMensuel.trim()) {
+      try {
+        roicMensuel = evaluerFormule(formulesPersonnalisees.roicMensuel, variables);
+      } catch (error) {
+        console.warn('Erreur dans la formule ROIC Mensuel personnalisée:', error);
+        roicMensuel = resultats.nopat / capitalInvesti; // Formule par défaut
+      }
+    } else {
+      roicMensuel = resultats.nopat / capitalInvesti; // Formule par défaut
+    }
+    
+    // Ajouter ROIC mensuel aux variables pour le calcul annuel
+    variables.roicMensuel = roicMensuel;
+    
+    // Calculer ROIC Annuel (avec formule personnalisée si définie)
+    let roicAnnuel;
+    if (formulesPersonnalisees.roicAnnuel && formulesPersonnalisees.roicAnnuel.trim()) {
+      try {
+        roicAnnuel = evaluerFormule(formulesPersonnalisees.roicAnnuel, variables);
+      } catch (error) {
+        console.warn('Erreur dans la formule ROIC Annuel personnalisée:', error);
+        roicAnnuel = Math.pow(1 + roicMensuel, 12) - 1; // Formule par défaut
+      }
+    } else {
+      roicAnnuel = Math.pow(1 + roicMensuel, 12) - 1; // Formule par défaut
+    }
+    
+    return {
+      mensuel: roicMensuel,
+      annuel: roicAnnuel
+    };
+  };
+
   const calculerFCF = () => {
-    // FCF = NOPAT + D&A - CAPEX - ΔBFR
-    // Calcul en mensuel puis conversion en annuel
-    const ebitMensuel = calculerEBIT();
-    const tauxImposition = getNumericTauxImposition() / 100;
-    const nopatMensuel = ebitMensuel * (1 - tauxImposition);
-    const capexMensuel = getNumericCapex() / 12;
-    const fcfMensuel = nopatMensuel - capexMensuel;
-    const fcfAnnuel = fcfMensuel * 12;
+    const fcfData = calculerFCFStandardise();
     
-    console.log('=== CALCUL FCF ===');
-    console.log(`EBIT mensuel: ${ebitMensuel.toLocaleString()} FCFA`);
-    console.log(`Taux d'imposition: ${getNumericTauxImposition()}% (${tauxImposition})`);
-    console.log(`NOPAT mensuel: ${ebitMensuel.toLocaleString()} × (1 - ${tauxImposition}) = ${nopatMensuel.toLocaleString()} FCFA`);
-    console.log(`CAPEX mensuel: ${getNumericCapex().toLocaleString()} / 12 = ${capexMensuel.toLocaleString()} FCFA`);
-    console.log(`FCF mensuel: ${nopatMensuel.toLocaleString()} - ${capexMensuel.toLocaleString()} = ${fcfMensuel.toLocaleString()} FCFA`);
-    console.log(`FCF annuel: ${fcfMensuel.toLocaleString()} × 12 = ${fcfAnnuel.toLocaleString()} FCFA`);
-    console.log('==================');
+    console.log('=== CALCUL FCF STANDARDISÉ ===');
+    console.log(`Volume total: ${fcfData.volumeTotal.toLocaleString()} FCFA`);
+    console.log(`Bénéfice brut total: ${fcfData.beneficeTotal.toLocaleString()} FCFA`);
+    console.log(`Charges mensuelles: ${fcfData.chargesMensuelles.toLocaleString()} FCFA`);
+    console.log(`EBITDA: ${fcfData.ebitda.toLocaleString()} FCFA`);
+    console.log(`D&A mensuel: ${fcfData.daMensuel.toLocaleString()} FCFA`);
+    console.log(`EBIT: ${fcfData.ebit.toLocaleString()} FCFA`);
+    console.log(`NOPAT: ${fcfData.nopat.toLocaleString()} FCFA`);
+    console.log(`FCF mensuel (NOPAT + D&A): ${fcfData.fcfMensuel.toLocaleString()} FCFA`);
+    console.log(`FCF annuel: ${fcfData.fcfAnnuel.toLocaleString()} FCFA`);
+    console.log('===============================');
     
-    return fcfAnnuel;
+    return fcfData.fcfAnnuel;
+  };
+
+  // 5) DCF et valorisation selon nouvelles formules
+  const calculerDCFStandardise = () => {
+    const fcfData = calculerFCFStandardise();
+    
+    // Paramètres (annuel → mensuel)
+    const r = (getNumericWacc() || getNumericTauxActualisationAnnuel()) / 100;
+    const r_m = Math.pow(1 + r, 1/12) - 1;
+    const g = getNumericCroissanceTerminale() / 100;
+    const g_m = Math.pow(1 + g, 1/12) - 1;
+    const n = getNumericDureeAnalyse();
+    
+    // Investissement initial I0 = capex + bfr
+    const I0 = getNumericCapex() + getNumericBfr();
+    
+    // Valeur terminale (fin mois n)
+    const valeurTerminale = fcfData.fcfMensuel * (1 + g_m) / (r_m - g_m);
+    
+    // Variables de base disponibles pour les formules personnalisées
+    const variables = {
+      beneficeTotal: fcfData.beneficeTotal,
+      chargesMensuelles: fcfData.chargesMensuelles,
+      chargesTotales: fcfData.chargesMensuelles,
+      daMensuel: fcfData.daMensuel,
+      tauxImposition: getNumericTauxImposition(),
+      capex: getNumericCapex(),
+      bfr: getNumericBfr(),
+      tresorerie: getNumericTresorerie(),
+      ebitda: fcfData.ebitda,
+      ebit: fcfData.ebit,
+      nopat: fcfData.nopat,
+      fcfMensuel: fcfData.fcfMensuel,
+      fcfAnnuel: fcfData.fcfAnnuel,
+      valeurTerminale,
+      tauxActualisation: r_m,
+      croissanceTerminale: g_m,
+      dureeAnalyse: n
+    };
+    
+    // 1. Calculer vanFluxOperationnels (avec formule personnalisée si définie)
+    let vanFluxOperationnels;
+    if (formulesPersonnalisees.vanFluxOperationnels && formulesPersonnalisees.vanFluxOperationnels.trim() && formulesPersonnalisees.vanFluxOperationnels !== '0') {
+      try {
+        vanFluxOperationnels = evaluerFormule(formulesPersonnalisees.vanFluxOperationnels, variables);
+      } catch (error) {
+        console.warn('Erreur dans la formule VAN Flux Opérationnels personnalisée:', error);
+        // Calcul par défaut avec boucle
+        vanFluxOperationnels = 0;
+        for (let t = 1; t <= n; t++) {
+          vanFluxOperationnels += fcfData.fcfMensuel / Math.pow(1 + r_m, t);
+        }
+      }
+    } else {
+      // Calcul par défaut avec boucle DCF
+      vanFluxOperationnels = 0;
+      for (let t = 1; t <= n; t++) {
+        vanFluxOperationnels += fcfData.fcfMensuel / Math.pow(1 + r_m, t);
+      }
+    }
+    
+    // Ajouter vanFluxOperationnels aux variables
+    variables.vanFluxOperationnels = vanFluxOperationnels;
+    
+    // 2. Calculer vanValeurTerminale (avec formule personnalisée si définie)
+    let vanValeurTerminale;
+    if (formulesPersonnalisees.vanValeurTerminale && formulesPersonnalisees.vanValeurTerminale.trim()) {
+      try {
+        vanValeurTerminale = evaluerFormule(formulesPersonnalisees.vanValeurTerminale, variables);
+      } catch (error) {
+        console.warn('Erreur dans la formule VAN Valeur Terminale personnalisée:', error);
+        vanValeurTerminale = valeurTerminale / Math.pow(1 + r_m, n); // Formule par défaut
+      }
+    } else {
+      vanValeurTerminale = valeurTerminale / Math.pow(1 + r_m, n); // Formule par défaut
+    }
+    
+    // Ajouter vanValeurTerminale aux variables
+    variables.vanValeurTerminale = vanValeurTerminale;
+    
+    // 3. Calculer investissementInitial (avec formule personnalisée si définie)
+    let investissementInitial;
+    if (formulesPersonnalisees.investissementInitial && formulesPersonnalisees.investissementInitial.trim()) {
+      try {
+        investissementInitial = evaluerFormule(formulesPersonnalisees.investissementInitial, variables);
+      } catch (error) {
+        console.warn('Erreur dans la formule Investissement Initial personnalisée:', error);
+        investissementInitial = I0; // Formule par défaut
+      }
+    } else {
+      investissementInitial = I0; // Formule par défaut
+    }
+    
+    // Ajouter investissementInitial aux variables
+    variables.investissementInitial = investissementInitial;
+    
+    // 4. Calculer VAN finale (avec formule personnalisée si définie)
+    let van;
+    if (formulesPersonnalisees.van && formulesPersonnalisees.van.trim()) {
+      try {
+        van = evaluerFormule(formulesPersonnalisees.van, variables);
+      } catch (error) {
+        console.warn('Erreur dans la formule VAN personnalisée:', error);
+        van = vanFluxOperationnels + vanValeurTerminale - investissementInitial; // Formule par défaut
+      }
+    } else {
+      van = vanFluxOperationnels + vanValeurTerminale - investissementInitial; // Formule par défaut
+    }
+    
+    // Enterprise Value
+    const enterpriseValue = vanFluxOperationnels + vanValeurTerminale;
+    
+    // Equity Value
+    const equityValue = enterpriseValue - getNumericDette() + getNumericTresorerie();
+    
+    // Indice de profitabilité
+    const indiceProfitabilite = enterpriseValue / I0;
+    
+    // Payback simple (mois)
+    const paybackSimple = I0 / fcfData.fcfMensuel;
+    
+    // Payback actualisé (mois)
+    let cumulActualise = 0;
+    let paybackActualise = null;
+    for (let t = 1; t <= n; t++) {
+      cumulActualise += fcfData.fcfMensuel / Math.pow(1 + r_m, t);
+      if (cumulActualise >= I0 && paybackActualise === null) {
+        paybackActualise = t;
+        break;
+      }
+    }
+    
+    return {
+      ...fcfData,
+      r,
+      r_m,
+      g,
+      g_m,
+      n,
+      I0,
+      valeurTerminale,
+      van,
+      enterpriseValue,
+      equityValue,
+      indiceProfitabilite,
+      paybackSimple,
+      paybackActualise
+    };
   };
 
   const calculerValeurTerminale = () => {
-    const fcfFinal = calculerFCF();
-    const waccDecimal = getNumericWacc() / 100;
-    const croissanceDecimal = getNumericCroissanceTerminale() / 100;
+    const dcfData = calculerDCFStandardise();
     
-    // Si FCF est négatif, pas de valeur terminale
-    if (fcfFinal <= 0) {
-      return 0;
-    }
+    console.log('=== CALCUL VALEUR TERMINALE STANDARDISÉ ===');
+    console.log(`FCF mensuel: ${dcfData.fcfMensuel.toLocaleString()} FCFA`);
+    console.log(`Taux mensuel (r_m): ${(dcfData.r_m * 100).toFixed(4)}%`);
+    console.log(`Croissance mensuelle (g_m): ${(dcfData.g_m * 100).toFixed(4)}%`);
+    console.log(`Valeur Terminale: ${dcfData.valeurTerminale.toLocaleString()} FCFA`);
+    console.log('===========================================');
     
-    const fcfAvecCroissance = fcfFinal * (1 + croissanceDecimal);
-    const denominateur = waccDecimal - croissanceDecimal;
-    const valeurTerminale = fcfAvecCroissance / denominateur;
-    
-    console.log('=== CALCUL VALEUR TERMINALE ===');
-    console.log(`FCF annuel: ${fcfFinal.toLocaleString()} FCFA`);
-    console.log(`WACC: ${getNumericWacc()}% (${waccDecimal})`);
-    console.log(`Croissance g: ${getNumericCroissanceTerminale()}% (${croissanceDecimal})`);
-    console.log(`FCF avec croissance: ${fcfFinal.toLocaleString()} × (1 + ${croissanceDecimal}) = ${fcfAvecCroissance.toLocaleString()} FCFA`);
-    console.log(`Dénominateur: ${waccDecimal} - ${croissanceDecimal} = ${denominateur}`);
-    console.log(`Valeur Terminale: ${fcfAvecCroissance.toLocaleString()} / ${denominateur} = ${valeurTerminale.toLocaleString()} FCFA`);
-    console.log('================================');
-    
-    return valeurTerminale;
+    return dcfData.valeurTerminale;
   };
 
   const calculerEnterpriseValue = () => {
-    const fcf = calculerFCF();
-    const valeurTerminale = calculerValeurTerminale();
-    const waccDecimal = getNumericWacc() / 100;
+    const dcfData = calculerDCFStandardise();
     
-    // Si FCF est négatif, l'entreprise n'est pas viable
-    if (fcf <= 0) {
-      return 0;
-    }
+    console.log('=== CALCUL ENTERPRISE VALUE STANDARDISÉ ===');
+    console.log(`Enterprise Value: ${dcfData.enterpriseValue.toLocaleString()} FCFA`);
+    console.log('===========================================');
     
-    console.log('=== CALCUL ENTERPRISE VALUE ===');
-    console.log(`FCF annuel: ${fcf.toLocaleString()} FCFA`);
-    console.log(`WACC: ${getNumericWacc()}% (${waccDecimal})`);
-    console.log(`Valeur Terminale: ${valeurTerminale.toLocaleString()} FCFA`);
-    
-    // Actualisation des FCF sur 5 ans
-    let fcfActualise = 0;
-    console.log('\n--- FCF actualisés sur 5 ans ---');
-    for (let annee = 1; annee <= 5; annee++) {
-      const coeffActualisation = Math.pow(1 + waccDecimal, annee);
-      const fcfAnnee = fcf / coeffActualisation;
-      fcfActualise += fcfAnnee;
-      console.log(`Année ${annee}: ${fcf.toLocaleString()} / ${coeffActualisation.toFixed(4)} = ${fcfAnnee.toLocaleString()} FCFA`);
-    }
-    console.log(`Total FCF actualisés: ${fcfActualise.toLocaleString()} FCFA`);
-    
-    // Actualisation de la valeur terminale (seulement si positive)
-    const coeffActualisationVT = Math.pow(1 + waccDecimal, 5);
-    const valeurTerminaleActualisee = valeurTerminale > 0 ? valeurTerminale / coeffActualisationVT : 0;
-    console.log(`\n--- Valeur Terminale actualisée ---`);
-    console.log(`Coeff d'actualisation (année 5): ${coeffActualisationVT.toFixed(4)}`);
-    console.log(`VT actualisée: ${valeurTerminale.toLocaleString()} / ${coeffActualisationVT.toFixed(4)} = ${valeurTerminaleActualisee.toLocaleString()} FCFA`);
-    
-    const enterpriseValue = fcfActualise + valeurTerminaleActualisee;
-    console.log(`\nEnterprise Value: ${fcfActualise.toLocaleString()} + ${valeurTerminaleActualisee.toLocaleString()} = ${enterpriseValue.toLocaleString()} FCFA`);
-    console.log('================================');
-    
-    return enterpriseValue;
+    return dcfData.enterpriseValue;
   };
 
   const calculerEquityValue = () => {
-    const enterpriseValue = calculerEnterpriseValue();
-    const dette = getNumericDette();
-    const tresorerie = getNumericTresorerie();
-    const equityValue = enterpriseValue - dette + tresorerie;
+    const dcfData = calculerDCFStandardise();
     
-    console.log('=== CALCUL EQUITY VALUE ===');
-    console.log(`Enterprise Value: ${enterpriseValue.toLocaleString()} FCFA`);
-    console.log(`Dette: ${dette.toLocaleString()} FCFA`);
-    console.log(`Trésorerie: ${tresorerie.toLocaleString()} FCFA`);
-    console.log(`Equity Value: ${enterpriseValue.toLocaleString()} - ${dette.toLocaleString()} + ${tresorerie.toLocaleString()} = ${equityValue.toLocaleString()} FCFA`);
-    console.log('==========================');
+    console.log('=== CALCUL EQUITY VALUE STANDARDISÉ ===');
+    console.log(`Equity Value: ${dcfData.equityValue.toLocaleString()} FCFA`);
+    console.log('=======================================');
     
-    return equityValue;
+    return dcfData.equityValue;
   };
 
   // Calculs DCF
   const tauxActualisationMensuel = Math.pow(1 + getNumericTauxActualisationAnnuel() / 100, 1/12) - 1;
   
-  // Calcul des flux de trésorerie mensuels
+  // Calcul des flux de trésorerie mensuels selon nouvelles formules
   const calculerFluxDCF = () => {
     const flux = [];
-    const beneficeBrutMensuel = beneficeTotal;
-    const chargesFixesMensuelles = chargesTotales;
-    const investissementInitial = -getNumericCapex(); // Décaissement initial CAPEX
+    const dcfData = calculerDCFStandardise();
+    
+    // Investissement initial I0 = CAPEX + BFR (décaissement à t0)
+    const investissementInitial = -dcfData.I0;
     
     // Mois 0 : investissement initial
     flux.push({
       mois: 0,
-      beneficeBrut: 0,
-      chargesFixes: 0,
-      fluxNet: investissementInitial,
-      fluxActualise: investissementInitial,
+      nopat: 0,
+      depreciation: 0,
+      capex: dcfData.I0,  // Tout l'investissement initial
+      deltaBfr: 0,
+      fcf: investissementInitial,
+      fcfActualise: investissementInitial,
       cumulActualise: investissementInitial
     });
     
-    // Mois 1 à dureeAnalyse
+    // Mois 1 à dureeAnalyse : FCF = NOPAT + D&A (pas de CAPEX ni ΔBFR supplémentaires)
     let cumulActualise = investissementInitial;
-    for (let mois = 1; mois <= getNumericDureeAnalyse(); mois++) {
-      const fluxNet = beneficeBrutMensuel - chargesFixesMensuelles;
-      const facteurActualisation = Math.pow(1 + tauxActualisationMensuel, -mois);
-      const fluxActualise = fluxNet * facteurActualisation;
-      cumulActualise += fluxActualise;
+    for (let mois = 1; mois <= dcfData.n; mois++) {
+      const facteurActualisation = Math.pow(1 + dcfData.r_m, -mois);
+      const fcfActualise = dcfData.fcfMensuel * facteurActualisation;
+      cumulActualise += fcfActualise;
       
       flux.push({
         mois,
-        beneficeBrut: beneficeBrutMensuel,
-        chargesFixes: chargesFixesMensuelles,
-        fluxNet,
-        fluxActualise,
+        nopat: dcfData.nopat,
+        depreciation: dcfData.daMensuel,
+        capex: 0,  // Pas de CAPEX mensuel après t0
+        deltaBfr: 0,  // Pas de ΔBFR mensuel après t0
+        fcf: dcfData.fcfMensuel,
+        fcfActualise,
         cumulActualise
       });
     }
@@ -1790,25 +2504,26 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
   
   // Calcul des indicateurs DCF
   const calculerIndicateursDCF = () => {
-    const investissementInitial = Math.abs(fluxDCF[0].fluxNet);
+    const dcfData = calculerDCFStandardise();
     
-    // VAN (NPV)
-    const van = fluxDCF.reduce((sum, flux) => sum + flux.fluxActualise, 0);
-    
-    // TRI mensuel (approximation par itération)
+    // TRI mensuel (approximation par itération) - basé sur FCF
     const calculerTRI = () => {
       let triMensuel = 0.01; // 1% par mois comme point de départ
       const tolerance = 0.0001;
       const maxIterations = 100;
       
       for (let i = 0; i < maxIterations; i++) {
-        let vanTest = fluxDCF[0].fluxNet; // Investissement initial
+        let vanTest = -dcfData.I0; // Investissement initial négatif
         
-        for (let mois = 1; mois <= getNumericDureeAnalyse(); mois++) {
-          const fluxNet = fluxDCF[mois].fluxNet;
+        for (let mois = 1; mois <= dcfData.n; mois++) {
+          const fcf = dcfData.fcfMensuel;
           const facteurActualisation = Math.pow(1 + triMensuel, -mois);
-          vanTest += fluxNet * facteurActualisation;
+          vanTest += fcf * facteurActualisation;
         }
+        
+        // Ajouter la valeur terminale
+        const vtActualisee = dcfData.valeurTerminale / Math.pow(1 + triMensuel, dcfData.n);
+        vanTest += vtActualisee;
         
         if (Math.abs(vanTest) < tolerance) {
           break;
@@ -1828,54 +2543,66 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
     const triMensuel = calculerTRI();
     const triAnnuel = Math.pow(1 + triMensuel, 12) - 1;
     
-    // Indice de profitabilité
-    const indiceProfitabilite = (van + investissementInitial) / investissementInitial;
-    
-    // Délai de récupération actualisé
-    const paybackActualise = fluxDCF.findIndex(flux => flux.cumulActualise >= 0);
-    
     return {
-      van,
+      van: dcfData.van,
       triMensuel,
       triAnnuel,
-      indiceProfitabilite,
-      paybackActualise: paybackActualise === -1 ? 'Jamais' : paybackActualise
+      indiceProfitabilite: dcfData.indiceProfitabilite,
+      paybackActualise: dcfData.paybackActualise === null ? 'Jamais' : dcfData.paybackActualise
     };
   };
   
   const indicateursDCF = calculerIndicateursDCF();
 
-  // Calcul des flux DCF pour la simulation
+  // Calcul des flux DCF pour la simulation avec volume supplémentaire
   const calculerFluxDCFSimulation = () => {
+    // Calculer les métriques avec volume supplémentaire
+    const agregatsSimulation = calculerAgregats(); // Utilise déjà les volumes ajustés
+    const chargesMensuelles = getNumericSalaire() + getNumericElectricite() + getNumericEau() + 
+                             getNumericInternet() + getNumericSacsLivraison() + getNumericChargesTransport() + 
+                             getNumericLoyer() + getNumericAutresCharges();
+    const ebitdaSimulation = agregatsSimulation.beneficeTotal - chargesMensuelles;
+    const daMensuel = getNumericDepreciationAmortissement() / 12;
+    const ebitSimulation = ebitdaSimulation - daMensuel;
+    const nopatSimulation = ebitSimulation * (1 - getNumericTauxImposition() / 100);
+    const fcfMensuelSimulation = nopatSimulation + daMensuel; // FCF = NOPAT + D&A
+    
+    // Paramètres DCF
+    const r = (getNumericWacc() || getNumericTauxActualisationAnnuel()) / 100;
+    const r_m = Math.pow(1 + r, 1/12) - 1;
+    const n = getNumericDureeAnalyse();
+    const I0 = getNumericCapex() + getNumericBfr();
+    
     const flux = [];
-    const beneficeBrutMensuel = beneficeTotalSimulation;
-    const chargesFixesMensuelles = chargesTotales;
-    const investissementInitial = -getNumericCapex(); // Décaissement initial CAPEX
+    const investissementInitial = -I0;
     
     // Mois 0 : investissement initial
     flux.push({
       mois: 0,
-      beneficeBrut: 0,
-      chargesFixes: 0,
-      fluxNet: investissementInitial,
-      fluxActualise: investissementInitial,
+      nopat: 0,
+      depreciation: 0,
+      capex: I0,
+      deltaBfr: 0,
+      fcf: investissementInitial,
+      fcfActualise: investissementInitial,
       cumulActualise: investissementInitial
     });
     
     // Mois 1 à dureeAnalyse
     let cumulActualise = investissementInitial;
-    for (let mois = 1; mois <= getNumericDureeAnalyse(); mois++) {
-      const fluxNet = beneficeBrutMensuel - chargesFixesMensuelles;
-      const facteurActualisation = Math.pow(1 + tauxActualisationMensuel, -mois);
-      const fluxActualise = fluxNet * facteurActualisation;
-      cumulActualise += fluxActualise;
+    for (let mois = 1; mois <= n; mois++) {
+      const facteurActualisation = Math.pow(1 + r_m, -mois);
+      const fcfActualise = fcfMensuelSimulation * facteurActualisation;
+      cumulActualise += fcfActualise;
       
       flux.push({
         mois,
-        beneficeBrut: beneficeBrutMensuel,
-        chargesFixes: chargesFixesMensuelles,
-        fluxNet,
-        fluxActualise,
+        nopat: nopatSimulation,
+        depreciation: daMensuel,
+        capex: 0,  // Pas de CAPEX mensuel après t0
+        deltaBfr: 0,  // Pas de ΔBFR mensuel après t0
+        fcf: fcfMensuelSimulation,
+        fcfActualise,
         cumulActualise
       });
     }
@@ -1887,24 +2614,24 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
   
   // Calcul des indicateurs DCF pour la simulation
   const calculerIndicateursDCFSimulation = () => {
-    const investissementInitial = Math.abs(fluxDCFSimulation[0].fluxNet);
+    const investissementInitial = Math.abs(fluxDCFSimulation[0].fcf);
     
-    // VAN (NPV)
-    const van = fluxDCFSimulation.reduce((sum, flux) => sum + flux.fluxActualise, 0);
+    // VAN (NPV) - basé sur FCF actualisé
+    const van = fluxDCFSimulation.reduce((sum, flux) => sum + flux.fcfActualise, 0);
     
-    // TRI mensuel (approximation par itération)
+    // TRI mensuel (approximation par itération) - basé sur FCF
     const calculerTRI = () => {
       let triMensuel = 0.01; // 1% par mois comme point de départ
       const tolerance = 0.0001;
       const maxIterations = 100;
       
       for (let i = 0; i < maxIterations; i++) {
-        let vanTest = fluxDCFSimulation[0].fluxNet; // Investissement initial
+        let vanTest = fluxDCFSimulation[0].fcf; // Investissement initial
         
         for (let mois = 1; mois <= getNumericDureeAnalyse(); mois++) {
-          const fluxNet = fluxDCFSimulation[mois].fluxNet;
+          const fcf = fluxDCFSimulation[mois].fcf;
           const facteurActualisation = Math.pow(1 + triMensuel, -mois);
-          vanTest += fluxNet * facteurActualisation;
+          vanTest += fcf * facteurActualisation;
         }
         
         if (Math.abs(vanTest) < tolerance) {
@@ -1928,7 +2655,7 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
     // Indice de profitabilité
     const indiceProfitabilite = (van + investissementInitial) / investissementInitial;
     
-    // Délai de récupération actualisé
+    // Délai de récupération actualisé - basé sur FCF cumulé actualisé
     const paybackActualise = fluxDCFSimulation.findIndex(flux => flux.cumulActualise >= 0);
     
     return {
@@ -2175,7 +2902,7 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
         {/* Résumé global */}
       <div className="bg-green-50 border border-green-200 rounded-lg p-3 sm:p-4 md:p-6 mb-4 sm:mb-6 md:mb-8">
         <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-green-800">📊 Résumé Global</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 sm:gap-6">
             <div>
               <div className="text-sm text-gray-600">Volume point de vente:</div>
             <div className="text-lg sm:text-xl font-bold text-gray-800">{additionalVolume > 0 ? adjustedVolume.toLocaleString() : volume.toLocaleString()}</div>
@@ -2196,33 +2923,46 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
                 </button>
               </div>
               <div className={`text-lg sm:text-xl font-bold ${
-                (getBeneficeTotalActif() - chargesTotales) > 0 ? 'text-green-600' : 'text-red-600'
+                calculerBeneficeNetMensuel().beneficeNetMensuel > 0 ? 'text-green-600' : 'text-red-600'
               }`}>
-                {Math.round(getBeneficeTotalActif() - chargesTotales).toLocaleString()}
+                {Math.round(calculerBeneficeNetMensuel().beneficeNetMensuel).toLocaleString()}
               </div>
               <div className="text-xs text-gray-500">FCFA (après charges)</div>
             </div>
             <div>
               <div className="text-sm text-gray-600 flex items-center gap-2">
-                Marge Moyenne:
+                Marge Moyenne (ventes):
                 <button
                   onClick={() => setMargeExplicationVisible(!margeExplicationVisible)}
-                  className="w-5 h-5 bg-blue-500 text-white rounded-full text-xs font-bold hover:bg-blue-600 transition-colors flex items-center justify-center"
-                  title="Explication du calcul de la marge moyenne"
+                  className="w-5 h-5 bg-purple-500 text-white rounded-full text-xs font-bold hover:bg-purple-600 transition-colors flex items-center justify-center"
+                  title="Explication du calcul de la marge moyenne sur ventes"
                 >
                   i
                 </button>
               </div>
-            <div className="text-lg sm:text-xl font-bold text-blue-600">{(margeMoyenne * 100).toFixed(2)}%</div>
+            <div className="text-lg sm:text-xl font-bold text-purple-600">
+              {(margeMoyenneVentes * 100).toFixed(2)}%
+            </div>
+            <div className="text-xs text-gray-500">
+              {margeMoyenneVentes.toFixed(4)} FCFA/FCFA - Bénéfice / Volume total
+            </div>
             </div>
             <div>
-              <div className="text-sm text-gray-600">ROI Annuel:</div>
-              <div className={`text-lg sm:text-xl font-bold ${
-                calculerROI().annuel > 0 ? 'text-green-600' : 'text-red-600'
-              }`}>
-                {(calculerROI().annuel * 100).toFixed(1)}%
+              <div className="text-sm text-gray-600">Bénéfice total mensuel:</div>
+              <div className="text-lg sm:text-xl font-bold text-green-600">
+                {Math.round(calculerAgregats().beneficeTotal).toLocaleString()} FCFA
               </div>
-              <div className="text-xs text-gray-500">Retour sur investissement</div>
+              <div className="text-xs text-gray-500">Correspond au 6.5%</div>
+            </div>
+{/* ROI Annuel masqué - seul ROIC affiché */}
+            <div>
+              <div className="text-sm text-gray-600">ROIC Annuel:</div>
+              <div className={`text-lg sm:text-xl font-bold ${
+                calculerROIC().annuel > 0 ? 'text-green-600' : 'text-red-600'
+              }`}>
+                {(calculerROIC().annuel * 100).toFixed(1)}%
+              </div>
+              <div className="text-xs text-gray-500">Retour sur capital investi</div>
             </div>
           </div>
         </div>
@@ -2232,7 +2972,7 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
           <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4 sm:p-6 mb-4 sm:mb-6 md:mb-8 shadow-lg">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-blue-800 flex items-center gap-2">
-                🧮 Calcul Détaillé de la Marge Moyenne Pondérée
+                🧮 Calcul Détaillé de la Marge Moyenne (ventes)
                 <span className="text-sm font-normal text-blue-600">
                   ({(() => {
                     const explication = genererExplicationMarge();
@@ -2294,9 +3034,9 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
                             <th className="text-left py-2 px-2 font-semibold text-blue-800">Produit</th>
                             <th className="text-right py-2 px-2 font-semibold text-blue-800">Volume</th>
                             <th className="text-right py-2 px-2 font-semibold text-blue-800">Part %</th>
-                            <th className="text-left py-2 px-2 font-semibold text-blue-800">Calcul Marge</th>
+                            <th className="text-left py-2 px-2 font-semibold text-blue-800">Calcul Bénéfice</th>
                             <th className="text-right py-2 px-2 font-semibold text-blue-800">Marge</th>
-                            <th className="text-right py-2 px-2 font-semibold text-blue-800">Contribution</th>
+                            <th className="text-right py-2 px-2 font-semibold text-blue-800">Bénéfice</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -2311,7 +3051,7 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
                               <td className="text-right py-2 px-2 font-mono text-blue-600">{produit.repartitionPourcentage}%</td>
                               <td className="py-2 px-2 font-mono text-xs text-gray-600">{produit.calculDetail}</td>
                               <td className="text-right py-2 px-2 font-mono font-semibold text-green-600">{produit.margePourcentage}%</td>
-                              <td className="text-right py-2 px-2 font-mono font-semibold text-purple-600">{produit.contributionPourcentage}%</td>
+                              <td className="text-right py-2 px-2 font-mono font-semibold text-purple-600">{produit.beneficeArrondi.toLocaleString()}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -2328,18 +3068,20 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
                     <h4 className="font-semibold text-purple-800 mb-3">🎯 Calcul Final</h4>
                     <div className="space-y-3">
                       <div className="text-sm">
-                        <div className="font-medium text-purple-700 mb-2">Formule: Marge Moyenne = Σ(Marge × Répartition)</div>
-                        <div className="text-xs text-purple-600 mb-2">Les répartitions totalisent 100%, donc pas de division supplémentaire</div>
+                        <div className="font-medium text-purple-700 mb-2">Formule: Marge Moyenne (ventes) = Σ(Bénéfices) / Volume Total</div>
+                        <div className="text-xs text-purple-600 mb-2">Somme de tous les bénéfices divisée par le volume total</div>
                         <div className="font-mono text-sm bg-white p-3 rounded border">
-                          <div>Somme pondérée = {explication.detailsProduits.map(p => `${p.margePourcentage}% × ${p.repartitionPourcentage}%`).join(' + ')}</div>
-                          <div className="mt-2 text-purple-600">= {explication.detailsProduits.map(p => p.contributionPourcentage + '%').join(' + ')}</div>
-                          <div className="mt-2 text-green-600 font-semibold">= {(explication.sommePonderee * 100).toFixed(2)}%</div>
+                          <div>Somme des bénéfices = {explication.detailsProduits.map(p => p.beneficeArrondi.toLocaleString()).join(' + ')}</div>
+                          <div className="mt-2 text-purple-600">= {Math.round(explication.beneficeTotal).toLocaleString()} FCFA</div>
+                          <div className="mt-2 text-blue-600">Volume Total = {explication.volumeTotal.toLocaleString()} FCFA</div>
+                          <div className="mt-2 text-green-600 font-semibold">Marge = {Math.round(explication.beneficeTotal).toLocaleString()} / {explication.volumeTotal.toLocaleString()} = {explication.margeFinalePourcentage}%</div>
                         </div>
                       </div>
                       <div className="bg-white p-4 rounded border-2 border-purple-300">
                         <div className="text-center">
-                          <div className="text-sm text-purple-600 mb-1">Marge Moyenne Pondérée</div>
+                          <div className="text-sm text-purple-600 mb-1">Marge Moyenne (ventes)</div>
                           <div className="text-2xl font-bold text-purple-700">{explication.margeFinalePourcentage}%</div>
+                          <div className="text-xs text-purple-500 mt-1">{(explication.margeFinale).toFixed(4)} FCFA/FCFA</div>
                         </div>
                       </div>
                     </div>
@@ -2349,11 +3091,11 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
                   <div className="bg-gray-50 p-4 rounded-lg border">
                     <h4 className="font-semibold text-gray-800 mb-2">💡 Pourquoi cette méthode ?</h4>
                     <div className="text-sm text-gray-700 space-y-1">
-                      <div>• <strong>Pondération par volume :</strong> Les produits avec plus de volume ont plus d'impact sur la marge globale</div>
-                      <div>• <strong>Calcul dynamique :</strong> La marge s'ajuste automatiquement quand vous changez les volumes</div>
-                      <div>• <strong>Réalisme :</strong> Reflète l'impact réel de chaque produit sur la rentabilité totale</div>
-                      <div>• <strong>Tous les produits inclus :</strong> Même les produits non-éditables (Autres, Pack) contribuent au calcul avec la marge moyenne</div>
-                      <div>• <strong>Somme = 100% :</strong> Toutes les répartitions sont incluses, pas de division supplémentaire</div>
+                      <div>• <strong>Marge sur ventes :</strong> Calcule directement le bénéfice par FCFA de chiffre d'affaires</div>
+                      <div>• <strong>Formule simple :</strong> Somme des bénéfices ÷ Volume total = marge moyenne</div>
+                      <div>• <strong>Cohérence DCF :</strong> Compatible avec les calculs financiers (ROI, VAN, etc.)</div>
+                      <div>• <strong>Indicateur de rentabilité :</strong> Montre directement la rentabilité de chaque FCFA vendu</div>
+                      <div>• <strong>Seuil de rentabilité :</strong> Permet de calculer facilement le CA minimum nécessaire</div>
                       {explication.estSimulation && (
                         <div className="text-purple-600">• <strong>Mode simulation :</strong> Montre l'impact des nouvelles répartitions de volume</div>
                       )}
@@ -2462,7 +3204,7 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
                   </table>
                 </div>
                 <div className="mt-3 text-xs text-gray-600">
-                  <div>🥩 = Avec abats (pération incluse) • † = Calculé avec marge moyenne</div>
+                  <div>🥩 = Avec Foie, Yell, Filet (pération incluse) • † = Calculé avec marge moyenne</div>
                   <div className="mt-1"><strong>Formule par produit :</strong> Bénéfice = Marge × Répartition × Volume Total</div>
                 </div>
               </div>
@@ -2563,6 +3305,7 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
                 onChange={(e) => setModeleChatGPT(e.target.value)}
                 className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
               >
+                <option value="gpt-5">GPT-5 (Dernière génération, le plus avancé)</option>
                 <option value="gpt-4">GPT-4 (Plus avancé, plus cher)</option>
                 <option value="gpt-4o">GPT-4o (Nouveau, équilibré)</option>
                 <option value="gpt-4o-mini">GPT-4o-mini (Recommandé, économique)</option>
@@ -2753,14 +3496,14 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
                         </table>
                       </div>
                       <div className="mt-3 p-3 bg-blue-100 rounded">
-                        <div className="font-semibold text-blue-800">Marge Moyenne: {(keyData.margeMoyenne * 100).toFixed(2)}%</div>
+                        <div className="font-semibold text-blue-800">Marge Moyenne (ventes): {(keyData.margeMoyenneVentes * 100).toFixed(1)}% - {Math.round(keyData.beneficeTotal).toLocaleString()} FCFA</div>
                       </div>
                     </div>
 
                     {/* Métriques financières */}
                     <div className="bg-purple-50 p-4 rounded-lg">
                       <h4 className="font-semibold text-purple-800 mb-3">💰 Métriques Financières</h4>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                         <div>
                           <span className="text-sm text-gray-600">Marge brute:</span>
                           <div className="font-mono text-lg">{keyData.beneficeTotal.toLocaleString()} FCFA</div>
@@ -2781,13 +3524,14 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
                           <span className="text-sm text-gray-600">FCF:</span>
                           <div className="font-mono text-lg">{keyData.fcf.toLocaleString()} FCFA</div>
                         </div>
+
                         <div>
-                          <span className="text-sm text-gray-600">ROI Mensuel:</span>
-                          <div className="font-mono text-lg">{(keyData.roiMensuel * 100).toFixed(2)}%</div>
+                          <span className="text-sm text-gray-600">ROIC Mensuel:</span>
+                          <div className="font-mono text-lg">{(keyData.roicMensuel * 100).toFixed(2)}%</div>
                         </div>
                         <div>
-                          <span className="text-sm text-gray-600">ROI Annuel:</span>
-                          <div className="font-mono text-lg">{(keyData.roiAnnuel * 100).toFixed(2)}%</div>
+                          <span className="text-sm text-gray-600">ROIC Annuel:</span>
+                          <div className="font-mono text-lg">{(keyData.roicAnnuel * 100).toFixed(2)}%</div>
                         </div>
                       </div>
                     </div>
@@ -2839,7 +3583,8 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
                       </div>
                       <div className="mt-3 p-3 bg-orange-100 rounded">
                         <div className="font-semibold text-orange-800">Total Charges: {keyData.charges.total.toLocaleString()} FCFA</div>
-                        <div className="font-semibold text-orange-900 mt-2">Total Charges + Amortissement: {Math.round(keyData.charges.totalChargesAvecAmortissement).toLocaleString()} FCFA</div>
+                        <div className="font-semibold text-orange-900 mt-2">Total Charges Opérationnelles: {Math.round(keyData.charges.totalChargesOperationnelles).toLocaleString()} FCFA</div>
+                        <div className="text-xs text-gray-600 mt-1">D&A traité séparément: {formatMillions(getNumericDepreciationAmortissement() / 12)} FCFA/mois</div>
                       </div>
                     </div>
 
@@ -3011,7 +3756,7 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
               </div>
             </div>
             
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-3">
               <button
                 onClick={genererAnalyseComplete}
                 disabled={analyseCompleteLoading || !contextePersonnalise.trim()}
@@ -3024,10 +3769,29 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
                 {analyseCompleteLoading ? (
                   <div className="flex items-center gap-2">
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    Analyse complète en cours...
+                    Analyse en cours...
                   </div>
                 ) : (
-                  '🔍 Générer Analyse Complète'
+                  '🔍 Analyse Standard'
+                )}
+              </button>
+              
+              <button
+                onClick={genererAnalysePlusPlus}
+                disabled={analyseCompleteLoading || !contextePersonnalise.trim()}
+                className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
+                  analyseCompleteLoading || !contextePersonnalise.trim()
+                    ? 'bg-gray-400 cursor-not-allowed' 
+                    : 'bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-lg hover:shadow-xl'
+                }`}
+              >
+                {analyseCompleteLoading ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Analyse ++ en cours...
+                  </div>
+                ) : (
+                  '🚀 Interprétation ++'
                 )}
               </button>
             </div>
@@ -3294,18 +4058,11 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
              <div className="text-lg sm:text-xl font-bold text-orange-600">{chargesMensuelles.toLocaleString()}</div>
            </div>
            <div>
-             <div className="text-sm text-gray-600">Amortissement mensuel:</div>
-             <div className="text-lg sm:text-xl font-bold text-blue-600">{formatMillions(amortissementFixeMensuel)} FCFA</div>
-             <div className="text-xs text-gray-500">{formatMillions(getNumericAmortissementAnnuel())} FCFA / 12 mois</div>
+             <div className="text-sm text-gray-600">D&A mensuel (calculé séparément):</div>
+             <div className="text-lg sm:text-xl font-bold text-blue-600">{formatMillions(getNumericDepreciationAmortissement() / 12)} FCFA</div>
+             <div className="text-xs text-gray-500">CAPEX {formatMillions(getNumericCapex())} / {dureeAmortissement} mois</div>
            </div>
-                                             {/* Amortissement masqué - charges fixes à 0 */}
-                      {false && (
-                      <div>
-             <div className="text-sm text-gray-600">Amortissement mensuel:</div>
-             <div className="text-lg sm:text-xl font-bold text-blue-600">{amortissementChargesFixes.toLocaleString()}</div>
-             <div className="text-xs text-gray-500">Charges fixes / {dureeAmortissement}</div>
-           </div>
-                      )}
+                                             {/* Amortissement masqué - charges fixes à 0 - supprimé pour éviter erreurs */}
            <div>
              <div className="text-sm text-gray-600">Total charges mensuelles:</div>
              <div className="text-lg sm:text-xl font-bold text-red-700">{formatMillions(chargesTotales)} FCFA</div>
@@ -3507,9 +4264,10 @@ Votre analyse doit être structurée, précise, et adaptée au contexte fourni. 
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4 md:p-6 mb-4 sm:mb-6 md:mb-8">
         <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-blue-800">🏦 Calculs Financiers Avancés</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-          <div className="cursor-help" title={`EBIT = Marge brute - Charges Opérationnelles
+          <div className="cursor-help" title={`EBIT = Marge brute - Charges opérationnelles - D&A
 Marge brute: ${Math.round(getBeneficeTotalActif()).toLocaleString()} FCFA
 Charges Opérationnelles: ${Math.round(chargesTotales).toLocaleString()} FCFA
+D&A mensuel: ${Math.round(getNumericDepreciationAmortissement() / 12).toLocaleString()} FCFA
 EBIT Mensuel: ${Math.round(calculerEBIT()).toLocaleString()} FCFA
 EBIT Annuel: ${Math.round(calculerEBIT() * 12).toLocaleString()} FCFA`}>
             <div className="text-sm text-gray-600">EBIT (annuel):</div>
@@ -3518,10 +4276,11 @@ EBIT Annuel: ${Math.round(calculerEBIT() * 12).toLocaleString()} FCFA`}>
             </div>
             <div className="text-xs text-gray-500">Bénéfice avant intérêts et impôts</div>
           </div>
-          <div className="cursor-help" title={`EBITDA = EBIT + D&A
-EBIT: ${Math.round(calculerEBIT() * 12).toLocaleString()} FCFA
-D&A: ${Math.round(getNumericDepreciationAmortissement()).toLocaleString()} FCFA
-EBITDA: ${Math.round(calculerEBITDA() * 12).toLocaleString()} FCFA`}>
+          <div className="cursor-help" title={`EBITDA = Marge brute - Charges opérationnelles (hors D&A)
+Marge brute: ${Math.round(getBeneficeTotalActif()).toLocaleString()} FCFA
+Charges Opérationnelles: ${Math.round(chargesTotales).toLocaleString()} FCFA
+EBITDA Mensuel: ${Math.round(calculerEBITDA()).toLocaleString()} FCFA
+EBITDA Annuel: ${Math.round(calculerEBITDA() * 12).toLocaleString()} FCFA`}>
             <div className="text-sm text-gray-600">EBITDA (annuel):</div>
             <div className="text-lg sm:text-xl font-bold text-green-600">
               {Math.round(calculerEBITDA() * 12).toLocaleString()}
@@ -3538,9 +4297,9 @@ NOPAT: ${Math.round(calculerNOPAT() * 12).toLocaleString()} FCFA`}>
             </div>
             <div className="text-xs text-gray-500">Résultat net d'exploitation après impôts</div>
           </div>
-          <div className="cursor-help" title={`FCF = (NOPAT mensuel - CAPEX mensuel) × 12
-NOPAT mensuel: ${Math.round(calculerNOPAT()).toLocaleString()} FCFA
-CAPEX mensuel: ${Math.round(getNumericCapex() / 12).toLocaleString()} FCFA
+          <div className="cursor-help" title={`FCF annuel = NOPAT annuel + D&A annuel
+NOPAT annuel: ${Math.round(calculerNOPAT() * 12).toLocaleString()} FCFA
+D&A annuel: ${Math.round(getNumericDepreciationAmortissement()).toLocaleString()} FCFA
 FCF annuel: ${Math.round(calculerFCF()).toLocaleString()} FCFA`}>
             <div className="text-sm text-gray-600">FCF (annuel):</div>
             <div className={`text-lg sm:text-xl font-bold ${
@@ -3559,18 +4318,26 @@ FCF annuel: ${Math.round(calculerFCF()).toLocaleString()} FCFA`}>
             </div>
             <div className="text-xs text-gray-500">Dépréciation & Amortissement</div>
           </div>
-          <div className="cursor-help" title={`ROI = Bénéfice Net / Investissement Initial
+{/* ROI masqué - seul ROIC affiché */}
+          <div className="cursor-help" title={`ROI = EBIT / CAPEX
 ROI Mensuel: ${(calculerROI().mensuel * 100).toFixed(2)}%
 ROI Annuel: ${(calculerROI().annuel * 100).toFixed(2)}%
-Investissement (CAPEX): ${getNumericCapex().toLocaleString()} FCFA
-Bénéfice Net Mensuel: ${Math.round(calculerEBIT()).toLocaleString()} FCFA`}>
-            <div className="text-sm text-gray-600">ROI (annuel):</div>
+CAPEX: ${getNumericCapex().toLocaleString()} FCFA
+EBIT Mensuel: ${Math.round(calculerEBIT()).toLocaleString()} FCFA
+
+ROIC mensuel = NOPAT / (CAPEX + BFR - Trésorerie)
+ROIC annuel = (1 + ROIC mensuel)^12 - 1
+ROIC Mensuel: ${(calculerROIC().mensuel * 100).toFixed(2)}%
+ROIC Annuel: ${(calculerROIC().annuel * 100).toFixed(2)}%
+Capital Investi Net: ${(getNumericCapex() + getNumericBfr() - getNumericTresorerie()).toLocaleString()} FCFA
+NOPAT Mensuel: ${Math.round(calculerNOPAT()).toLocaleString()} FCFA`}>
+            <div className="text-sm text-gray-600">ROIC (annuel):</div>
             <div className={`text-lg sm:text-xl font-bold ${
-              calculerROI().annuel > 0 ? 'text-green-600' : 'text-red-600'
+              calculerROIC().annuel > 0 ? 'text-green-600' : 'text-red-600'
             }`}>
-              {(calculerROI().annuel * 100).toFixed(1)}%
+              {(calculerROIC().annuel * 100).toFixed(1)}%
             </div>
-            <div className="text-xs text-gray-500">Retour sur investissement</div>
+            <div className="text-xs text-gray-500">Retour sur capital investi</div>
           </div>
           <div className="cursor-help" title={`Valeur Terminale = FCF × (1 + g) / (WACC - g)
 FCF: ${Math.round(calculerFCF()).toLocaleString()} FCFA
@@ -3692,10 +4459,12 @@ Comparaison: TRI ${indicateursDCF.triAnnuel > (tauxActualisationAnnuel / 100) ? 
             <thead className="bg-gradient-to-r from-indigo-500 to-indigo-600">
               <tr>
                 <th className="px-2 sm:px-4 py-3 text-left text-xs sm:text-sm font-medium text-white uppercase tracking-wider">Mois</th>
-                <th className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-medium text-white uppercase tracking-wider">Bénéfice Brut</th>
-                {/* Colonne Charges Fixes masquée */}
-                <th className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-medium text-white uppercase tracking-wider">Flux Net</th>
-                <th className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-medium text-white uppercase tracking-wider">Flux Actualisé</th>
+                <th className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-medium text-white uppercase tracking-wider">NOPAT</th>
+                <th className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-medium text-white uppercase tracking-wider">D&A</th>
+                <th className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-medium text-white uppercase tracking-wider">CAPEX</th>
+                <th className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-medium text-white uppercase tracking-wider">ΔBFR</th>
+                <th className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-medium text-white uppercase tracking-wider">FCF</th>
+                <th className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-medium text-white uppercase tracking-wider">FCF Actualisé</th>
                 <th className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-medium text-white uppercase tracking-wider">Cumul Actualisé</th>
               </tr>
             </thead>
@@ -3706,18 +4475,26 @@ Comparaison: TRI ${indicateursDCF.triAnnuel > (tauxActualisationAnnuel / 100) ? 
                     {flux.mois === 0 ? 'Mois 0' : `Mois ${flux.mois}`}
                   </td>
                   <td className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm">
-                    {flux.beneficeBrut.toLocaleString()}
+                    {flux.nopat.toLocaleString()}
                   </td>
-                  {/* Cellule Charges Fixes masquée */}
-                  <td className={`px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-bold ${
-                    flux.fluxNet > 0 ? 'text-green-600' : 'text-red-600'
-                  }`}>
-                    {flux.fluxNet.toLocaleString()}
+                  <td className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm">
+                    {flux.depreciation.toLocaleString()}
+                  </td>
+                  <td className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm text-red-600">
+                    -{flux.capex.toLocaleString()}
+                  </td>
+                  <td className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm text-red-600">
+                    -{flux.deltaBfr.toLocaleString()}
                   </td>
                   <td className={`px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-bold ${
-                    flux.fluxActualise > 0 ? 'text-green-600' : 'text-red-600'
+                    flux.fcf > 0 ? 'text-green-600' : 'text-red-600'
                   }`}>
-                    {flux.fluxActualise.toLocaleString('fr-FR', {minimumFractionDigits: 0, maximumFractionDigits: 0})}
+                    {flux.fcf.toLocaleString()}
+                  </td>
+                  <td className={`px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-bold ${
+                    flux.fcfActualise > 0 ? 'text-green-600' : 'text-red-600'
+                  }`}>
+                    {flux.fcfActualise.toLocaleString('fr-FR', {minimumFractionDigits: 0, maximumFractionDigits: 0})}
                   </td>
                   <td className={`px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-bold ${
                     flux.cumulActualise > 0 ? 'text-green-600' : 'text-red-600'
@@ -3885,9 +4662,10 @@ Comparaison: TRI ${indicateursDCF.triAnnuel > (tauxActualisationAnnuel / 100) ? 
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4 md:p-6 mb-4 sm:mb-6 md:mb-8">
         <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-blue-800">🏦 Calculs Financiers Avancés - Simulation</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-          <div className="cursor-help" title={`EBIT = Marge brute - Charges Opérationnelles
+          <div className="cursor-help" title={`EBIT = Marge brute - Charges opérationnelles - D&A
 Marge brute: ${Math.round(getBeneficeTotalActif()).toLocaleString()} FCFA
 Charges Opérationnelles: ${Math.round(chargesTotales).toLocaleString()} FCFA
+D&A mensuel: ${Math.round(getNumericDepreciationAmortissement() / 12).toLocaleString()} FCFA
 EBIT Mensuel: ${Math.round(calculerEBIT()).toLocaleString()} FCFA
 EBIT Annuel: ${Math.round(calculerEBIT() * 12).toLocaleString()} FCFA`}>
             <div className="text-sm text-gray-600">EBIT (annuel):</div>
@@ -3896,10 +4674,11 @@ EBIT Annuel: ${Math.round(calculerEBIT() * 12).toLocaleString()} FCFA`}>
             </div>
             <div className="text-xs text-gray-500">Bénéfice avant intérêts et impôts</div>
           </div>
-          <div className="cursor-help" title={`EBITDA = EBIT + D&A
-EBIT: ${Math.round(calculerEBIT() * 12).toLocaleString()} FCFA
-D&A: ${Math.round(depreciationAmortissement).toLocaleString()} FCFA
-EBITDA: ${Math.round(calculerEBITDA() * 12).toLocaleString()} FCFA`}>
+          <div className="cursor-help" title={`EBITDA = Marge brute - Charges opérationnelles (hors D&A)
+Marge brute: ${Math.round(getBeneficeTotalActif()).toLocaleString()} FCFA
+Charges Opérationnelles: ${Math.round(chargesTotales).toLocaleString()} FCFA
+EBITDA Mensuel: ${Math.round(calculerEBITDA()).toLocaleString()} FCFA
+EBITDA Annuel: ${Math.round(calculerEBITDA() * 12).toLocaleString()} FCFA`}>
             <div className="text-sm text-gray-600">EBITDA (annuel):</div>
             <div className="text-lg sm:text-xl font-bold text-green-600">
               {Math.round(calculerEBITDA() * 12).toLocaleString()}
@@ -3916,10 +4695,10 @@ NOPAT: ${Math.round(calculerNOPAT() * 12).toLocaleString()} FCFA`}>
             </div>
             <div className="text-xs text-gray-500">Résultat net d'exploitation après impôts</div>
           </div>
-          <div className="cursor-help" title={`FCF = NOPAT - CAPEX
-NOPAT: ${Math.round(calculerNOPAT() * 12).toLocaleString()} FCFA
-CAPEX: ${Math.round(capex).toLocaleString()} FCFA
-FCF: ${Math.round(calculerFCF()).toLocaleString()} FCFA`}>
+          <div className="cursor-help" title={`FCF annuel = NOPAT annuel + D&A annuel (CAPEX et ΔBFR = one-shot t0)
+NOPAT annuel: ${Math.round(calculerNOPAT() * 12).toLocaleString()} FCFA
+D&A annuel: ${Math.round(getNumericDepreciationAmortissement()).toLocaleString()} FCFA
+FCF annuel: ${Math.round(calculerFCF()).toLocaleString()} FCFA`}>
             <div className="text-sm text-gray-600">FCF (annuel):</div>
             <div className={`text-lg sm:text-xl font-bold ${
               calculerFCF() > 0 ? 'text-green-600' : 'text-red-600'
@@ -4057,10 +4836,12 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
             <thead className="bg-gradient-to-r from-purple-500 to-purple-600">
               <tr>
                 <th className="px-2 sm:px-4 py-3 text-left text-xs sm:text-sm font-medium text-white uppercase tracking-wider">Mois</th>
-                <th className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-medium text-white uppercase tracking-wider">Bénéfice Brut</th>
-                {/* Colonne Charges Fixes masquée */}
-                <th className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-medium text-white uppercase tracking-wider">Flux Net</th>
-                <th className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-medium text-white uppercase tracking-wider">Flux Actualisé</th>
+                <th className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-medium text-white uppercase tracking-wider">NOPAT</th>
+                <th className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-medium text-white uppercase tracking-wider">D&A</th>
+                <th className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-medium text-white uppercase tracking-wider">CAPEX</th>
+                <th className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-medium text-white uppercase tracking-wider">ΔBFR</th>
+                <th className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-medium text-white uppercase tracking-wider">FCF</th>
+                <th className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-medium text-white uppercase tracking-wider">FCF Actualisé</th>
                 <th className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-medium text-white uppercase tracking-wider">Cumul Actualisé</th>
               </tr>
             </thead>
@@ -4071,18 +4852,26 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
                     {flux.mois === 0 ? 'Mois 0' : `Mois ${flux.mois}`}
                   </td>
                   <td className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm">
-                    {flux.beneficeBrut.toLocaleString()}
+                    {flux.nopat.toLocaleString()}
                   </td>
-                  {/* Cellule Charges Fixes masquée */}
-                  <td className={`px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-bold ${
-                    flux.fluxNet > 0 ? 'text-green-600' : 'text-red-600'
-                  }`}>
-                    {flux.fluxNet.toLocaleString()}
+                  <td className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm">
+                    {flux.depreciation.toLocaleString()}
+                  </td>
+                  <td className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm text-red-600">
+                    -{flux.capex.toLocaleString()}
+                  </td>
+                  <td className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm text-red-600">
+                    -{flux.deltaBfr.toLocaleString()}
                   </td>
                   <td className={`px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-bold ${
-                    flux.fluxActualise > 0 ? 'text-green-600' : 'text-red-600'
+                    flux.fcf > 0 ? 'text-green-600' : 'text-red-600'
                   }`}>
-                    {flux.fluxActualise.toLocaleString('fr-FR', {minimumFractionDigits: 0, maximumFractionDigits: 0})}
+                    {flux.fcf.toLocaleString()}
+                  </td>
+                  <td className={`px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-bold ${
+                    flux.fcfActualise > 0 ? 'text-green-600' : 'text-red-600'
+                  }`}>
+                    {flux.fcfActualise.toLocaleString('fr-FR', {minimumFractionDigits: 0, maximumFractionDigits: 0})}
                   </td>
                   <td className={`px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-bold ${
                     flux.cumulActualise > 0 ? 'text-green-600' : 'text-red-600'
@@ -4247,7 +5036,11 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
           finalParams: result.finalParams
         });
       } else {
-        const currentBenefit = getBeneficeTotalActif() - chargesTotales;
+        const agregatsActuels = calculerAgregats();
+      const chargesActuelles = getNumericChargesFixes() + getNumericSalaire() + getNumericElectricite() + 
+                              getNumericEau() + getNumericInternet() + getNumericSacsLivraison() + 
+                              getNumericChargesTransport() + getNumericLoyer() + getNumericAutresCharges();
+      const currentBenefit = agregatsActuels.beneficeTotal - chargesActuelles;
         const targetBenefit = parseFloat(solverConstraints.beneficeNet.value) || 0;
         
         let errorMessage = `Aucune solution trouvée.\n\n`;
@@ -4325,77 +5118,88 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
     return params;
   };
 
-  // Calculer le bénéfice net avec des paramètres donnés
+  // Calculer le bénéfice net avec des paramètres donnés (utilise les nouvelles fonctions standardisées)
   const calculateBeneficeNetWithParams = (params) => {
-    console.log(`🧮 CALCUL BÉNÉFICE AVEC PARAMÈTRES:`);
+    console.log(`🧮 CALCUL BÉNÉFICE AVEC PARAMÈTRES (nouvelles formules):`);
     console.log(`   Volume: ${params.volume.toLocaleString()}`);
     console.log(`   Charges: ${params.chargesTotales.toLocaleString()}`);
     console.log(`   Pération: ${(params.peration * 100).toFixed(2)}%`);
     console.log(`   Abats: ${params.gainProduitsNobleFoieYellParKg} FCFA/kg`);
     
-    // Utiliser les répartitions exactes de l'interface principale
-    const repartitionsActuelles = getNumericAdditionalVolume() > 0 ? getAdjustedRepartitions() : produits;
-    console.log(`   📊 Utilisation des répartitions de l'interface principale`);
+    // Créer un contexte temporaire avec les paramètres modifiés
+    const tempContext = {
+      volumeTotal: params.volume,
+      peration: params.peration,
+      gainProduitsNobleFoieYellParKg: params.gainProduitsNobleFoieYellParKg,
+      produits: { ...produits }
+    };
     
-    // Calculer d'abord la marge moyenne des produits éditables avec les nouveaux paramètres
-    let margeMoyenneEditables = 0;
-    let nombreProduitsEditables = 0;
-    
-    Object.entries(produits).forEach(([nom, data]) => {
-      if (data.editable && data.prixAchat && data.prixVente) {
-        let margeTemp;
-        if (data.hasAbats) {
-          margeTemp = ((data.prixVente * (1 - params.peration) + params.gainProduitsNobleFoieYellParKg) / data.prixAchat) - 1;
+    // Appliquer les marges personnalisées si définies
+    if (params.marges) {
+      Object.entries(params.marges).forEach(([nomLower, marge]) => {
+        const nom = Object.keys(produits).find(p => p.toLowerCase() === nomLower);
+        if (nom && produits[nom].editable) {
+          console.log(`   🎯 ${nom}: marge personnalisée = ${(marge * 100).toFixed(2)}%`);
+          // Calculer le nouveau prix de vente basé sur la marge
+          const prixAchat = produits[nom].prixAchat;
+          if (produits[nom].hasAbats) {
+            // Pour les produits à abats : PV = (marge + 1) * PA - abats) / (1 - peration)
+            const prixVenteNouveau = ((marge + 1) * prixAchat - params.gainProduitsNobleFoieYellParKg) / (1 - params.peration);
+            tempContext.produits[nom] = { ...produits[nom], prixVente: prixVenteNouveau };
         } else {
-          margeTemp = (data.prixVente / data.prixAchat) - 1;
+            // Pour les autres : PV = (marge + 1) * PA
+            const prixVenteNouveau = (marge + 1) * prixAchat;
+            tempContext.produits[nom] = { ...produits[nom], prixVente: prixVenteNouveau };
+          }
         }
-        margeMoyenneEditables += margeTemp;
-        nombreProduitsEditables++;
-        console.log(`   📊 ${nom}: marge = ${(margeTemp * 100).toFixed(2)}%`);
-      }
-    });
+      });
+    }
     
-    margeMoyenneEditables = nombreProduitsEditables > 0 ? margeMoyenneEditables / nombreProduitsEditables : 0;
-    console.log(`   📈 Marge moyenne éditables: ${(margeMoyenneEditables * 100).toFixed(2)}%`);
+    // Utiliser calculerAgregats avec le contexte temporaire
+    const volumeOriginal = getNumericVolume() + getNumericAdditionalVolume();
+    const produitsOriginaux = getNumericAdditionalVolume() > 0 ? getAdjustedRepartitions() : produits;
     
-    let beneficeBrut = 0;
+    let beneficeTotal = 0;
     
-    // Calculer le bénéfice brut pour chaque produit avec les répartitions exactes
-    Object.entries(produits).forEach(([nom, data]) => {
-      let marge;
-      const nomLower = nom.toLowerCase();
+    Object.entries(tempContext.produits).forEach(([nom, produitData]) => {
+      const repartition = produitsOriginaux[nom] ? produitsOriginaux[nom].repartition : produitData.repartition;
       
-      // Utiliser la marge personnalisée si définie, sinon calculer selon le type de produit
-      if (params.marges && params.marges[nomLower] !== undefined) {
-        marge = params.marges[nomLower];
-        console.log(`   🎯 ${nom}: marge personnalisée = ${(marge * 100).toFixed(2)}%`);
-      } else if (data.editable && data.prixAchat && data.prixVente) {
-        // Calculer la marge avec les paramètres personnalisés (peration et abatsParKg)
-        if (data.hasAbats) {
-          marge = ((data.prixVente * (1 - params.peration) + params.gainProduitsNobleFoieYellParKg) / data.prixAchat) - 1;
-        } else {
-          marge = (data.prixVente / data.prixAchat) - 1;
-        }
-        console.log(`   ✅ ${nom}: marge calculée = ${(marge * 100).toFixed(2)}%`);
-      } else {
-        // Pour les produits non-éditables, utiliser la marge moyenne
-        marge = margeMoyenneEditables;
-        console.log(`   ➡️ ${nom}: marge moyenne = ${(marge * 100).toFixed(2)}%`);
+      // Calculer les métriques avec les paramètres du solver
+      const CA_p = tempContext.volumeTotal * repartition;
+      
+      // Pour les produits non-éditables (pas de prix), pas de bénéfice
+      if (!produitData.editable || !produitData.prixAchat || !produitData.prixVente) {
+        console.log(`   💰 ${nom}: bénéfice = 0 (produit non-éditable, part: ${(repartition * 100).toFixed(1)}%)`);
+        return;
       }
       
-      // Utiliser la répartition exacte de l'interface principale
-      const repartitionExacte = repartitionsActuelles[nom] ? repartitionsActuelles[nom].repartition : data.repartition;
-      const benefice = calculerBenefice(marge, repartitionExacte, params.volume);
-      beneficeBrut += benefice;
-      console.log(`   💰 ${nom}: bénéfice = ${benefice.toLocaleString()} (part: ${(repartitionExacte * 100).toFixed(1)}%)`);
+      // COGS_p = CA_p * (prixAchat / prixVente)
+      const COGS_p = CA_p * (produitData.prixAchat / produitData.prixVente);
+      
+      // Abats_p = (hasAbats ? (abatsParKg * CA_p / prixVente) : 0)
+      const Abats_p = produitData.hasAbats ? 
+        (tempContext.gainProduitsNobleFoieYellParKg * CA_p / produitData.prixVente) : 0;
+      
+      // Pertes_p = peration * CA_p (uniquement pour les produits à carcasse)
+      const Pertes_p = produitData.hasAbats ? (tempContext.peration * CA_p) : 0;
+      
+      // benefice = max(0, CA_p - COGS_p - Pertes_p + Abats_p)
+      const benefice = Math.max(0, CA_p - COGS_p - Pertes_p + Abats_p);
+      
+      beneficeTotal += benefice;
+      console.log(`   💰 ${nom}: bénéfice = ${benefice.toLocaleString()} (part: ${(repartition * 100).toFixed(1)}%)`);
     });
     
-    const beneficeNet = beneficeBrut - params.chargesTotales;
-    console.log(`   🎯 BÉNÉFICE BRUT: ${beneficeBrut.toLocaleString()} FCFA`);
+    const beneficeNet = beneficeTotal - params.chargesTotales;
+    console.log(`   🎯 BÉNÉFICE BRUT: ${beneficeTotal.toLocaleString()} FCFA`);
     console.log(`   🎯 BÉNÉFICE NET: ${beneficeNet.toLocaleString()} FCFA`);
     
     // Validation avec la simulation principale
-    const currentBenefitUI = getBeneficeTotalActif() - chargesTotales;
+    const agregatsActuels = calculerAgregats();
+    const chargesActuelles = getNumericChargesFixes() + getNumericSalaire() + getNumericElectricite() + 
+                            getNumericEau() + getNumericInternet() + getNumericSacsLivraison() + 
+                            getNumericChargesTransport() + getNumericLoyer() + getNumericAutresCharges();
+    const currentBenefitUI = agregatsActuels.beneficeTotal - chargesActuelles;
     console.log(`🔍 COMPARAISON:`);
     console.log(`   📊 Bénéfice UI actuel: ${currentBenefitUI.toLocaleString()} FCFA`);
     console.log(`   🧮 Bénéfice calculé solveur: ${beneficeNet.toLocaleString()} FCFA`);
@@ -4501,7 +5305,11 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
       console.log(`🎲 Initialisation volume: ${x0.toLocaleString()} (volume actuel)`);
     } else if (solverVariable === 'chargesTotales') {
       // Estimation intelligente : charges actuelles + écart nécessaire
-      const currentBenefit = getBeneficeTotalActif() - chargesTotales;
+      const agregatsActuels = calculerAgregats();
+      const chargesActuelles = getNumericChargesFixes() + getNumericSalaire() + getNumericElectricite() + 
+                              getNumericEau() + getNumericInternet() + getNumericSacsLivraison() + 
+                              getNumericChargesTransport() + getNumericLoyer() + getNumericAutresCharges();
+      const currentBenefit = agregatsActuels.beneficeTotal - chargesActuelles;
       const targetBenefit = parseFloat(solverConstraints.beneficeNet.value) || 0;
       const adjustment = currentBenefit - targetBenefit;
       x0 = chargesTotales + adjustment;
@@ -5027,7 +5835,7 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
                           ))}
                         </div>
                         <p className="text-xs text-green-600 mt-2">
-                          🥩 = Avec abats • † = Calculé (non-éditable)
+                          🥩 = Avec Foie, Yell, Filet • † = Calculé (non-éditable)
                         </p>
                       </div>
                     )}
@@ -5201,11 +6009,13 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
               <div className="text-lg font-bold text-blue-600">240,000,000</div>
               <div className="text-sm text-gray-600">Basé sur l'hypothèse : 20,000,000 × 12 mois</div>
                 </div>
+            {/* Section cachée car incorrecte - utilisait une estimation approximative obsolète
             <div className="bg-white p-3 rounded border">
               <div className="font-medium text-gray-800">Bénéfice Mensuel Approximatif</div>
               <div className="text-lg font-bold text-green-600">~2,000,000</div>
               <div className="text-sm text-gray-600">Basé sur l'hypothèse CA : environ 10% du CA mensuel</div>
               </div>
+            */}
             </div>
           </div>
 
@@ -5225,8 +6035,8 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
             </div>
             <div className="bg-white p-3 rounded border">
               <div className="font-medium text-gray-800">BFR (annuel)</div>
-              <div className="text-lg font-bold text-orange-600">2,500,000</div>
-              <div className="text-sm text-gray-600">1.04% du CA annuel (240M × 1.04%)</div>
+              <div className="text-lg font-bold text-orange-600">250,000</div>
+              <div className="text-sm text-gray-600">One-shot initial (selon nouvelles formules)</div>
             </div>
             <div className="bg-white p-3 rounded border">
               <div className="font-medium text-gray-800">D&A (annuel)</div>
@@ -5289,6 +6099,39 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
           </div>
         </div>
 
+        {/* Nouvelle Marge Moyenne */}
+        <div className="mb-6">
+          <h4 className="text-sm font-semibold text-teal-700 mb-3">📊 Nouvelle Marge Moyenne (ventes)</h4>
+          <div className="space-y-4">
+            <div className="bg-white p-4 rounded border">
+              <div className="font-medium text-gray-800 mb-2">🎯 Qu'est-ce que la Marge Moyenne (ventes) ?</div>
+              <div className="text-sm text-gray-600">
+                La nouvelle marge moyenne calcule directement le bénéfice par FCFA de chiffre d'affaires :
+                <br/><strong>Formule :</strong> Marge = Σ(Bénéfices par produit) ÷ Volume Total
+                <br/>Cette méthode remplace l'ancienne moyenne pondérée des markups.
+              </div>
+            </div>
+            <div className="bg-white p-4 rounded border">
+              <div className="font-medium text-gray-800 mb-2">💡 Pourquoi ce changement ?</div>
+              <div className="text-sm text-gray-600">
+                • <strong>Plus précise :</strong> Calcule directement la rentabilité de chaque FCFA vendu<br/>
+                • <strong>Cohérence DCF :</strong> Compatible avec les calculs financiers (ROI, VAN, TRI)<br/>
+                • <strong>Seuil de rentabilité :</strong> Permet de calculer facilement le CA minimum nécessaire<br/>
+                • <strong>Indicateur de performance :</strong> Montre l'efficacité commerciale réelle
+              </div>
+            </div>
+            <div className="bg-white p-4 rounded border">
+              <div className="font-medium text-gray-800 mb-2">🔍 Comment ça marche ?</div>
+              <div className="text-sm text-gray-600">
+                1. <strong>Calcul par produit :</strong> Bénéfice = CA - COGS (avec ajustements abats/pération)<br/>
+                2. <strong>Somme totale :</strong> Addition de tous les bénéfices produits<br/>
+                3. <strong>Division :</strong> Bénéfice total ÷ Volume total = Marge sur ventes<br/>
+                4. <strong>Utilisation :</strong> Seuil = Charges ÷ Marge moyenne (ventes)
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Indicateurs financiers */}
         <div className="mb-6">
           <h4 className="text-sm font-semibold text-teal-700 mb-3">📈 Indicateurs Financiers</h4>
@@ -5318,8 +6161,8 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
             <div className="bg-white p-4 rounded border">
               <div className="font-medium text-gray-800 mb-2">💵 FCF (Free Cash Flow)</div>
               <div className="text-sm text-gray-600">
-                Flux de trésorerie disponible. Il représente les liquidités générées par l'activité après 
-                déduction des investissements nécessaires : FCF = NOPAT + D&A - CAPEX - ΔBFR.
+                Flux de trésorerie disponible. Dans ce modèle : FCF = NOPAT + D&A mensuel.
+                <br/>CAPEX et ΔBFR sont des investissements one-shot initiaux (t=0) uniquement.
               </div>
             </div>
             <div className="bg-white p-4 rounded border">
@@ -5554,6 +6397,353 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
     </>
   );
 
+  const renderFormulesContent = () => (
+    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 sm:p-4 md:p-6 mb-4 sm:mb-6 md:mb-8">
+      <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-yellow-800">🧮 Éditeur de Formules Personnalisées</h3>
+      
+      <div className="mb-6 p-4 bg-yellow-100 rounded-lg">
+        <h4 className="font-semibold text-yellow-800 mb-2">📝 Instructions</h4>
+        <div className="text-sm text-yellow-700">
+          <p className="mb-2">Vous pouvez personnaliser les formules de calcul utilisées dans l'application. Variables disponibles :</p>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs font-mono bg-white p-2 rounded">
+            <span>• beneficeTotal</span>
+            <span>• chargesMensuelles</span>
+            <span>• chargesTotales</span>
+            <span>• daMensuel</span>
+            <span>• tauxImposition</span>
+            <span>• capex</span>
+            <span>• bfr</span>
+            <span>• tresorerie</span>
+            <span>• ebitda</span>
+            <span>• ebit</span>
+            <span>• nopat</span>
+            <span>• fcfMensuel</span>
+            <span>• roicMensuel</span>
+          </div>
+          <p className="mt-2 text-xs">Utilisez la syntaxe JavaScript (ex: Math.pow, +, -, *, /, parenthèses)</p>
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        {Object.entries(formulesPersonnalisees).map(([nom, formule]) => (
+          <div key={nom} className="bg-white p-4 rounded-lg border border-yellow-200">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              {nom.toUpperCase()} :
+            </label>
+            
+            {/* Zone d'édition avec dropdown de variables */}
+            <div className="relative">
+              <textarea
+                id={`formula-${nom}`}
+                value={formule}
+                onChange={(e) => setFormulesPersonnalisees(prev => ({
+                  ...prev,
+                  [nom]: e.target.value
+                }))}
+                className="w-full p-3 border border-gray-300 rounded-lg text-sm font-mono"
+                style={{ fontSize: '14px' }}
+                rows="3"
+                placeholder={`Cliquez sur les boutons ci-dessous pour construire votre formule`}
+              />
+              
+              {/* Dropdown pour insérer des variables */}
+              <div className="mt-2">
+                <div className="mb-2">
+                  <span className="text-xs font-medium text-gray-700 mr-2">📊 Variables Financières:</span>
+                </div>
+                <div className="flex flex-wrap gap-1 mb-3">
+                  {[
+                    { variable: 'beneficeTotal', label: 'Bénéfice Total', color: 'bg-blue-100 text-blue-700 hover:bg-blue-200' },
+                    { variable: 'chargesMensuelles', label: 'Charges Mensuelles', color: 'bg-red-100 text-red-700 hover:bg-red-200' },
+                    { variable: 'chargesTotales', label: 'Charges Totales', color: 'bg-red-100 text-red-700 hover:bg-red-200' },
+                    { variable: 'daMensuel', label: 'D&A Mensuel', color: 'bg-orange-100 text-orange-700 hover:bg-orange-200' },
+                    { variable: 'tauxImposition', label: 'Taux Imposition', color: 'bg-purple-100 text-purple-700 hover:bg-purple-200' },
+                    { variable: 'capex', label: 'CAPEX', color: 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200' },
+                    { variable: 'bfr', label: 'BFR', color: 'bg-teal-100 text-teal-700 hover:bg-teal-200' },
+                    { variable: 'tresorerie', label: 'Trésorerie', color: 'bg-green-100 text-green-700 hover:bg-green-200' }
+                  ].map(({ variable, label, color }) => (
+                    <button
+                      key={variable}
+                      onClick={() => {
+                        const textarea = document.getElementById(`formula-${nom}`);
+                        const start = textarea.selectionStart;
+                        const end = textarea.selectionEnd;
+                        const currentValue = formule;
+                        const newValue = currentValue.substring(0, start) + variable + currentValue.substring(end);
+                        
+                        setFormulesPersonnalisees(prev => ({
+                          ...prev,
+                          [nom]: newValue
+                        }));
+                        
+                        // Remettre le focus et positionner le curseur
+                        setTimeout(() => {
+                          textarea.focus();
+                          textarea.setSelectionRange(start + variable.length, start + variable.length);
+                        }, 0);
+                      }}
+                      className={`px-2 py-1 text-xs rounded transition-colors ${color}`}
+                      title={`Insérer ${label}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                
+                {/* Variables calculées */}
+                <div className="mb-2">
+                  <span className="text-xs font-medium text-gray-700 mr-2">🧮 Variables Calculées:</span>
+                </div>
+                <div className="flex flex-wrap gap-1 mb-3">
+                  {[
+                    { variable: 'ebitda', label: 'EBITDA', color: 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200' },
+                    { variable: 'ebit', label: 'EBIT', color: 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200' },
+                    { variable: 'nopat', label: 'NOPAT', color: 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200' },
+                    { variable: 'fcfMensuel', label: 'FCF Mensuel', color: 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200' },
+                    { variable: 'roicMensuel', label: 'ROIC Mensuel', color: 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200' },
+                    { variable: 'vanFluxOperationnels', label: 'VAN Flux Op.', color: 'bg-purple-100 text-purple-700 hover:bg-purple-200' },
+                    { variable: 'vanValeurTerminale', label: 'VAN Val. Term.', color: 'bg-purple-100 text-purple-700 hover:bg-purple-200' },
+                    { variable: 'investissementInitial', label: 'Invest. Initial', color: 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200' },
+                    { variable: 'valeurTerminale', label: 'Val. Terminale', color: 'bg-pink-100 text-pink-700 hover:bg-pink-200' },
+                    { variable: 'tauxActualisation', label: 'Taux Actua.', color: 'bg-gray-100 text-gray-700 hover:bg-gray-200' },
+                    { variable: 'dureeAnalyse', label: 'Durée Analyse', color: 'bg-gray-100 text-gray-700 hover:bg-gray-200' }
+                  ].map(({ variable, label, color }) => (
+                    <button
+                      key={variable}
+                      onClick={() => {
+                        const textarea = document.getElementById(`formula-${nom}`);
+                        const start = textarea.selectionStart;
+                        const end = textarea.selectionEnd;
+                        const currentValue = formule;
+                        const newValue = currentValue.substring(0, start) + variable + currentValue.substring(end);
+                        
+                        setFormulesPersonnalisees(prev => ({
+                          ...prev,
+                          [nom]: newValue
+                        }));
+                        
+                        setTimeout(() => {
+                          textarea.focus();
+                          textarea.setSelectionRange(start + variable.length, start + variable.length);
+                        }, 0);
+                      }}
+                      className={`px-2 py-1 text-xs rounded transition-colors ${color}`}
+                      title={`Insérer ${label}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                
+                {/* Opérateurs */}
+                <div className="mb-2">
+                  <span className="text-xs font-medium text-gray-700 mr-2">⚡ Opérateurs:</span>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {[
+                    { op: ' + ', label: '+', color: 'bg-gray-100 text-gray-700 hover:bg-gray-200' },
+                    { op: ' - ', label: '−', color: 'bg-gray-100 text-gray-700 hover:bg-gray-200' },
+                    { op: ' * ', label: '×', color: 'bg-gray-100 text-gray-700 hover:bg-gray-200' },
+                    { op: ' / ', label: '÷', color: 'bg-gray-100 text-gray-700 hover:bg-gray-200' },
+                    { op: '(', label: '(', color: 'bg-gray-100 text-gray-700 hover:bg-gray-200' },
+                    { op: ')', label: ')', color: 'bg-gray-100 text-gray-700 hover:bg-gray-200' },
+                    { op: 'Math.pow(', label: 'Puissance', color: 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' },
+                    { op: 'Math.sqrt(', label: 'Racine', color: 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' },
+                    { op: 'Math.abs(', label: 'Absolue', color: 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' }
+                  ].map(({ op, label, color }) => (
+                    <button
+                      key={op}
+                      onClick={() => {
+                        const textarea = document.getElementById(`formula-${nom}`);
+                        const start = textarea.selectionStart;
+                        const end = textarea.selectionEnd;
+                        const currentValue = formule;
+                        const newValue = currentValue.substring(0, start) + op + currentValue.substring(end);
+                        
+                        setFormulesPersonnalisees(prev => ({
+                          ...prev,
+                          [nom]: newValue
+                        }));
+                        
+                        setTimeout(() => {
+                          textarea.focus();
+                          textarea.setSelectionRange(start + op.length, start + op.length);
+                        }, 0);
+                      }}
+                      className={`px-2 py-1 text-xs rounded transition-colors ${color}`}
+                      title={`Insérer ${label}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                
+                {/* Boutons d'action rapide */}
+                <div className="mt-3 flex gap-2">
+                  <button
+                    onClick={() => setFormulesPersonnalisees(prev => ({
+                      ...prev,
+                      [nom]: ''
+                    }))}
+                    className="px-3 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
+                  >
+                    🗑️ Effacer
+                  </button>
+                  <button
+                    onClick={() => {
+                      const defaultFormulas = {
+                        ebitda: 'beneficeTotal - chargesMensuelles',
+                        ebit: 'ebitda - daMensuel',
+                        nopat: 'ebit * (1 - tauxImposition / 100)',
+                        fcfMensuel: 'nopat + daMensuel',
+                        fcfAnnuel: 'fcfMensuel * 12',
+                        roicMensuel: 'nopat / (capex + bfr - tresorerie)',
+                        roicAnnuel: 'Math.pow(1 + roicMensuel, 12) - 1',
+                        beneficeNetMensuel: 'beneficeTotal - chargesTotales',
+                        vanFluxOperationnels: '0', // Sera calculé avec boucle DCF
+                        vanValeurTerminale: 'valeurTerminale / Math.pow(1 + tauxActualisation, dureeAnalyse)',
+                        investissementInitial: 'capex + bfr',
+                        van: 'vanFluxOperationnels + vanValeurTerminale - investissementInitial'
+                      };
+                      setFormulesPersonnalisees(prev => ({
+                        ...prev,
+                        [nom]: defaultFormulas[nom] || ''
+                      }));
+                    }}
+                    className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
+                  >
+                    🔄 Défaut
+                  </button>
+                </div>
+              </div>
+            </div>
+            
+            <div className="mt-3 text-xs text-gray-500 bg-gray-50 p-2 rounded">
+              <strong>Exemple:</strong> {nom === 'ebitda' ? 'beneficeTotal - chargesMensuelles' : 
+                       nom === 'ebit' ? 'ebitda - daMensuel' :
+                       nom === 'nopat' ? 'ebit * (1 - tauxImposition / 100)' :
+                       nom === 'fcfMensuel' ? 'nopat + daMensuel' :
+                       nom === 'fcfAnnuel' ? 'fcfMensuel * 12' :
+                       nom === 'roicMensuel' ? 'nopat / (capex + bfr - tresorerie)' :
+                       nom === 'roicAnnuel' ? 'Math.pow(1 + roicMensuel, 12) - 1' :
+                       nom === 'beneficeNetMensuel' ? 'beneficeTotal - chargesTotales' :
+                       nom === 'vanFluxOperationnels' ? '0 (calculé avec boucle DCF)' :
+                       nom === 'vanValeurTerminale' ? 'valeurTerminale / Math.pow(1 + tauxActualisation, dureeAnalyse)' :
+                       nom === 'investissementInitial' ? 'capex + bfr' :
+                       nom === 'van' ? 'vanFluxOperationnels + vanValeurTerminale - investissementInitial' :
+                       'Formule personnalisée'}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-6 flex flex-wrap gap-3">
+        <button
+          onClick={sauvegarderFormules}
+          className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-medium"
+        >
+          💾 Sauvegarder dans Cookie
+        </button>
+        <button
+          onClick={chargerFormules}
+          className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
+        >
+          📂 Charger depuis Cookie
+        </button>
+        <button
+          onClick={reinitialiserFormules}
+          className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors font-medium"
+        >
+          🔄 Réinitialiser par Défaut
+        </button>
+        <button
+          onClick={() => {
+            if (!formulesPersonnalisees.van) {
+              setFormulesPersonnalisees(prev => ({
+                ...prev,
+                van: 'vanFluxOperationnels + vanValeurTerminale - investissementInitial'
+              }));
+              alert('✅ Formule VAN ajoutée !');
+            } else {
+              alert('ℹ️ La formule VAN existe déjà.');
+            }
+          }}
+          className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors font-medium"
+        >
+          ➕ Ajouter VAN
+        </button>
+        <button
+          onClick={() => {
+            // Test des formules avec les variables actuelles
+            const variables = {
+              beneficeTotal: getBeneficeTotalActif(),
+              chargesMensuelles: chargesMensuelles,
+              chargesTotales: chargesTotales,
+              daMensuel: getNumericDepreciationAmortissement() / 12,
+              tauxImposition: getNumericTauxImposition(),
+              capex: getNumericCapex(),
+              bfr: getNumericBfr(),
+              tresorerie: getNumericTresorerie(),
+              ebitda: 0, // Sera calculé dynamiquement
+              ebit: 0,
+              nopat: 0,
+              fcfMensuel: 0,
+              roicMensuel: 0,
+              // Variables DCF pour la VAN
+              vanFluxOperationnels: 10000000, // Exemple 
+              vanValeurTerminale: 5000000, // Exemple
+              investissementInitial: getNumericCapex() + getNumericBfr(),
+              valeurTerminale: 15000000,
+              tauxActualisation: 0.01,
+              croissanceTerminale: 0.0025,
+              dureeAnalyse: getNumericDureeAnalyse()
+            };
+            
+            // Calcul séquentiel des formules
+            try {
+              variables.ebitda = evaluerFormule(formulesPersonnalisees.ebitda, variables);
+              variables.ebit = evaluerFormule(formulesPersonnalisees.ebit, variables);
+              variables.nopat = evaluerFormule(formulesPersonnalisees.nopat, variables);
+              variables.fcfMensuel = evaluerFormule(formulesPersonnalisees.fcfMensuel, variables);
+              variables.roicMensuel = evaluerFormule(formulesPersonnalisees.roicMensuel, variables);
+              
+              const resultats = {
+                ebitda: variables.ebitda,
+                ebit: variables.ebit,
+                nopat: variables.nopat,
+                fcfMensuel: variables.fcfMensuel,
+                fcfAnnuel: evaluerFormule(formulesPersonnalisees.fcfAnnuel, variables),
+                roicMensuel: variables.roicMensuel,
+                roicAnnuel: evaluerFormule(formulesPersonnalisees.roicAnnuel, variables),
+                beneficeNetMensuel: evaluerFormule(formulesPersonnalisees.beneficeNetMensuel, variables),
+                vanFluxOperationnels: evaluerFormule(formulesPersonnalisees.vanFluxOperationnels || '0', variables),
+                vanValeurTerminale: evaluerFormule(formulesPersonnalisees.vanValeurTerminale, variables),
+                investissementInitial: evaluerFormule(formulesPersonnalisees.investissementInitial, variables),
+                van: evaluerFormule(formulesPersonnalisees.van, variables)
+              };
+              
+              alert(`Test des formules réussi !\n\n${Object.entries(resultats).map(([k, v]) => `${k}: ${v?.toLocaleString() || 'Erreur'}`).join('\n')}`);
+            } catch (error) {
+              alert(`Erreur dans les formules: ${error.message}`);
+            }
+          }}
+          className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors font-medium"
+        >
+          🧪 Tester les Formules
+        </button>
+      </div>
+
+      <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+        <h4 className="font-semibold text-blue-800 mb-2">ℹ️ Note Importante</h4>
+        <p className="text-sm text-blue-700">
+          Les formules personnalisées remplacent les calculs par défaut de l'application. 
+          Assurez-vous que vos formules sont correctes avant de les utiliser pour des décisions importantes.
+          Les formules sont sauvegardées localement dans votre navigateur.
+        </p>
+      </div>
+    </div>
+  );
+
   return (
     <div className="p-2 sm:p-4 md:p-6 bg-gray-50 min-h-screen">
       <div ref={mainContainerRef} className="max-w-7xl mx-auto bg-white rounded-lg shadow-lg p-4 sm:p-6 md:p-8">
@@ -5642,6 +6832,16 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
              🎯 Solveur
            </button>
            <button
+             onClick={() => setActiveTab('formules')}
+             className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+               activeTab === 'formules'
+                 ? 'bg-yellow-500 text-white'
+                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+             }`}
+           >
+             🧮 Formules
+           </button>
+           <button
              onClick={() => setActiveTab('faq')}
              className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
                activeTab === 'faq'
@@ -5660,6 +6860,7 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
          {activeTab === 'dcf' && renderDCFContent()}
          {activeTab === 'dcfSimulation' && renderDCFSimulationContent()}
          {activeTab === 'solver' && renderSolverContent()}
+         {activeTab === 'formules' && renderFormulesContent()}
          {activeTab === 'faq' && renderFAQContent()}
 
         {/* Graphiques */}
@@ -5763,119 +6964,33 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
               <LineChart data={(() => {
                 const data = [];
                 
-                // DEBUG: Calculer le bénéfice de base avec les prix ACTUELS (pas originaux)
-                let baseBeneficeOriginal = 0;
-                Object.entries(produits).map(([nom, data]) => {
-                  let margeBrute;
-                  if (data.editable && data.prixAchat && data.prixVente) {
-                    margeBrute = calculerMargeBrute(data);
-                  } else {
-                    margeBrute = margeMoyenne;
-                  }
-                  const benefice = calculerBenefice(margeBrute, data.repartition, getNumericVolume());
-                  baseBeneficeOriginal += benefice;
-                  return { nom, ...data, margeBrute, benefice };
-                                });
+                // Utiliser la même formule que l'interface : bénéfice net mensuel = getBeneficeTotalActif() - chargesTotales
+                const beneficeNetBase = getBeneficeTotalActif() - chargesTotales;
                 
-                // Calculer le bénéfice net de base en soustrayant les charges totales
-                const baseBeneficeNet = baseBeneficeOriginal - chargesTotales;
+                console.log(`💰 BASE GRAPHIQUE - Bénéfice Net: ${(beneficeNetBase || 0).toLocaleString()} FCFA`);
                 
-                data.push({ variation: 'Base', benefice: baseBeneficeNet });
+                data.push({ variation: 'Base', benefice: beneficeNetBase || 0 });
                 
-                // Simuler chaque variation comme si on faisait un vrai bump
+                                // Utiliser directement notre fonction corrigée pour la cohérence
                 [50, 100, 150, 200].forEach(variation => {
                   console.log(`🎯 GRAPHIQUE SENSIBILITÉ - Variation +${variation}`);
                   console.log(`📊 Produit cible: ${selectedProductForPricing}`);
                   
-                  // Simuler le bump: partir des prix ACTUELS et appliquer la variation
-                  const tempProduits = JSON.parse(JSON.stringify(produits));
-                  console.log('📊 Prix AVANT variation (graphique):');
-                  Object.keys(tempProduits).forEach(nom => {
-                    if (tempProduits[nom].editable && tempProduits[nom].prixVente) {
-                      console.log(`   ${nom}: ${tempProduits[nom].prixVente}`);
-                    }
-                  });
+                  // Utiliser la fonction corrigée calculerBeneficeAvecVariationPrixCorrige
+                  const beneficeTotal = calculerBeneficeAvecVariationPrixCorrige('prixVente', variation) || 0;
+                  // Calculer directement les charges mensuelles au lieu d'utiliser calculerChargesEtResultats
+                  const chargesMensuelles = getNumericSalaire() + getNumericElectricite() + getNumericEau() + 
+                                           getNumericInternet() + getNumericSacsLivraison() + getNumericChargesTransport() + 
+                                           getNumericLoyer() + getNumericAutresCharges();
+                  const beneficeNet = (beneficeTotal || 0) - chargesMensuelles;
                   
-                  Object.keys(tempProduits).forEach(nom => {
-                    if (tempProduits[nom].editable && tempProduits[nom].prixVente) {
-                      if (selectedProductForPricing === 'Tous' || nom === selectedProductForPricing) {
-                        const ancienPrix = tempProduits[nom].prixVente;
-                        tempProduits[nom].prixVente = tempProduits[nom].prixVente + variation;
-                        console.log(`✅ ${nom}: ${ancienPrix} → ${tempProduits[nom].prixVente} (+${variation})`);
-                      }
-                    }
-                  });
-                  
-                  // Calculer la moyenne pondérée exactement comme calculerMargeMoyenne()
-                  let margePonderee = 0;
-                  
-                  // Étape 1: Calculer la marge moyenne des produits éditables
-                  let margeMoyenneEditables = 0;
-                  let nombreProduitsEditables = 0;
-                  
-                  Object.entries(tempProduits).forEach(([nom, data]) => {
-                    if (data.editable && data.prixAchat && data.prixVente) {
-                      let marge;
-                    if (data.hasAbats) {
-                        marge = ((data.prixVente * (1 - getNumericPeration()) + getNumericGainProduitsNobleFoieYellParKg()) / data.prixAchat) - 1;
-                    } else {
-                        marge = (data.prixVente / data.prixAchat) - 1;
-                      }
-                      margeMoyenneEditables += marge;
-                      nombreProduitsEditables++;
-                    }
-                  });
-                  
-                  margeMoyenneEditables = nombreProduitsEditables > 0 ? margeMoyenneEditables / nombreProduitsEditables : 0;
-
-                  // Étape 2: Calculer la moyenne pondérée de TOUS les produits
-                  Object.entries(tempProduits).forEach(([nom, data]) => {
-                    let marge;
-                    
-                    if (data.editable && data.prixAchat && data.prixVente) {
-                      if (data.hasAbats) {
-                        marge = ((data.prixVente * (1 - getNumericPeration()) + getNumericGainProduitsNobleFoieYellParKg()) / data.prixAchat) - 1;
-                      } else {
-                        marge = (data.prixVente / data.prixAchat) - 1;
-                      }
-                    } else {
-                      // Pour les produits non éditables, utiliser la marge moyenne des éditables
-                      marge = margeMoyenneEditables;
-                    }
-                    
-                    // Pondérer par la répartition du produit
-                    margePonderee += marge * data.repartition;
-                  });
-                  
-                  // Le résultat final EST la moyenne pondérée (pas de division supplémentaire)
-                  const margeMoyenneApresVump = margePonderee;
-                  
-                  // Calculer le bénéfice avec la moyenne pondérée correcte
-                  let beneficeTotal = 0;
-                  Object.entries(tempProduits).map(([nom, data]) => {
-                    let margeBrute;
-                    if (data.editable && data.prixAchat && data.prixVente) {
-                      margeBrute = calculerMargeBrute(data);
-                    } else {
-                      // Utiliser la marge moyenne des éditables pour les non-éditables
-                      margeBrute = margeMoyenneEditables;
-                    }
-                    
-                    const benefice = calculerBenefice(margeBrute, data.repartition, getNumericVolume());
-                    beneficeTotal += benefice;
-                    
-                    return { nom, ...data, margeBrute, benefice };
-                  });
-                  
-                  // Calculer le bénéfice net en soustrayant les charges totales
-                  const beneficeNet = beneficeTotal - chargesTotales;
-                  
-                  console.log(`💰 BÉNÉFICE TOTAL GRAPHIQUE (+${variation}): ${beneficeTotal.toLocaleString()} FCFA`);
-                  console.log(`💰 BÉNÉFICE NET GRAPHIQUE (+${variation}): ${beneficeNet.toLocaleString()} FCFA`);
-                  console.log(`💸 CHARGES TOTALES: ${chargesTotales.toLocaleString()} FCFA`);
+                  console.log(`💰 BÉNÉFICE TOTAL GRAPHIQUE (+${variation}): ${(beneficeTotal || 0).toLocaleString()} FCFA`);
+                  console.log(`💰 BÉNÉFICE NET GRAPHIQUE (+${variation}): ${(beneficeNet || 0).toLocaleString()} FCFA`);
+                  console.log(`💸 CHARGES MENSUELLES: ${chargesMensuelles.toLocaleString()} FCFA`);
+                  console.log(`⚠️ VÉRIFICATION: beneficeTotal=${beneficeTotal}, chargesMensuelles=${chargesMensuelles}, beneficeNet=${beneficeNet}`);
                   console.log(`🎯 GRAPHIQUE SENSIBILITÉ - Variation +${variation} - FIN`);
                   
-                  data.push({ variation: `+${variation}`, benefice: beneficeNet });
+                  data.push({ variation: `+${variation}`, benefice: beneficeNet || 0 });
                 });
                 
                 return data;
@@ -5898,7 +7013,7 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
               </LineChart>
             </ResponsiveContainer>
             <div className="mt-2 text-xs text-gray-600 text-center">
-              Impact sur le bénéfice total en modifiant le prix de vente {selectedProductForPricing === 'Tous' ? 'de tous les produits' : `du ${selectedProductForPricing.toLowerCase()}`}
+              Impact sur le bénéfice net en modifiant le prix de vente {selectedProductForPricing === 'Tous' ? 'de tous les produits' : `du ${selectedProductForPricing.toLowerCase()}`}
             </div>
           </div>
 
@@ -5911,119 +7026,32 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
               <LineChart data={(() => {
                 const data = [];
                 
-                // DEBUG: Calculer le bénéfice de base avec les prix ACTUELS (pas originaux)
-                let baseBeneficeOriginal = 0;
-                Object.entries(produits).map(([nom, data]) => {
-                  let margeBrute;
-                  if (data.editable && data.prixAchat && data.prixVente) {
-                    margeBrute = calculerMargeBrute(data);
-                  } else {
-                    margeBrute = margeMoyenne;
-                  }
-                  const benefice = calculerBenefice(margeBrute, data.repartition, getNumericVolume());
-                  baseBeneficeOriginal += benefice;
-                  return { nom, ...data, margeBrute, benefice };
-                });
+                // Utiliser la même formule que l'interface : bénéfice net mensuel = getBeneficeTotalActif() - chargesTotales
+                const beneficeNetBase = getBeneficeTotalActif() - chargesTotales;
                 
-                // Calculer le bénéfice net de base en soustrayant les charges totales
-                const baseBeneficeNet = baseBeneficeOriginal - chargesTotales;
+                console.log(`💰 BASE GRAPHIQUE - Bénéfice Net: ${(beneficeNetBase || 0).toLocaleString()} FCFA`);
                 
-                data.push({ variation: 'Base', benefice: baseBeneficeNet });
+                data.push({ variation: 'Base', benefice: beneficeNetBase || 0 });
                 
-                // Simuler chaque variation comme si on faisait un vrai bump
+                // Utiliser directement notre fonction corrigée pour la cohérence
                 [-50, -100, -150, -200].forEach(variation => {
                   console.log(`🎯 GRAPHIQUE SENSIBILITÉ PRIX ACHAT - Variation ${variation}`);
                   console.log(`📊 Produit cible: ${selectedProductForPricing}`);
                   
-                  // Simuler le bump: partir des prix ACTUELS et appliquer la variation
-                  const tempProduits = JSON.parse(JSON.stringify(produits));
-                  console.log('📊 Prix AVANT variation (graphique):');
-                  Object.keys(tempProduits).forEach(nom => {
-                    if (tempProduits[nom].editable && tempProduits[nom].prixAchat) {
-                      console.log(`   ${nom}: ${tempProduits[nom].prixAchat}`);
-                    }
-                  });
+                  // Utiliser la fonction corrigée calculerBeneficeAvecVariationPrixCorrige
+                  const beneficeTotal = calculerBeneficeAvecVariationPrixCorrige('prixAchat', variation) || 0;
+                  // Calculer directement les charges mensuelles
+                  const chargesMensuelles = getNumericSalaire() + getNumericElectricite() + getNumericEau() + 
+                                           getNumericInternet() + getNumericSacsLivraison() + getNumericChargesTransport() + 
+                                           getNumericLoyer() + getNumericAutresCharges();
+                  const beneficeNet = (beneficeTotal || 0) - chargesMensuelles;
                   
-                  Object.keys(tempProduits).forEach(nom => {
-                    if (tempProduits[nom].editable && tempProduits[nom].prixAchat) {
-                      if (selectedProductForPricing === 'Tous' || nom === selectedProductForPricing) {
-                        const ancienPrix = tempProduits[nom].prixAchat;
-                        tempProduits[nom].prixAchat = tempProduits[nom].prixAchat + variation;
-                        console.log(`✅ ${nom}: ${ancienPrix} → ${tempProduits[nom].prixAchat} (${variation})`);
-                      }
-                    }
-                  });
-                  
-                  // Calculer la moyenne pondérée exactement comme calculerMargeMoyenne()
-                  let margePonderee = 0;
-                  
-                  // Étape 1: Calculer la marge moyenne des produits éditables
-                  let margeMoyenneEditables = 0;
-                  let nombreProduitsEditables = 0;
-                  
-                  Object.entries(tempProduits).forEach(([nom, data]) => {
-                    if (data.editable && data.prixAchat && data.prixVente) {
-                      let marge;
-                    if (data.hasAbats) {
-                        marge = ((data.prixVente * (1 - getNumericPeration()) + getNumericGainProduitsNobleFoieYellParKg()) / data.prixAchat) - 1;
-                    } else {
-                        marge = (data.prixVente / data.prixAchat) - 1;
-                      }
-                      margeMoyenneEditables += marge;
-                      nombreProduitsEditables++;
-                    }
-                  });
-                  
-                  margeMoyenneEditables = nombreProduitsEditables > 0 ? margeMoyenneEditables / nombreProduitsEditables : 0;
-
-                  // Étape 2: Calculer la moyenne pondérée de TOUS les produits
-                  Object.entries(tempProduits).forEach(([nom, data]) => {
-                    let marge;
-                    
-                    if (data.editable && data.prixAchat && data.prixVente) {
-                      if (data.hasAbats) {
-                        marge = ((data.prixVente * (1 - getNumericPeration()) + getNumericGainProduitsNobleFoieYellParKg()) / data.prixAchat) - 1;
-                      } else {
-                        marge = (data.prixVente / data.prixAchat) - 1;
-                      }
-                    } else {
-                      // Pour les produits non éditables, utiliser la marge moyenne des éditables
-                      marge = margeMoyenneEditables;
-                    }
-                    
-                    // Pondérer par la répartition du produit
-                    margePonderee += marge * data.repartition;
-                  });
-                  
-                  // Le résultat final EST la moyenne pondérée (pas de division supplémentaire)
-                  const margeMoyenneApresVump = margePonderee;
-                  
-                  // Calculer le bénéfice avec la moyenne pondérée correcte
-                  let beneficeTotal = 0;
-                  Object.entries(tempProduits).map(([nom, data]) => {
-                    let margeBrute;
-                    if (data.editable && data.prixAchat && data.prixVente) {
-                      margeBrute = calculerMargeBrute(data);
-                    } else {
-                      // Utiliser la marge moyenne des éditables pour les non-éditables
-                      margeBrute = margeMoyenneEditables;
-                    }
-                    
-                    const benefice = calculerBenefice(margeBrute, data.repartition, getNumericVolume());
-                    beneficeTotal += benefice;
-                    
-                    return { nom, ...data, margeBrute, benefice };
-                  });
-                  
-                  // Calculer le bénéfice net en soustrayant les charges totales
-                  const beneficeNet = beneficeTotal - chargesTotales;
-                  
-                  console.log(`💰 BÉNÉFICE TOTAL GRAPHIQUE (${variation}): ${beneficeTotal.toLocaleString()} FCFA`);
-                  console.log(`💰 BÉNÉFICE NET GRAPHIQUE (${variation}): ${beneficeNet.toLocaleString()} FCFA`);
-                  console.log(`💸 CHARGES TOTALES: ${chargesTotales.toLocaleString()} FCFA`);
+                  console.log(`💰 BÉNÉFICE TOTAL GRAPHIQUE (${variation}): ${(beneficeTotal || 0).toLocaleString()} FCFA`);
+                  console.log(`💰 BÉNÉFICE NET GRAPHIQUE (${variation}): ${(beneficeNet || 0).toLocaleString()} FCFA`);
+                  console.log(`💸 CHARGES MENSUELLES: ${chargesMensuelles.toLocaleString()} FCFA`);
                   console.log(`🎯 GRAPHIQUE SENSIBILITÉ PRIX ACHAT - Variation ${variation} - FIN`);
                   
-                  data.push({ variation: `${variation}`, benefice: beneficeNet });
+                  data.push({ variation: `${variation}`, benefice: beneficeNet || 0 });
                 });
                 
                 return data;
@@ -6046,7 +7074,7 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
               </LineChart>
             </ResponsiveContainer>
             <div className="mt-2 text-xs text-gray-600 text-center">
-              Impact sur le bénéfice total en modifiant le prix d'achat {selectedProductForPricing === 'Tous' ? 'de tous les produits' : `du ${selectedProductForPricing.toLowerCase()}`}
+              Impact sur le bénéfice net en modifiant le prix d'achat {selectedProductForPricing === 'Tous' ? 'de tous les produits' : `du ${selectedProductForPricing.toLowerCase()}`}
             </div>
           </div>
         </div>
@@ -6075,7 +7103,7 @@ Comparaison: TRI ${indicateursDCFSimulation.triAnnuel > (tauxActualisationAnnuel
                   <tr key={produit.nom} className={index % 2 === 0 ? "bg-gray-50" : "bg-white"}>
                         <td className="px-2 sm:px-4 py-3 text-xs sm:text-sm font-semibold text-gray-800">
                           <div>{produit.nom}</div>
-                      {produit.hasAbats && <div className="text-xs text-blue-600">🥩 Avec abats</div>}
+                      {produit.hasAbats && <div className="text-xs text-blue-600">🥩Avec Foie, Yell, Filet </div>}
                       {!isEditable && <div className="text-xs text-gray-500">(calculé)</div>}
                           {activeTab === 'volume' && produit.nom === selectedProduct && (
                             <div className="text-xs text-purple-600">📈 Volume augmenté</div>
